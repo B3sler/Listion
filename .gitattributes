@@ -1,0 +1,21 @@
+# Normalize line endings to LF in repo; Git will handle platform conversion in working dirs
+* text=auto eol=lf
+
+# Treat these as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.svg text eol=lf
+
+# Lock files should use LF for reliable diffs
+package-lock.json text eol=lf
+
+# Keep shell/batch with native endings if needed
+*.bat eol=crlf
+*.ps1 eol=crlf
+

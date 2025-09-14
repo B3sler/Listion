@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build, Lint, Test (frontend)
@@ -12,9 +16,6 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x, 22.x]
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,34 +25,24 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies (fresh, ignore lock)
-        run: |
-          rm -f package-lock.json
-          rm -rf node_modules
-          npm install
+      - name: Install dependencies (workspace root)
+        run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint (frontend)
+        run: npm run --workspace frontend lint
 
-      - name: Type check
-        run: npm run type-check
+      - name: Type check (frontend)
+        run: npm run --workspace frontend type-check
 
-      - name: Build
-        run: npm run build
+      - name: Build (frontend)
+        run: npm run --workspace frontend build
 
-      - name: Unit tests
-        run: npm run test:unit -- --run
+      - name: Unit tests (frontend)
+        run: npm run --workspace frontend test:unit -- --run
         env:
           CI: true
-
-      - name: Upload production build artifact
-        if: ${{ matrix.node-version == '22.x' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
 
   backend:
     name: Lint, Type-Check, Build, Test (backend)
@@ -59,9 +50,6 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x, 22.x]
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,57 +59,21 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci || (echo "npm ci failed, falling back to fresh install" && rm -f package-lock.json && rm -rf node_modules && npm install)
-          else
-            npm install
-          fi
+      - name: Install dependencies (workspace root)
+        run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint (backend)
+        run: npm run --workspace backend lint
 
-      - name: Type check
-        run: npm run type-check
+      - name: Type check (backend)
+        run: npm run --workspace backend type-check
 
-      - name: Build
-        run: npm run build
+      - name: Build (backend)
+        run: npm run --workspace backend build
 
-      - name: Unit tests
-        run: npm test -- --runInBand
+      - name: Unit tests (backend)
+        run: npm run --workspace backend test -- --runInBand
         env:
           CI: true
-
-  deploy:
-    name: Deploy to GitHub Pages (frontend)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build, backend]
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
-
-      - name: Add SPA fallback (404.html)
-        run: |
-          cp dist/index.html dist/404.html
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

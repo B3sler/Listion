@@ -1,0 +1,28 @@
+name: Feature Request
+description: Schlage eine neue Funktion vor
+labels: [enhancement]
+assignees: [B3sler]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problemstellung
+      description: Welches Problem soll gelöst werden?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Vorschlag
+      description: Beschreibe die gewünschte Lösung
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen
+      description: Welche Alternativen wurden erwogen?
+  - type: textarea
+    id: context
+    attributes:
+      label: Kontext/Notizen

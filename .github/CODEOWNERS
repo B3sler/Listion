@@ -1,0 +1,18 @@
+# CODEOWNERS
+
+# DevOps / Workflows
+/.github/ @B3sler
+
+# Monorepo: Frontend
+/frontend/ @B3sler
+
+# Monorepo: Backend
+/backend/ @B3sler
+
+# Konfigurationen & Meta
+/*.json @B3sler
+/*.md @B3sler
+/*.yml @B3sler
+
+# Default-Fallback
+* @B3sler

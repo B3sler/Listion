@@ -1,0 +1,77 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    reviewers:
+      - "B3sler"
+    assignees:
+      - "B3sler"
+    labels:
+      - "dependencies"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    reviewers:
+      - "B3sler"
+    assignees:
+      - "B3sler"
+    labels:
+      - "dependencies"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    reviewers:
+      - "B3sler"
+    assignees:
+      - "B3sler"
+    labels:
+      - "dependencies"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: "Europe/Berlin"
+    reviewers:
+      - "B3sler"
+    assignees:
+      - "B3sler"
+    labels:
+      - "ci"
+      - "dependencies"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
