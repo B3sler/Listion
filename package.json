@@ -7,15 +7,20 @@
     "backend"
   ],
   "scripts": {
-    "dev": "concurrently -c \"cyan,magenta\" -n \"frontend,backend\" \"npm run -w frontend dev\" \"npm run -w backend dev\"",
-    "build": "npm run -ws build",
-    "lint": "npm run -ws lint",
-    "type-check": "npm run -ws type-check",
-    "test": "npm run -ws test",
-    "format": "npm run -ws format"
+    "dev": "concurrently -c \"cyan,magenta\" -n \"frontend,backend\" \"npm run --workspace frontend dev\" \"npm run --workspace backend dev\"",
+    "build": "npm run --workspaces build",
+    "lint": "npm run --workspaces lint",
+    "type-check": "npm run --workspaces type-check",
+    "test": "npm run --workspaces test",
+    "format": "npm run --workspaces format"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
+  },
+  "overrides": {
+    "rollup": "^4.24.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.24.0"
   }
 }
-
