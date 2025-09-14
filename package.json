@@ -1,0 +1,21 @@
+{
+  "name": "listion",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -c \"cyan,magenta\" -n \"frontend,backend\" \"npm run -w frontend dev\" \"npm run -w backend dev\"",
+    "build": "npm run -ws build",
+    "lint": "npm run -ws lint",
+    "type-check": "npm run -ws type-check",
+    "test": "npm run -ws test",
+    "format": "npm run -ws format"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
+

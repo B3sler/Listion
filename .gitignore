@@ -1,1 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
 .idea/
+
+# Node
+node_modules/
+**/node_modules/
+
+# Build outputs
+/dist/
+**/dist/
+/build/
+**/build/
+/coverage/
+**/coverage/
+
+# Caches
+.cache/
+**/.cache/
+.vite/
+**/.vite/
+.eslintcache
+.turbo/
+.parcel-cache/
+*.tsbuildinfo
+
+# Env files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
