@@ -12,16 +12,21 @@
     "lint": "npm run --workspaces lint",
     "type-check": "npm run --workspaces type-check",
     "test": "npm run --workspaces test",
-    "format": "npm run --workspaces format"
+    "format": "npm run --workspaces format",
+    "prepare": "simple-git-hooks",
+    "lint:commits": "commitlint --from=origin/main --to=HEAD || echo \"Hinweis: Für lokale Branches ggf. --from anpassen\""
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
     "concurrently": "^9.2.1",
-    "jsdom": "^27.0.0"
+    "jsdom": "^27.0.0",
+    "simple-git-hooks": "^2.9.0"
+  },
+  "simple-git-hooks": {
+    "commit-msg": "commitlint --edit"
   },
   "overrides": {
     "rollup": "^4.24.0"
-  },
-  "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "^4.50.1"
   }
 }
