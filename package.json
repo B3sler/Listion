@@ -17,8 +17,8 @@
     "lint:commits": "commitlint --from=origin/main --to=HEAD || echo \"Hinweis: Für lokale Branches ggf. --from anpassen\""
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "concurrently": "^9.2.1",
     "jsdom": "^27.0.0",
     "simple-git-hooks": "^2.13.1"
@@ -27,7 +27,7 @@
     "rollup": "^4.24.0"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "^4.50.1"
+    "@rollup/rollup-linux-x64-gnu": "^4.52.3"
   },
   "simple-git-hooks": {
     "commit-msg": "npx commitlint --edit"
