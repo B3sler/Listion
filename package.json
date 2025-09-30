@@ -17,7 +17,7 @@
     "lint:commits": "commitlint --from=origin/main --to=HEAD || echo \"Hinweis: Für lokale Branches ggf. --from anpassen\""
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
+    "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^19.8.1",
     "concurrently": "^9.2.1",
     "jsdom": "^27.0.0",
