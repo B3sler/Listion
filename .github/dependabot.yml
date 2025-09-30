@@ -3,11 +3,11 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "06:00"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 100
     versioning-strategy: increase
     reviewers:
       - "B3sler"
@@ -22,11 +22,11 @@ updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "06:15"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 100
     versioning-strategy: increase
     reviewers:
       - "B3sler"
@@ -41,11 +41,11 @@ updates:
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "06:30"
       timezone: "Europe/Berlin"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 100
     versioning-strategy: increase
     reviewers:
       - "B3sler"
@@ -60,7 +60,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: weekly
+      interval: monthly
       day: monday
       time: "07:00"
       timezone: "Europe/Berlin"
