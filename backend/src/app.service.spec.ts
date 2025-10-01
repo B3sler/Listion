@@ -1,15 +1,25 @@
+import { Test, TestingModule } from '@nestjs/testing'
 import { AppService } from './app.service'
 
 describe('AppService', () => {
-  it('should return ping payload', () => {
-    const service = new AppService()
-    const res = service.getPing()
-    expect(res).toEqual({ ok: true, app: 'Listion' })
+  let service: AppService
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [AppService],
+    }).compile()
+
+    service = module.get<AppService>(AppService)
   })
 
-  it('should return hello message', () => {
-    const service = new AppService()
-    expect(service.getHello()).toEqual({ message: 'Hello from Backend' })
+  it('should be defined', () => {
+    expect(service).toBeDefined()
+  })
+
+  it('should return health status', () => {
+    const result = service.getHealth()
+    expect(result).toHaveProperty('status', 'ok')
+    expect(result).toHaveProperty('service', 'Listion Backend')
+    expect(result).toHaveProperty('timestamp')
   })
 })
-
