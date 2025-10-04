@@ -1,4 +1,4 @@
-# Listion 🗒️
+<img src="frontend/public/listion/listion_written_light.svg" alt="Listion" width="auto" height="150" />
 
 A modern, workspace-based Todo app with visual sizing, drag & drop, and timeline-style planning.
 
@@ -133,5 +133,8 @@ Report vulnerabilities privately as described in SECURITY.md. Do not open public
 
 Proprietary. All rights reserved. This repository is not open for public use.
 
+
+
+<img src="frontend/public/listion/listion_logo_check.svg" alt="Logo" width="auto" height="150" />
 
 by @B3sler
