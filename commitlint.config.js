@@ -5,16 +5,16 @@ module.exports = {
       2,
       'always',
       [
-        'feat',     // Neue Features
+        'feat',     // New features
         'fix',      // Bugfixes
-        'docs',     // Dokumentation
-        'style',    // Code-Formatierung
-        'refactor', // Code-Refactoring
-        'perf',     // Performance-Verbesserungen
+        'docs',     // Documentation
+        'style',    // Code formatting
+        'refactor', // Code refactoring
+        'perf',     // Performance improvements
         'test',     // Tests
-        'chore',    // Wartungsarbeiten
-        'ci',       // CI/CD Änderungen
-        'build',    // Build-System
+        'chore',    // Maintenance tasks
+        'ci',       // CI/CD changes
+        'build',    // Build system
         'revert'    // Reverts
       ]
     ],
@@ -25,4 +25,3 @@ module.exports = {
     'type-empty': [2, 'never']
   }
 };
-

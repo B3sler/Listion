@@ -14,7 +14,7 @@
     "test": "npm run --workspaces test",
     "format": "npm run --workspaces format",
     "setup-hooks": "npx simple-git-hooks",
-    "lint:commits": "commitlint --from=origin/main --to=HEAD || echo \"Hinweis: Für lokale Branches ggf. --from anpassen\""
+    "lint:commits": "commitlint --from=origin/main --to=HEAD || echo \"Note: For local branches, adjust --from if necessary\""
   },
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",

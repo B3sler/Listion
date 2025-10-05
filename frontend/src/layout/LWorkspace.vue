@@ -9,7 +9,7 @@ type ContextMenuState = {
 }
 
 const contextMenu = ref<ContextMenuState>({
-  visible: true,
+  visible: false,
   x: 0,
   y: 0,
 })
@@ -28,18 +28,18 @@ const closeContextMenu = () => {
 }
 
 const createBit = () => {
-  console.log('Bit erstellen wurde ausgewählt')
-  alert('Bit erstellen - Funktion wird implementiert')
+  console.log('Create bit was selected')
+  alert('Create bit - Function will be implemented')
 }
 
 const menuItems = [
   {
-    label: 'Bit erstellen',
+    label: 'Create Bit',
     icon: '+',
     action: createBit,
   },
   {
-    label: 'Packet erstellen',
+    label: 'Create Packet',
     icon: '◼️',
     action: createBit,
   },
@@ -50,7 +50,7 @@ const menuItems = [
   <div class="w-full min-h-screen bg-gray-50 p-5" @contextmenu="handleContextMenu">
     <div class="max-w-7xl ">
       <h1 class="text-3xl font-bold text-gray-900 mb-4">Workspace</h1>
-      <p class="text-gray-500 text-base">Rechtsklick für Optionen</p>
+      <p class="text-gray-500 text-base">Right-click for options</p>
     </div>
 
     <LContextMenu

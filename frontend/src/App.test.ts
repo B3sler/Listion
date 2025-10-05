@@ -42,6 +42,6 @@ describe('App', () => {
     })
     await router.push('/')
     await router.isReady()
-    expect(wrapper.text()).toContain('Moderne Task-Verwaltung')
+    expect(wrapper.text()).toContain('Modern Task Management')
   })
 })

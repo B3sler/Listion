@@ -11,22 +11,22 @@ const features = [
   {
     icon: '🎯',
     title: 'Drag & Drop',
-    description: 'Intuitive Aufgaben- und Gruppenverwaltung per Drag & Drop',
+    description: 'Intuitive task and group management via drag & drop',
   },
   {
     icon: '📊',
-    title: 'Visuelle Task-Größen',
-    description: 'Schnelle Aufwandseinschätzung durch visuelle Sizing',
+    title: 'Visual Task Sizing',
+    description: 'Quick effort estimation through visual sizing',
   },
   {
     icon: '📅',
-    title: 'Timeline-Planung',
-    description: 'Timeline-Style Planning mit Abhängigkeiten',
+    title: 'Timeline Planning',
+    description: 'Timeline-style planning with dependencies',
   },
   {
     icon: '🔍',
-    title: 'Smart Filter',
-    description: 'Filtere nach Status, Priorität und Tags',
+    title: 'Smart Filters',
+    description: 'Filter by status, priority and tags',
   },
 ]
 </script>
@@ -44,9 +44,9 @@ const features = [
         </div>
 
         <div class="space-y-4 max-w-3xl">
-          <h1 class="text-4xl md:text-6xl font-bold text-white">Moderne Task-Verwaltung</h1>
+          <h1 class="text-4xl md:text-6xl font-bold text-white">Modern Task Management</h1>
           <p class="text-xl md:text-2xl text-slate-300">
-            Worpace-based mit visuellem Sizing, Drag & Drop und Timeline-Planung
+            Workspace-based with visual sizing, drag & drop and timeline planning
           </p>
         </div>
 
@@ -55,7 +55,7 @@ const features = [
           class="group relative px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         >
           <span class="flex items-center gap-2">
-            Zum Workspace >
+            Go to Workspace >
           </span>
         </button>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-16 w-full max-w-6xl">
