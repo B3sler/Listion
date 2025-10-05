@@ -2,33 +2,46 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
+import LLandingPage from './layout/LLandingPage.vue'
+import LWorkspace from './layout/LWorkspace.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: { template: '<div>Home</div>' } },
-    { path: '/about', component: { template: '<div>About</div>' } }
-  ]
+    { path: '/', component: LLandingPage },
+    { path: '/workspace', component: LWorkspace },
+  ],
 })
 
 describe('App', () => {
   it('should render without crashing', async () => {
     const wrapper = mount(App, {
       global: {
-        plugins: [router]
-      }
+        plugins: [router],
+      },
     })
     await router.isReady()
     expect(wrapper).toBeTruthy()
   })
 
-  it('should have the correct component structure', async () => {
+  it('should render RouterView', async () => {
     const wrapper = mount(App, {
       global: {
-        plugins: [router]
-      }
+        plugins: [router],
+      },
     })
     await router.isReady()
-    expect(wrapper.find('#app')).toBeTruthy()
+    expect(wrapper.html()).toBeTruthy()
+  })
+
+  it('should render LLandingPage on root path', async () => {
+    const wrapper = mount(App, {
+      global: {
+        plugins: [router],
+      },
+    })
+    await router.push('/')
+    await router.isReady()
+    expect(wrapper.text()).toContain('Moderne Task-Verwaltung')
   })
 })
