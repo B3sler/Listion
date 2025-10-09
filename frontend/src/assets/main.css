@@ -1,1 +1,54 @@
 @import 'tailwindcss';
+
+:root {
+  --hue: 215;
+  --saturation: 100%;
+  --lightness: 50%;
+
+  /* Light-Palette */
+  --brand: hsl(var(--hue) 100% 30.4%);
+  --text1: hsl(var(--hue) 100% 12%);
+  --text2: hsl(var(--hue) 100% 18%);
+  --surface1: hsl(var(--hue) 100% 98%);
+  --surface2: hsl(var(--hue) 100% 94%);
+  --surface3: hsl(var(--hue) 100% 85%);
+  --surface4: hsl(var(--hue) 100% 60%);
+  --surface-shadow: var(--hue) 30% 13%;
+  --shadow-strength: 0.2;
+
+  /* Dark/Dim-Variants */
+  --brand-dim: hsl(var(--hue) calc(var(--saturation) / 1.25) calc(var(--lightness) / 1.25));
+  --text1-dim: hsl(var(--hue) 15% 75%);
+  --text2-dim: hsl(var(--hue) 10% 61%);
+  --surface1-dim: hsl(var(--hue) 10% 20%);
+  --surface2-dim: hsl(var(--hue) 10% 25%);
+  --surface3-dim: hsl(var(--hue) 5% 30%);
+  --surface4-dim: hsl(var(--hue) 5% 35%);
+  --surface-shadow-dim: var(--hue) 30% 13%;
+  --shadow-strength-dim: 0.2;
+}
+
+/* Change Theme per HTML */
+.theme-dark {
+  --brand: var(--brand-dim);
+  --text1: var(--text1-dim);
+  --text2: var(--text2-dim);
+  --surface1: var(--surface1-dim);
+  --surface2: var(--surface2-dim);
+  --surface3: var(--surface3-dim);
+  --surface4: var(--surface4-dim);
+  --surface-shadow: var(--surface-shadow-dim);
+  --shadow-strength: var(--shadow-strength-dim);
+}
+
+/* Tailwind v4 Token-Mapping: bg-surface2, text-text1, … */
+@theme {
+  --color-brand: var(--brand);
+  --color-text1: var(--text1);
+  --color-text2: var(--text2);
+  --color-surface1: var(--surface1);
+  --color-surface2: var(--surface2);
+  --color-surface3: var(--surface3);
+  --color-surface4: var(--surface4);
+  --color-shadow: hsl(var(--surface-shadow) / var(--shadow-strength));
+}

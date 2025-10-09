@@ -43,18 +43,18 @@ const handleItemClick = (action: () => void) => {
 <template>
   <div
     ref="menuRef"
-    class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[1000] min-w-[200px] "
+    class="fixed bg-surface3 border border-gray-200 rounded-lg shadow-lg z-[1000] min-w-[200px]"
     :style="{ left: `${x}px`, top: `${y}px` }"
   >
-    <ul class="list-none m-0 p-0 divide-y divide-gray-100 ">
+    <ul class="list-none m-0 p-0 divide-y divide-gray-100">
       <li
         v-for="(item, index) in items"
         :key="index"
-        class="flex items-center px-2 py-1 cursor-pointer transition-colors duration-200 hover:bg-gray-100 select-none "
+        class="flex items-center px-2 py-1 cursor-pointer transition-colors rounded-lg duration-200 hover:bg-surface4 select-none"
         @click="handleItemClick(item.action)"
       >
-        <span v-if="item.icon" class="mr-3 text-lg ">{{ item.icon }}</span>
-        <span class="text-sm text-gray-700">{{ item.label }}</span>
+        <span v-if="item.icon" class="mr-3 text-lg">{{ item.icon }}</span>
+        <span class="text-sm text-text1">{{ item.label }}</span>
       </li>
     </ul>
   </div>
