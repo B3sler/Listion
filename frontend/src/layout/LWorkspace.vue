@@ -80,7 +80,7 @@ const menuItems = [
   },
 ]
 
-const { initTheme, applyTheme } = useTheme()
+const { initTheme, applyTheme, isDark } = useTheme()
 
 onMounted(() => {
   initTheme()
@@ -91,6 +91,7 @@ onMounted(() => {
 <template>
   <div
     class="w-full min-h-screen bg-surface1 p-5"
+    :class="isDark ? 'bg-dotted-grid-dark' : 'bg-dotted-grid-light'"
     @contextmenu="handleContextMenu"
     @touchstart="handleTouchStart"
     @touchend="handleTouchEnd"

@@ -56,3 +56,13 @@
   --color-surface4: var(--surface4);
   --color-shadow: hsl(var(--surface-shadow) / var(--shadow-strength));
 }
+
+.bg-dotted-grid-light {
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1.25px);
+  background-size: 24px 24px;
+}
+
+.bg-dotted-grid-dark {
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.3) 1px, transparent 1.25px);
+  background-size: 24px 24px;
+}
