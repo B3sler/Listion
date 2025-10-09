@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
-import { useTheme } from '@/composables/useTheme'
+import { useTheme } from '@/composables/useTheme.ts'
 
 type ContextMenuState = {
   visible: boolean
@@ -97,7 +97,7 @@ onMounted(() => {
     @touchmove="handleTouchMove"
   >
     <div class="max-w-7xl">
-      <h1 class="text-3xl font-bold text-text1 mb-4">Workspace</h1>
+      <h1 class="text-3xl font-bold text-text0 mb-4">Workspace</h1>
       <p class="text-text1 text-base">Right-click or long-press for options</p>
     </div>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTheme } from '@/composables/useTheme'
+import { useTheme } from '@/composables/useTheme.ts'
 
 const router = useRouter()
 const { isDark } = useTheme()
@@ -35,7 +35,7 @@ const features = [
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-surface1 to-surface2">
+  <div class="min-h-screen bg-gradient-to-br from-surface2 via-surface3 to-surface2">
     <div class="container mx-auto px-4 py-16">
       <div class="flex flex-col items-center justify-center text-center space-y-8 min-h-[80vh]">
         <div class="animate-fade-in">
@@ -43,15 +43,15 @@ const features = [
         </div>
 
         <div class="space-y-4 max-w-3xl">
-          <h1 class="text-4xl md:text-6xl font-bold text-text1">Modern Task Management</h1>
-          <p class="text-xl md:text-2xl text-text2">
+          <h1 class="text-4xl md:text-6xl font-bold text-text0">Modern Task Management</h1>
+          <p class="text-xl md:text-2xl text-text1">
             Workspace-based with visual sizing, drag & drop and timeline planning
           </p>
         </div>
 
         <button
           @click="navigateToWorkspace"
-          class="group relative px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          class="group relative px-8 py-4 bg-brand hover:bg-blue-500 text-white text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         >
           <span class="flex items-center gap-2"> Go to Workspace > </span>
         </button>
@@ -60,7 +60,7 @@ const features = [
           <div
             v-for="(feature, index) in features"
             :key="index"
-            class="bg-surface2 p-6 rounded-lg border border-surface3 hover:bg-surface3 transition-all duration-300 hover:transform hover:scale-105"
+            class="bg-surface1 p-6 rounded-lg border border-surface3 hover:bg-surface2 transition-all duration-300 hover:transform hover:scale-105 shadow-lg"
           >
             <div class="text-4xl mb-3">{{ feature.icon }}</div>
             <h3 class="text-lg font-semibold text-text1 mb-2">{{ feature.title }}</h3>
