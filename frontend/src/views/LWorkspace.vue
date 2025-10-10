@@ -101,7 +101,6 @@ onMounted(() => {
       <h1 class="text-3xl font-bold text-text0 mb-4">Workspace</h1>
       <p class="text-text1 text-base">Right-click or long-press for options</p>
     </div>
-
     <LContextMenu
       v-if="contextMenu.visible"
       :x="contextMenu.x"

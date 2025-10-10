@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
-import LLandingPage from './layout/LLandingPage.vue'
-import LWorkspace from './layout/LWorkspace.vue'
+import LLandingPage from './views/LLandingPage.vue'
+import LWorkspace from './views/LWorkspace.vue'
 
 const router = createRouter({
   history: createWebHistory(),

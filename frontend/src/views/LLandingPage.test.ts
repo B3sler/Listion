@@ -31,7 +31,7 @@ describe('LLandingPage', () => {
     await router.isReady()
     const logo = wrapper.find('img[alt="Listion Logo"]')
     expect(logo.exists()).toBe(true)
-    expect(logo.attributes('src')).toBe('/listion/listion_written_light.svg')
+    expect(logo.attributes('src')).toBe('/listion/listion_written_dark.svg')
   })
 
   it('should display the main heading', async () => {
@@ -43,7 +43,7 @@ describe('LLandingPage', () => {
     await router.isReady()
     const heading = wrapper.find('h1')
     expect(heading.exists()).toBe(true)
-    expect(heading.text()).toContain('Moderne Task-Verwaltung')
+    expect(heading.text()).toContain('Modern Task Management')
   })
 
   it('should display feature cards', async () => {
