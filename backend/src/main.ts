@@ -4,12 +4,17 @@ import { Logger } from '@nestjs/common'
 import { AppModule } from './app.module'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import * as express from 'express'
+import cookieParser from 'cookie-parser'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
+  app.use(cookieParser()) // Cookie-Parser aktivieren
   app.use(express.json()) // JSON-Body-Parser aktivieren
-  app.enableCors({ origin: true, credentials: true })
+  app.enableCors({
+    origin: 'http://localhost:5173', // Frontend-Origin
+    credentials: true,
+  })
   app.setGlobalPrefix('api')
 
   // Swagger Setup

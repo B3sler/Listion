@@ -4,7 +4,6 @@ import api from '@/helpers/api'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<{ email: string; name?: string } | null>(null)
-  const token = ref<string | null>(null)
   const isAuthenticated = ref(false)
   const error = ref<string | null>(null)
 
@@ -13,16 +12,9 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await api.post('/api/auth/register', { email, password, name: username })
       user.value = res.data.user
-      token.value = res.data.token
       isAuthenticated.value = true
     } catch (e: unknown) {
-      if (typeof e === 'object' && e !== null && 'response' in e) {
-        error.value =
-          (e as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Registration failed.'
-      } else {
-        error.value = 'Registration failed.'
-      }
+      error.value = (e as any)?.response?.data?.message || 'Registration failed.'
     }
   }
 
@@ -31,24 +23,28 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await api.post('/api/auth/login', { email, password })
       user.value = res.data.user
-      token.value = res.data.token
       isAuthenticated.value = true
     } catch (e: unknown) {
-      if (typeof e === 'object' && e !== null && 'response' in e) {
-        error.value =
-          (e as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Login failed.'
-      } else {
-        error.value = 'Login failed.'
-      }
+      error.value = (e as any)?.response?.data?.message || 'Login failed.'
     }
   }
 
-  function logout() {
+  async function checkAuth() {
+    try {
+      const res = await api.get('/api/auth/me')
+      user.value = res.data.user
+      isAuthenticated.value = true
+    } catch {
+      user.value = null
+      isAuthenticated.value = false
+    }
+  }
+
+  async function logout() {
+    await api.post('/api/auth/logout')
     user.value = null
-    token.value = null
     isAuthenticated.value = false
   }
 
-  return { user, token, isAuthenticated, error, register, login, logout }
+  return { user, isAuthenticated, error, register, login, checkAuth, logout }
 })

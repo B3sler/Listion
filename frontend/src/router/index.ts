@@ -35,14 +35,17 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
   const protectedRoutes = ['/workspace']
-  if (protectedRoutes.includes(to.path) && !userStore.isAuthenticated) {
-    next('/')
-  } else {
-    next()
+  if (protectedRoutes.includes(to.path)) {
+    await userStore.checkAuth()
+    if (!userStore.isAuthenticated) {
+      next('/')
+      return
+    }
   }
+  next()
 })
 
 export default router
