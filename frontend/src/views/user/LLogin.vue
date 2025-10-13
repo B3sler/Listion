@@ -2,6 +2,8 @@
 import { useTheme } from '@/composables/useTheme.ts'
 import { computed, onMounted, ref } from 'vue'
 import router from '@/router'
+import { useUserStore } from '@/stores/userStore'
+import { storeToRefs } from 'pinia'
 
 const { initTheme, applyTheme, isDark } = useTheme()
 
@@ -18,8 +20,17 @@ const email = ref('')
 const password = ref('')
 const loginErrorMessage = ref('')
 
-function handleLogin() {
-  loginErrorMessage.value = 'Login function not implemented yet.'
+const userStore = useUserStore()
+const { error, isAuthenticated } = storeToRefs(userStore)
+
+async function handleLogin() {
+  loginErrorMessage.value = ''
+  await userStore.login(email.value, password.value)
+  if (error.value) {
+    loginErrorMessage.value = error.value
+  } else if (isAuthenticated.value) {
+    router.push('/workspace')
+  }
 }
 
 function navigateToRegister() {

@@ -2,6 +2,8 @@
 import { useTheme } from '@/composables/useTheme.ts'
 import { computed, onMounted, ref } from 'vue'
 import router from '@/router'
+import { useUserStore } from '@/stores/userStore'
+import { storeToRefs } from 'pinia'
 
 const { initTheme, applyTheme, isDark } = useTheme()
 
@@ -15,17 +17,25 @@ const logoSrc = computed(() =>
 )
 
 const email = ref('')
+const username = ref('')
 const password = ref('')
 const passwordRepeat = ref('')
 const registerErrorMessage = ref('')
 
-function handleRegister() {
+const userStore = useUserStore()
+const { error } = storeToRefs(userStore)
+
+async function handleRegister() {
   registerErrorMessage.value = ''
   if (password.value !== passwordRepeat.value) {
     registerErrorMessage.value = 'Passwords dont match.'
     return
+  }
+  await userStore.register(email.value, password.value, username.value)
+  if (error.value) {
+    registerErrorMessage.value = error.value
   } else {
-    registerErrorMessage.value = 'Register function not implemented yet.'
+    await router.push('/login')
   }
 }
 
@@ -58,6 +68,13 @@ function navigateToLogin() {
             type="email"
             required
             placeholder="E-Mail"
+            class="text-text0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+          <input
+            v-model="username"
+            type="text"
+            required
+            placeholder="Username"
             class="text-text0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
           <input

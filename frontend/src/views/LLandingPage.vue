@@ -6,8 +6,8 @@ import { useTheme } from '@/composables/useTheme.ts'
 const router = useRouter()
 const { isDark } = useTheme()
 
-const navigateToWorkspace = () => {
-  router.push('/workspace')
+const navigateToLogin = () => {
+  router.push('/login')
 }
 
 const logoSrc = computed(() =>
@@ -50,10 +50,10 @@ const features = [
         </div>
 
         <button
-          @click="navigateToWorkspace"
+          @click="navigateToLogin"
           class="group relative px-8 py-4 bg-brand hover:bg-blue-500 text-white text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         >
-          <span class="flex items-center gap-2"> Go to Workspace > </span>
+          <span class="flex items-center gap-2"> Login > </span>
         </button>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-16 w-full max-w-6xl">
