@@ -15,9 +15,11 @@ export const useUserStore = defineStore('user', () => {
       user.value = res.data.user
       token.value = res.data.token
       isAuthenticated.value = true
-    }  catch (e: unknown) {
+    } catch (e: unknown) {
       if (typeof e === 'object' && e !== null && 'response' in e) {
-        error.value = (e as { response?: { data?: { message?: string } } }).response?.data?.message || 'Registration failed.'
+        error.value =
+          (e as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Registration failed.'
       } else {
         error.value = 'Registration failed.'
       }
@@ -33,7 +35,9 @@ export const useUserStore = defineStore('user', () => {
       isAuthenticated.value = true
     } catch (e: unknown) {
       if (typeof e === 'object' && e !== null && 'response' in e) {
-        error.value = (e as { response?: { data?: { message?: string } } }).response?.data?.message || 'Login failed.'
+        error.value =
+          (e as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Login failed.'
       } else {
         error.value = 'Login failed.'
       }

@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
 import { useTheme } from '@/composables/useTheme.ts'
 import LTaskbar from '@/layout/LTaskbar.vue'
-import LMenu from "@/layout/LMenu.vue";
+import LMenu from '@/layout/LMenu.vue'
 
 type ContextMenuState = {
   visible: boolean

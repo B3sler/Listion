@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {ref} from 'vue'
-import {useUserStore} from '@/stores/userStore'
-import router from "@/router";
+import { ref } from 'vue'
+import { useUserStore } from '@/stores/userStore'
+import router from '@/router'
 
 const isOpen = ref(false)
 const userStore = useUserStore()
@@ -15,19 +15,17 @@ function handleLogout() {
 
 <template>
   <div class="fixed top-2 right-4 z-[9999]">
-    <button
-      @click="isOpen = !isOpen"
-      class="background group"
-      aria-label="Open Menu"
-      type="button"
-    >
+    <button @click="isOpen = !isOpen" class="background group" aria-label="Open Menu" type="button">
       <div class="menu__icon w-8 h-8 p-1">
         <span
-          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-top"></span>
+          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-top"
+        ></span>
         <span
-          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-scaled"></span>
+          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-scaled"
+        ></span>
         <span
-          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-bottom"></span>
+          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-bottom"
+        ></span>
       </div>
     </button>
     <div
@@ -39,7 +37,7 @@ function handleLogout() {
       </div>
       <button
         @click="handleLogout"
-        class="self-center px-2 py-1 bg-surface3 border-2 shadow-lg border-gray-400 text-text2 rounded hover:bg-red-600 "
+        class="self-center px-2 py-1 bg-surface3 border-2 shadow-lg border-gray-400 text-text2 rounded hover:bg-red-600"
         type="button"
       >
         Logout
@@ -64,37 +62,37 @@ function handleLogout() {
   height: 0.125rem;
   border-radius: 2px;
   background-color: var(--brand);
-  box-shadow: 0.5px 2px 0 hsla(0, 0%, 0%, .2);
-  transition: background-color .4s;
+  box-shadow: 0.5px 2px 0 hsla(0, 0%, 0%, 0.2);
+  transition: background-color 0.4s;
   position: relative;
 }
 
 .menu__icon span + span {
-  margin-top: .375rem;
+  margin-top: 0.375rem;
 }
 
 .menu__bar {
-  animation: ease .8s menu-icon-top-2 forwards;
+  animation: ease 0.8s menu-icon-top-2 forwards;
 }
 
 .menu__bar + .menu__bar {
-  animation: ease .8s menu-icon-scaled-2 forwards;
+  animation: ease 0.8s menu-icon-scaled-2 forwards;
 }
 
 .menu__bar + .menu__bar + .menu__bar {
-  animation: ease .8s menu-icon-bottom-2 forwards;
+  animation: ease 0.8s menu-icon-bottom-2 forwards;
 }
 
 .group:hover .menu__bar:first-child {
-  animation: ease .8s menu-icon-top forwards;
+  animation: ease 0.8s menu-icon-top forwards;
 }
 
 .group:hover .menu__bar:nth-child(2) {
-  animation: ease .8s menu-icon-scaled forwards;
+  animation: ease 0.8s menu-icon-scaled forwards;
 }
 
 .group:hover .menu__bar:last-child {
-  animation: ease .8s menu-icon-bottom forwards;
+  animation: ease 0.8s menu-icon-bottom forwards;
   background-color: rgb(22, 189, 11);
 }
 
@@ -104,22 +102,22 @@ function handleLogout() {
     transform: rotate(0);
   }
   50% {
-    top: .5rem;
+    top: 0.5rem;
     transform: rotate(0);
   }
   100% {
-    top: .5rem;
+    top: 0.5rem;
     transform: rotate(45deg);
   }
 }
 
 @keyframes menu-icon-top-2 {
   0% {
-    top: .5rem;
+    top: 0.5rem;
     transform: rotate(45deg);
   }
   50% {
-    top: .5rem;
+    top: 0.5rem;
     transform: rotate(0);
   }
   100% {
@@ -134,22 +132,22 @@ function handleLogout() {
     transform: rotate(0);
   }
   50% {
-    bottom: .5rem;
+    bottom: 0.5rem;
     transform: rotate(0);
   }
   100% {
-    bottom: .5rem;
+    bottom: 0.5rem;
     transform: rotate(135deg);
   }
 }
 
 @keyframes menu-icon-bottom-2 {
   0% {
-    bottom: .5rem;
+    bottom: 0.5rem;
     transform: rotate(135deg);
   }
   50% {
-    bottom: .5rem;
+    bottom: 0.5rem;
     transform: rotate(0);
   }
   100% {
