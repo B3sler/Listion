@@ -41,7 +41,7 @@ function navigateToRegister() {
       :class="isDark ? 'bg-dotted-grid-dark' : 'bg-dotted-grid-light'"
     >
       <div
-        class="w-full max-w-sm bg-surface2 border-2 border-gray-300 rounded-xl shadow-lg p-8 flex flex-col items-center"
+        class="animate-fade-in w-full max-w-sm bg-surface2 border-2 border-gray-300 rounded-xl shadow-lg p-8 flex flex-col items-center"
       >
         <h1 class="text-3xl font-bold mb-2 text-text0">Login</h1>
         <p class="mb-6 text-text1">Welcome back! Please login.</p>
@@ -81,4 +81,19 @@ function navigateToRegister() {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translatex(+40px);
+  }
+  to {
+    opacity: 1;
+    transform: translatex(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 1s ease-out;
+}
+</style>
