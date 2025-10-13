@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
 import { useTheme } from '@/composables/useTheme.ts'
 import LTaskbar from '@/layout/LTaskbar.vue'
+import LMenu from "@/layout/LMenu.vue";
 
 type ContextMenuState = {
   visible: boolean
@@ -103,6 +104,7 @@ onMounted(() => {
       <p class="text-text1 text-base">Right-click or long-press for options</p>
     </div>
     <LTaskbar></LTaskbar>
+    <LMenu></LMenu>
     <LContextMenu
       v-if="contextMenu.visible"
       :x="contextMenu.x"
