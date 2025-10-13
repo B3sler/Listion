@@ -1,37 +1,62 @@
-# Listion Backend (NestJS)
+<img src="../frontend/public/listion/listion_written_light.svg" alt="Listion Backend" height="120" />
 
-Entwicklungs-Setup:
+# Listion Backend
 
-- TypeScript, ESLint (Flat), Prettier, Jest (ts-jest)
-- Dev-Server: ts-node-dev
-- Endpoints:
-  - GET /api/ping -> { ok: true, app: APP_NAME }
-  - GET /api/hello -> { message: 'Hello from Backend' }
+The backend of Listion is built with NestJS and provides a modern API for task management and workspace features.
 
-Skripte:
+## Features ✨
 
-- npm run dev — Start im Watch-Modus (http://localhost:3000)
-- npm run build — Transpiliert nach dist/
-- npm test — Jest-Tests
-- npm run lint, npm run type-check
+- REST API for tasks, users, and workspaces
+- JWT authentication
+- Swagger/OpenAPI documentation
+- Project structure ready for future collaboration
 
-Umgebungsvariablen:
+## Tech Stack 🛠️
 
-- APP_NAME (Default: Listion)
-- PORT (Default: 3000)
+- NestJS (TypeScript)
+- Swagger/OpenAPI
+- Jest for testing
+- ESLint, Prettier
 
-Beispiel:
+## Requirements ⚙️
+
+- Node.js 20+
+- npm 10+
+
+## Quickstart 🚀
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+## Scripts 🔧
+
+- `npm run dev` – Dev server (http://localhost:3000)
+- `npm run build` – Build for production
+- `npm test` – Unit tests with Jest
+- `npm run lint` – Linting
+- `npm run type-check` – TypeScript type checking
+
+## Example Endpoints
+
+- `GET /api/ping` → { ok: true, app: APP_NAME }
+- `GET /api/hello` → { message: 'Hello from Backend' }
+
+## Environment Variables
+
+- `APP_NAME` (Default: Listion)
+- `PORT` (Default: 3000)
+
+```bash
 cp .env.example .env
 npm install
 npm run dev
-import { Module } from '@nestjs/common'
-import { ConfigModule } from '@nestjs/config'
-import { AppController } from './app.controller'
-import { AppService } from './app.service'
+```
 
-@Module({
-imports: [ConfigModule.forRoot({ isGlobal: true })],
-controllers: [AppController],
-providers: [AppService],
-})
-export class AppModule {}
+---
+
+For more information and the full project, see the [root README](../README.md)
