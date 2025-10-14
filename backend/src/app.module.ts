@@ -7,6 +7,9 @@ import { AppService } from './app.service'
 import { User } from './user.entity'
 import { UserService } from './user.service'
 import { AuthController } from './auth.controller'
+import { Bit } from './entities/bit.entity'
+import { BitService } from './services/bit.service'
+import { BitController } from './controllers/bit.controller'
 
 @Module({
   imports: [
@@ -18,16 +21,16 @@ import { AuthController } from './auth.controller'
       username: process.env.DB_USER || 'listion',
       password: process.env.DB_PASS || 'listion1221',
       database: process.env.DB_NAME || 'listion',
-      entities: [User],
+      entities: [User, Bit],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Bit]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'supersecret',
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  controllers: [AppController, AuthController],
-  providers: [AppService, UserService],
+  controllers: [AppController, AuthController, BitController],
+  providers: [AppService, UserService, BitService],
 })
 export class AppModule {}
