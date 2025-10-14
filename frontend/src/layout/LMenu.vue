@@ -37,10 +37,10 @@ function handleLogout() {
       </div>
       <button
         @click="handleLogout"
-        class="self-center px-2 py-1 bg-surface3 border-2 shadow-lg border-gray-400 text-text2 rounded hover:bg-red-600"
+        class="self-center w-40 px-6 py-3 bg-gradient-to-br from-surface3 to-surface4 text-text0 font-semibold text-base rounded-xl shadow-lg hover:shadow-sm hover:shadow-red-100 hover:scale-105"
         type="button"
       >
-        Logout
+          Logout
       </button>
     </div>
   </div>
