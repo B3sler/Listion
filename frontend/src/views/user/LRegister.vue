@@ -31,11 +31,11 @@ async function handleRegister() {
     registerErrorMessage.value = 'Passwords dont match.'
     return
   }
-  await userStore.register(email.value, password.value, username.value)
-  if (error.value) {
-    registerErrorMessage.value = error.value
-  } else {
-    await router.push('/login')
+  try {
+    await userStore.register(email.value, password.value, username.value)
+    await router.push('/workspace')
+  } catch (e) {
+    registerErrorMessage.value = error.value || 'Registration failed.'
   }
 }
 

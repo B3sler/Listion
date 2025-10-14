@@ -15,6 +15,7 @@ export const useUserStore = defineStore('user', () => {
       isAuthenticated.value = true
     } catch (e: unknown) {
       error.value = (e as any)?.response?.data?.message || 'Registration failed.'
+      throw e
     }
   }
 
@@ -26,14 +27,20 @@ export const useUserStore = defineStore('user', () => {
       isAuthenticated.value = true
     } catch (e: unknown) {
       error.value = (e as any)?.response?.data?.message || 'Login failed.'
+      throw e
     }
   }
 
   async function checkAuth() {
     try {
       const res = await api.get('/api/auth/me')
-      user.value = res.data.user
-      isAuthenticated.value = true
+      if (res.data.user) {
+        user.value = res.data.user
+        isAuthenticated.value = true
+      } else {
+        user.value = null
+        isAuthenticated.value = false
+      }
     } catch {
       user.value = null
       isAuthenticated.value = false
@@ -41,9 +48,14 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout() {
-    await api.post('/api/auth/logout')
-    user.value = null
-    isAuthenticated.value = false
+    try {
+      await api.post('/api/auth/logout')
+    } catch (e) {
+      console.error('Logout failed', e)
+    } finally {
+      user.value = null
+      isAuthenticated.value = false
+    }
   }
 
   return { user, isAuthenticated, error, register, login, checkAuth, logout }
