@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/helpers/api'
+import type { AxiosError } from 'axios'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<{ email: string; name?: string } | null>(null)
@@ -13,8 +14,9 @@ export const useUserStore = defineStore('user', () => {
       const res = await api.post('/api/auth/register', { email, password, name: username })
       user.value = res.data.user
       isAuthenticated.value = true
-    } catch (e: unknown) {
-      error.value = (e as any)?.response?.data?.message || 'Registration failed.'
+    } catch (e) {
+      const axiosError = e as AxiosError<{ message?: string }>
+      error.value = axiosError?.response?.data?.message || 'Registration failed.'
       throw e
     }
   }
@@ -25,8 +27,9 @@ export const useUserStore = defineStore('user', () => {
       const res = await api.post('/api/auth/login', { email, password })
       user.value = res.data.user
       isAuthenticated.value = true
-    } catch (e: unknown) {
-      error.value = (e as any)?.response?.data?.message || 'Login failed.'
+    } catch (e) {
+      const axiosError = e as AxiosError<{ message?: string }>
+      error.value = axiosError?.response?.data?.message || 'Login failed.'
       throw e
     }
   }

@@ -15,7 +15,7 @@ export class AuthController {
   @Post('register')
   async register(
     @Body() body: { email: string; password: string; name: string },
-    @Res() res: Response
+    @Res() res: Response,
   ) {
     const existing = await this.userService.findByEmail(body.email)
     if (existing) {
@@ -33,10 +33,7 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(
-    @Body() body: { email: string; password: string },
-    @Res() res: Response
-  ) {
+  async login(@Body() body: { email: string; password: string }, @Res() res: Response) {
     const user = await this.userService.validateUser(body.email, body.password)
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials.' })

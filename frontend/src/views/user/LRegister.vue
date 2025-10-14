@@ -34,7 +34,7 @@ async function handleRegister() {
   try {
     await userStore.register(email.value, password.value, username.value)
     await router.push('/workspace')
-  } catch (e) {
+  } catch {
     registerErrorMessage.value = error.value || 'Registration failed.'
   }
 }
