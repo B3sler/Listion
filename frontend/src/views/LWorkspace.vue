@@ -30,6 +30,11 @@ const dragStartX = ref(0)
 const dragStartY = ref(0)
 const dragStartPanX = ref(0)
 const dragStartPanY = ref(0)
+const initialDistance = ref(0)
+const initialZoom = ref(1)
+const touchStartPanX = ref(0)
+const touchStartPanY = ref(0)
+const isTwoFingerTouch = ref(false)
 
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
@@ -73,19 +78,28 @@ const closeContextMenu = () => {
 
 const handleWheel = (event: WheelEvent) => {
   event.preventDefault()
-  const delta = -event.deltaY / 1000
-  const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.value + delta))
 
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
+  if (event.ctrlKey) {
+    const delta = -event.deltaY
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.value + delta * 0.01))
 
-  const xs = (x - panX.value) / zoom.value
-  const ys = (y - panY.value) / zoom.value
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
 
-  panX.value = x - xs * newZoom
-  panY.value = y - ys * newZoom
-  zoom.value = newZoom
+    const xs = (x - panX.value) / zoom.value
+    const ys = (y - panY.value) / zoom.value
+
+    panX.value = x - xs * newZoom
+    panY.value = y - ys * newZoom
+    zoom.value = newZoom
+  }
+  else {
+    if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
+      panX.value -= event.deltaX
+      panY.value -= event.deltaY
+    }
+  }
 }
 
 const zoomIn = () => {
@@ -128,7 +142,26 @@ const handleMouseUp = () => {
 
 const handleTouchStart = (event: TouchEvent) => {
   if (event.touches.length === 2) {
-    //ToDO Zwei-Finger-Touch für Pinch-Zoom könnte hier implementiert werden
+    event.preventDefault()
+    isTwoFingerTouch.value = true
+
+    const touch1 = event.touches[0]
+    const touch2 = event.touches[1]
+    if (!touch1 || !touch2) return
+
+    const dx = touch2.clientX - touch1.clientX
+    const dy = touch2.clientY - touch1.clientY
+    initialDistance.value = Math.sqrt(dx * dx + dy * dy)
+    initialZoom.value = zoom.value
+
+    touchStartPanX.value = panX.value
+    touchStartPanY.value = panY.value
+
+    const midX = (touch1.clientX + touch2.clientX) / 2
+    const midY = (touch1.clientY + touch2.clientY) / 2
+    dragStartX.value = midX
+    dragStartY.value = midY
+
     return
   }
 
@@ -144,16 +177,42 @@ const handleTouchStart = (event: TouchEvent) => {
 }
 
 const handleTouchEnd = () => {
+  isTwoFingerTouch.value = false
   if (longPressTimer) {
     clearTimeout(longPressTimer)
     longPressTimer = null
   }
 }
 
-const handleTouchMove = () => {
+const handleTouchMove = (event: TouchEvent) => {
   if (longPressTimer) {
     clearTimeout(longPressTimer)
     longPressTimer = null
+  }
+
+  if (event.touches.length === 2 && isTwoFingerTouch.value) {
+    event.preventDefault()
+
+    const touch1 = event.touches[0]
+    const touch2 = event.touches[1]
+    if (!touch1 || !touch2) return
+
+    const dx = touch2.clientX - touch1.clientX
+    const dy = touch2.clientY - touch1.clientY
+    const currentDistance = Math.sqrt(dx * dx + dy * dy)
+
+    const scale = currentDistance / initialDistance.value
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, initialZoom.value * scale))
+
+    const midX = (touch1.clientX + touch2.clientX) / 2
+    const midY = (touch1.clientY + touch2.clientY) / 2
+
+    const panDeltaX = midX - dragStartX.value
+    const panDeltaY = midY - dragStartY.value
+
+    panX.value = touchStartPanX.value + panDeltaX
+    panY.value = touchStartPanY.value + panDeltaY
+    zoom.value = newZoom
   }
 }
 
