@@ -1,28 +1,28 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
 @Entity()
 export class Bit {
   @PrimaryGeneratedColumn()
-  id!: number;
+  id!: number
 
   @Column()
-  user!: number;
+  user!: number
 
   @Column({ type: 'text' })
-  titel!: string;
+  title!: string
 
   @CreateDateColumn({ type: 'timestamp' })
-  createdAt!: Date;
+  createdAt!: Date
 
   @Column({ type: 'int', default: 0 })
-  status!: number;
+  status!: number
 
   @Column({ type: 'timestamp', nullable: true })
-  dueDate?: Date;
+  dueDate?: Date
 
   @Column({ type: 'int', nullable: true })
-  priority?: number;
+  priority?: number
 
   @Column({ type: 'text', nullable: true })
-  notes?: string;
+  notes?: string
 }

@@ -1,3 +1,4 @@
+---
 #-------------------------------------------------------------------------------#
 #            Discover all capabilities of Qodana in our documentation           #
 #             https://www.jetbrains.com/help/qodana/about-qodana.html           #
@@ -10,7 +11,7 @@ on:
   push:
     branches:
       - main
-      - '**'
+      - "**"
 
 jobs:
   qodana:
@@ -24,7 +25,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: 'Qodana Scan'
+      - name: "Qodana Scan"
         uses: JetBrains/qodana-action@v2025.2
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
@@ -37,4 +38,4 @@ jobs:
           # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
           upload-result: false
           # quick-fixes available in Ultimate and Ultimate Plus plans
-          push-fixes: 'none'
+          push-fixes: "none"

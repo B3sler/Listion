@@ -93,8 +93,7 @@ const handleWheel = (event: WheelEvent) => {
     panX.value = x - xs * newZoom
     panY.value = y - ys * newZoom
     zoom.value = newZoom
-  }
-  else {
+  } else {
     if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
       panX.value -= event.deltaX
       panY.value -= event.deltaY

@@ -4,7 +4,9 @@ A modern, workspace-based Todo app with visual sizing, drag & drop, and timeline
 
 ## Overview 🧭
 
-Listion is a modern task management application that goes beyond simple lists. It focuses on flow and clarity through visual task sizing, intuitive drag & drop, and timeline-style planning for projects.
+Listion is a modern task management application that goes beyond simple lists. It focuses on flow
+and clarity through visual task sizing, intuitive drag & drop, and timeline-style planning for
+projects.
 
 ## Key features ✨
 
@@ -42,6 +44,7 @@ npm run dev
 ```
 
 ### Run individually 🔧
+
 ```bash
 # Frontend (Vite dev server)
 npm run --workspace frontend dev
@@ -67,6 +70,7 @@ npm test
 ```
 
 ### Frontend specifics 🖥️
+
 ```bash
 # Unit tests
 npm run --workspace frontend test       # run once
@@ -78,6 +82,7 @@ npm run --workspace frontend build
 ```
 
 ### Backend specifics 🗄️
+
 ```bash
 # Unit tests
 npm run --workspace backend test
@@ -93,7 +98,8 @@ npm run --workspace backend build
 - Base URL (dev): http://localhost:3000/api
 - Swagger UI (dev): http://localhost:3000/api/docs
 
-The full API surface is documented in Swagger; endpoints may evolve while the project is in active development.
+The full API surface is documented in Swagger; endpoints may evolve while the project is in active
+development.
 
 ## Configuration ⚙️
 
@@ -119,7 +125,8 @@ listion/
 
 ## Contributing 🤝
 
-We welcome contributions. Please read CONTRIBUTING.md for branching, commits, and local checks. Conventional Commits are enforced via commitlint; run once to enable hooks:
+We welcome contributions. Please read CONTRIBUTING.md for branching, commits, and local checks.
+Conventional Commits are enforced via commitlint; run once to enable hooks:
 
 ```bash
 npm run setup-hooks
@@ -127,13 +134,12 @@ npm run setup-hooks
 
 ## Security 🔐
 
-Report vulnerabilities privately as described in SECURITY.md. Do not open public issues for security reports.
+Report vulnerabilities privately as described in SECURITY.md. Do not open public issues for security
+reports.
 
 ## License 📄
 
 Proprietary. All rights reserved. This repository is not open for public use.
-
-
 
 <img src="frontend/public/listion/listion_logo_check.svg" alt="Logo" width="auto" height="150" />
 
