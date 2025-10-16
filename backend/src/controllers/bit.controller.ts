@@ -11,38 +11,38 @@ export class BitController {
   constructor(private readonly bitService: BitService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Alle Aufgaben abrufen' })
+  @ApiOperation({ summary: 'Get all bits (tasks)' })
   @ApiResponse({ status: 200, type: [Bit] })
   findAll() {
     return this.bitService.findAll();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Eine Aufgabe abrufen' })
+  @ApiOperation({ summary: 'Get a single bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
   findOne(@Param('id') id: number) {
     return this.bitService.findOne(id);
   }
 
   @Post()
-  @ApiOperation({ summary: 'Neue Aufgabe erstellen' })
+  @ApiOperation({ summary: 'Create a new bit (task)' })
   @ApiResponse({ status: 201, type: Bit })
   create(@Body() createBitDto: CreateBitDto) {
     return this.bitService.create(createBitDto);
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Aufgabe aktualisieren' })
+  @ApiOperation({ summary: 'Update a bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
   update(@Param('id') id: number, @Body() updateBitDto: UpdateBitDto) {
     return this.bitService.update(id, updateBitDto);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Aufgabe löschen' })
+  @ApiOperation({ summary: 'Delete a bit (task)' })
   @ApiResponse({ status: 204 })
   async remove(@Param('id') id: number) {
     await this.bitService.remove(id);
-    return { message: 'Gelöscht' };
+    return { message: 'Deleted' };
   }
 }
