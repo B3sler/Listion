@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { Bit } from '../entities/bit.entity'
-import { CreateBitDto } from '../types/create-bit.dto'
-import { UpdateBitDto } from '../types/update-bit.dto'
+import { Bit } from './bit.entity'
+import { CreateBitDto } from '../../dto/create-bit.dto'
+import { UpdateBitDto } from '../../dto/update-bit.dto'
 
 @Injectable()
 export class BitService {

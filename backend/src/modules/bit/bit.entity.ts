@@ -25,4 +25,13 @@ export class Bit {
 
   @Column({ type: 'text', nullable: true })
   notes?: string
+
+  @Column({ type: 'int', nullable: true })
+  x?: number
+
+  @Column({ type: 'int', nullable: true })
+  y?: number
+
+  @Column({ type: 'int', nullable: true })
+  workspace?: number
 }

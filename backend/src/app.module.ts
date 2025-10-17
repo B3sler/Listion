@@ -4,12 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { JwtModule } from '@nestjs/jwt'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
-import { User } from './user.entity'
-import { UserService } from './user.service'
-import { AuthController } from './auth.controller'
-import { Bit } from './entities/bit.entity'
-import { BitService } from './services/bit.service'
-import { BitController } from './controllers/bit.controller'
+import { User } from './modules/user/user.entity'
+import { UserService } from './modules/user/user.service'
+import { AuthController } from './modules/user/auth.controller'
+import { Bit } from './modules/bit/bit.entity'
+import { BitService } from './modules/bit/bit.service'
+import { BitController } from './modules/bit/bit.controller'
 
 @Module({
   imports: [

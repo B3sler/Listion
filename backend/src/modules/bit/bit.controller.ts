@@ -1,9 +1,9 @@
 import { Controller, Get, Post, Body, Param, Put, Delete } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import { BitService } from '../services/bit.service'
-import { CreateBitDto } from '../types/create-bit.dto'
-import { UpdateBitDto } from '../types/update-bit.dto'
-import { Bit } from '../entities/bit.entity'
+import { BitService } from './bit.service'
+import { CreateBitDto } from '../../dto/create-bit.dto'
+import { UpdateBitDto } from '../../dto/update-bit.dto'
+import { Bit } from './bit.entity'
 
 @ApiTags('Bit')
 @Controller('bit')

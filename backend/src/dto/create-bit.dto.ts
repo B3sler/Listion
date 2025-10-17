@@ -1,15 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger'
 
-export class UpdateBitDto {
-  @ApiProperty({
-    example: 'Go shopping',
-    description: 'Short text describing the bit (task)',
-    required: false,
-  })
-  title?: string
+export class CreateBitDto {
+  @ApiProperty({ example: 1, description: 'UserId to whom the task belongs' })
+  user!: number
+
+  @ApiProperty({ example: 'Go shopping', description: 'Short text describing the task' })
+  title!: string
 
   @ApiProperty({
-    example: 1,
+    example: 0,
     description: 'Status: 0=open, 1=in progress, 2=done',
     required: false,
   })
@@ -27,4 +26,13 @@ export class UpdateBitDto {
 
   @ApiProperty({ example: 'Milk, bread, eggs', description: 'Notes for the task', required: false })
   notes?: string
+
+  @ApiProperty({ example: 5, description: 'X Coordinate of Bit', required: false })
+  x?: number
+
+  @ApiProperty({ example: 2, description: 'X Coordinate of Bit', required: false })
+  y?: number
+
+  @ApiProperty({ example: 1, description: 'Bit workspace', required: false })
+  workspace?: number
 }
