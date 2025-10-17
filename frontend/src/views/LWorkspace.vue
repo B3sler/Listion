@@ -79,14 +79,13 @@ const closeContextMenu = () => {
 const handleWheel = (event: WheelEvent) => {
   event.preventDefault()
 
-  if (event.ctrlKey) {
+  if (!event.ctrlKey) {
     const delta = -event.deltaY
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.value + delta * 0.01))
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.value + delta * 0.005))
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
-
     const xs = (x - panX.value) / zoom.value
     const ys = (y - panY.value) / zoom.value
 
