@@ -141,6 +141,8 @@ reports.
 
 Proprietary. All rights reserved. This repository is not open for public use.
 
-<img src="frontend/public/listion/listion_logo_check.svg" alt="Logo" width="auto" height="150" />
+---
 
+```
 by @B3sler
+```
