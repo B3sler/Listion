@@ -57,6 +57,15 @@ npm install
 npm run dev
 ```
 
+## API Documentation 📚
+
+Listion Backend provides interactive API documentation via Swagger/OpenAPI. After starting the development server, the
+documentation is available at:
+
+- [http://localhost:3000/api](http://localhost:3000/api)
+
+Here you can test all endpoints and view their data structures.
+
 ---
 
 For more information and the full project, see the [root README](../README.md)
