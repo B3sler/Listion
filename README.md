@@ -30,6 +30,29 @@ Note: This repository is under active development. Some features are planned or 
 
 - Node.js 20+ (LTS recommended)
 - npm 10+
+- Docker and Docker Compose (for database)
+
+## Database setup 🗄️
+
+The application uses PostgreSQL as its database. Start the database using Docker Compose:
+
+```bash
+# Start the PostgreSQL database
+docker-compose up -d
+
+# Check if the database is running
+docker-compose ps
+
+# Stop the database
+docker-compose down
+
+# Stop and remove all data
+docker-compose down -v
+```
+
+Before starting the database, create a `.env` file in the root directory (provided by @B3sler).
+
+The database will be available at `localhost:5432` and data is persisted in a Docker volume.
 
 ## Quickstart 🚀
 
