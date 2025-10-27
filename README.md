@@ -1,5 +1,7 @@
 <img src="frontend/public/listion/listion_written_light.svg" alt="Listion" width="auto" height="150" />
 
+# Listion
+
 A modern, workspace-based Todo app with visual sizing, drag & drop, and timeline-style planning.
 
 ## Overview 🧭
