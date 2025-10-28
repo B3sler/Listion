@@ -4,7 +4,7 @@ import api from '@/helpers/api'
 import type { AxiosError } from 'axios'
 
 export const useUserStore = defineStore('user', () => {
-  const user = ref<{ email: string; name?: string } | null>(null)
+  const user = ref<{ id: number; email: string; name?: string } | null>(null)
   const isAuthenticated = ref(false)
   const error = ref<string | null>(null)
 

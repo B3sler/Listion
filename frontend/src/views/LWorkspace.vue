@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
+import LCreateBitModal from '@/components/LCreateBitModal.vue'
+import LBit from '@/components/LBit.vue'
 import { useTheme } from '@/composables/useTheme.ts'
+import { useBitStore } from '@/stores/bitStore'
+import { useUserStore } from '@/stores/userStore'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
 import { ScanSearch, ZoomIn, ZoomOut, Fullscreen } from 'lucide-vue-next'
+import type { CreateBitDto, Bit } from '@/types/bit'
 
 type ContextMenuState = {
   visible: boolean
@@ -17,6 +22,12 @@ const contextMenu = ref<ContextMenuState>({
   x: 0,
   y: 0,
 })
+
+const showCreateBitModal = ref(false)
+const createBitPosition = ref<{ x: number; y: number }>({ x: 0, y: 0 })
+
+const bitStore = useBitStore()
+const userStore = useUserStore()
 
 const storageKeyZoom = 'lZoom'
 const storageKeyPanZ = 'lPanX'
@@ -215,8 +226,39 @@ const handleTouchMove = (event: TouchEvent) => {
 }
 
 const createBit = () => {
-  console.log('Create bit was selected')
-  alert('Create bit - Function will be implemented')
+  const canvasElement = document.querySelector('.canvas-content')
+  if (!canvasElement) return
+
+  const rect = canvasElement.getBoundingClientRect()
+  const worldX = (contextMenu.value.x - rect.left - panX.value) / zoom.value
+  const worldY = (contextMenu.value.y - rect.top - panY.value) / zoom.value
+
+  createBitPosition.value = { x: worldX, y: worldY }
+  showCreateBitModal.value = true
+}
+
+const handleCreateBit = async (createBitDto: CreateBitDto) => {
+  try {
+    await bitStore.createBit(createBitDto)
+    showCreateBitModal.value = false
+  } catch (error) {
+    console.error('Failed to create bit:', error)
+  }
+}
+
+const handleDeleteBit = async (id: number) => {
+  if (confirm('Are you sure you want to delete this bit?')) {
+    try {
+      await bitStore.deleteBit(id)
+    } catch (error) {
+      console.error('Failed to delete bit:', error)
+    }
+  }
+}
+
+const handleEditBit = (bit: Bit) => {
+  console.log('Edit bit:', bit)
+  alert('Edit functionality will be implemented in a future update')
 }
 
 const menuItems = [
@@ -255,6 +297,7 @@ onMounted(() => {
   applyTheme()
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('mousemove', handleMouseMove)
+  bitStore.fetchBits()
 })
 </script>
 
@@ -270,7 +313,10 @@ onMounted(() => {
     @touchmove="handleTouchMove"
     :style="{ cursor: isDragging ? 'grabbing' : 'default' }"
   >
-    <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
+    <div
+      class="absolute inset-0 origin-top-left canvas-content"
+      :style="{ transform: canvasTransform }"
+    >
       <div class="p-5">
         <div class="max-w-7xl">
           <h1 class="text-3xl font-bold text-text0 mb-4">Workspace</h1>
@@ -279,6 +325,15 @@ onMounted(() => {
           </p>
         </div>
       </div>
+
+      <!-- Render bits -->
+      <LBit
+        v-for="bit in bitStore.bits"
+        :key="bit.id"
+        :bit="bit"
+        @delete="handleDeleteBit"
+        @edit="handleEditBit"
+      />
     </div>
 
     <div class="absolute bottom-4 left-4 z-50">
@@ -338,6 +393,14 @@ onMounted(() => {
       :y="contextMenu.y"
       :items="menuItems"
       @close="closeContextMenu"
+    />
+    <LCreateBitModal
+      v-if="showCreateBitModal"
+      :x="createBitPosition.x"
+      :y="createBitPosition.y"
+      :user-id="userStore.user?.id || 1"
+      @close="showCreateBitModal = false"
+      @create="handleCreateBit"
     />
   </div>
 </template>
