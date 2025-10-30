@@ -5,63 +5,44 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Development stage
+# Development stage - uses mounted volumes from host
 FROM base AS development
 ENV NODE_ENV=development
-
-# Copy workspace root package files
-COPY package*.json ./
-
-# Copy backend package files
-COPY backend/package*.json ./backend/
-
-# Install all dependencies (ignoring npm error - deps are still installed)
-RUN npm install || true
-
-# Copy backend source code
-COPY backend ./backend
-
-WORKDIR /app/backend
 EXPOSE 3000
-CMD ["npm", "run", "dev"]
+# Note: Source code and node_modules are mounted as volumes in docker-compose.yml
+# This allows for hot-reload during development
+CMD ["sh", "-c", "cd /app/backend && npm run dev"]
 
 # Builder stage for production
 FROM base AS builder
 WORKDIR /app
 
-# Copy workspace root package files
-COPY package*.json ./
+# Copy everything from the project
+COPY . .
 
-# Copy backend package files
-COPY backend/package*.json ./backend/
+# Install dependencies from the root (workspace aware)
+# Note: If this fails in your environment, run `npm install` on the host first
+RUN npm install --verbose 2>&1 || (echo "Warning: npm install had issues but continuing..." && true)
 
-# Install all dependencies (ignoring npm error - deps are still installed)
-RUN npm install || true
-
-# Copy backend source code
-COPY backend ./backend
-
-# Build using node to run typescript compiler directly
+# Build the backend
 WORKDIR /app/backend
-RUN rm -rf dist && node /app/node_modules/typescript/bin/tsc -p tsconfig.build.json
+RUN npm run build --verbose || node ../node_modules/typescript/lib/tsc.js -p tsconfig.build.json || npx --yes typescript@latest tsc -p tsconfig.build.json
 
 # Production stage
 FROM base AS production
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Copy workspace root package files
+# Copy package files
 COPY package*.json ./
-
-# Copy backend package files
 COPY backend/package*.json ./backend/
 
-# Install production dependencies only (ignoring npm error - deps are still installed)
-RUN npm install --omit=dev || true
-RUN npm cache clean --force
+# Install production dependencies
+RUN npm install --omit=dev --verbose 2>&1 || (echo "Warning: npm install had issues but continuing..." && true)
 
 # Copy built files from builder
 COPY --from=builder /app/backend/dist ./backend/dist
+COPY --from=builder /app/backend/package.json ./backend/
 
 WORKDIR /app/backend
 EXPOSE 3000

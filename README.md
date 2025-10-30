@@ -53,11 +53,14 @@ cd Listion
 cp .env.example .env
 # Edit .env with your configuration
 
+# Install dependencies (required for Docker development)
+npm install
+
 # Start all services (database, backend, frontend)
-docker-compose up
+docker compose up
 
 # Or run in background
-docker-compose up -d
+docker compose up -d
 ```
 
 Access the application:
@@ -140,19 +143,20 @@ See [DOCKER.md](DOCKER.md) for comprehensive Docker documentation.
 
 ```bash
 # Development mode (with hot-reload)
-docker-compose up
+npm install  # Required first!
+docker compose up
 
 # Production mode
-docker-compose -f docker-compose.prod.yml up
+docker compose -f docker-compose.prod.yml up
 
 # Stop services
-docker-compose down
+docker compose down
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Rebuild after changes
-docker-compose build
+docker compose build
 ```
 
 ## Common tasks 🧰

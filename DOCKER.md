@@ -20,21 +20,34 @@ cp .env.example .env
 
 Edit `.env` and set your values (especially `POSTGRES_PASSWORD` and `JWT_SECRET` for production).
 
-### 2. Start the Application (Development)
+### 2. Install Dependencies (Required)
+
+**Important**: Before starting Docker containers, install dependencies on your host machine:
+
+```bash
+npm install
+```
+
+This installs all dependencies in a `node_modules` directory that will be mounted into the containers. This approach:
+- Ensures dependencies are properly installed (works around npm/Alpine compatibility issues)
+- Enables hot-reload in development mode
+- Maintains workspace structure for the monorepo
+
+### 3. Start the Application (Development)
 
 ```bash
 # Start all services (postgres, backend, frontend)
-docker-compose up
+docker compose up
 
 # Or run in detached mode (background)
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # View logs for a specific service
-docker-compose logs -f backend
-docker-compose logs -f frontend
+docker compose logs -f backend
+docker compose logs -f frontend
 ```
 
 The application will be available at:
@@ -43,78 +56,100 @@ The application will be available at:
 - **Swagger UI**: http://localhost:3000/api/docs
 - **Database**: localhost:5432
 
-### 3. Stop the Application
+### 4. Stop the Application
 
 ```bash
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove all data (including database)
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Development Mode
 
-In development mode, the containers mount your local source code as volumes, enabling hot-reload for both frontend and backend.
+In development mode, the containers mount your local source code and node_modules as volumes, enabling hot-reload for both frontend and backend.
+
+**Prerequisites**: Run `npm install` on your host machine before starting Docker containers.
 
 ### Start Development Environment
 
 ```bash
-docker-compose up
+# Install dependencies first (required)
+npm install
+
+# Start Docker services
+docker compose up
 ```
 
 Changes you make to files in `./frontend` and `./backend` will be automatically detected and the services will reload.
 
 ### Rebuild After Dependency Changes
 
-If you add new npm packages, rebuild the containers:
+If you add new npm packages:
+
+```bash
+# Add package on host
+npm install <package-name>
+
+# Restart containers (no rebuild needed - uses mounted node_modules)
+docker compose restart
+```
+
+If you need to rebuild the containers for other reasons:
 
 ```bash
 # Rebuild specific service
-docker-compose build backend
-docker-compose build frontend
+docker compose build backend
+docker compose build frontend
 
 # Or rebuild all services
-docker-compose build
+docker compose build
 
 # Then restart
-docker-compose up
+docker compose up
 ```
 
 ### Access Container Shells
 
 ```bash
 # Backend shell
-docker-compose exec backend sh
+docker compose exec backend sh
 
 # Frontend shell
-docker-compose exec frontend sh
+docker compose exec frontend sh
 
 # Database shell
-docker-compose exec postgres psql -U listion_user -d listion
+docker compose exec postgres psql -U listion_user -d listion
 ```
 
 ## Production Mode
 
-Production mode builds optimized images:
+Production mode builds optimized images with all dependencies bundled:
 - Frontend: Static files served by nginx
 - Backend: Compiled JavaScript (no TypeScript compilation at runtime)
+
+**Note**: Production builds require dependencies to be properly installed during the build process. If you encounter npm errors during build, you can:
+1. Pre-build on your host: `npm install && npm run --workspace backend build && npm run --workspace frontend build`
+2. Copy the built files into the production containers
 
 ### Build and Run Production Images
 
 ```bash
-# Set production environment
-export BUILD_TARGET=production
-export NODE_ENV=production
+# Option 1: Build production images (may have npm issues in some environments)
+docker compose -f docker-compose.prod.yml build
 
-# Build production images
-docker-compose -f docker-compose.prod.yml build
+# Option 2: Build on host first (recommended if build fails)
+npm install
+npm run --workspace backend build
+npm run --workspace frontend build
+# Then the Docker build will use these pre-built files
 
 # Start production services
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # View logs
-docker-compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs -f
 ```
 
 The application will be available at:
@@ -125,8 +160,35 @@ The application will be available at:
 ### Stop Production Environment
 
 ```bash
-docker-compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml down
 ```
+
+## Known Issues and Workarounds
+
+### npm Install Issues in Alpine Linux
+
+Some environments may experience issues with npm install inside Alpine Linux containers. Symptoms include:
+- "Exit handler never called" errors
+- Missing `.bin` symlinks in node_modules
+- Packages installed but binaries not accessible
+
+**Workarounds**:
+
+1. **For Development** (Recommended): Install dependencies on your host machine before running Docker:
+   ```bash
+   npm install
+   docker compose up
+   ```
+   This uses mounted volumes, so the host's node_modules is used directly.
+
+2. **For Production Builds**: If builds fail, pre-build on the host:
+   ```bash
+   npm install
+   npm run build  # Builds both workspaces
+   ```
+   Then create a simpler Dockerfile that just copies the dist folders.
+
+3. **Alternative**: Use a different base image (e.g., `node:20` instead of `node:20-alpine`) in Dockerfiles, though this increases image size.
 
 ## Docker Services Overview
 

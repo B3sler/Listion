@@ -44,11 +44,9 @@ services:
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
-      # For development: mount source code for hot-reload
-      - ./backend:/app/backend
+      # For development: mount entire project for workspace support
+      - .:/app
       - /app/node_modules
-      - /app/backend/node_modules
-      - /app/backend/dist
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,11 +72,9 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
-      # For development: mount source code for hot-reload
-      - ./frontend:/app/frontend
+      # For development: mount entire project for workspace support
+      - .:/app
       - /app/node_modules
-      - /app/frontend/node_modules
-      - /app/frontend/dist
     depends_on:
       - backend
     networks:
