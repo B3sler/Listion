@@ -30,17 +30,71 @@ Note: This repository is under active development. Some features are planned or 
 
 ## Requirements ⚙️
 
+### Local Development
 - Node.js 20+ (LTS recommended)
 - npm 10+
-- Docker and Docker Compose (for database)
+
+### Docker Setup (Recommended)
+- Docker 20.10+
+- Docker Compose 2.0+
+
+## Getting Started
+
+You can run Listion in two ways:
+
+### Option 1: Docker (Recommended) 🐳
+
+Run the complete application stack with Docker. See [DOCKER.md](DOCKER.md) for detailed instructions.
+
+```bash
+# Clone and setup
+git clone https://github.com/B3sler/Listion.git
+cd Listion
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start all services (database, backend, frontend)
+docker-compose up
+
+# Or run in background
+docker-compose up -d
+```
+
+Access the application:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:3000/api
+- **Swagger UI**: http://localhost:3000/api/docs
+
+### Option 2: Local Development 🔧
+
+For local development without Docker (database still runs in Docker):
+
+```bash
+# Clone and install
+git clone https://github.com/B3sler/Listion.git
+cd Listion
+npm install
+
+# Setup environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start PostgreSQL database only
+docker-compose up -d postgres
+
+# Run frontend and backend (in separate terminals or use npm run dev)
+npm run dev
+```
 
 ## Database setup 🗄️
 
-The application uses PostgreSQL as its database. Start the database using Docker Compose:
+### With Docker Compose (Both Options)
+
+The application uses PostgreSQL as its database:
 
 ```bash
 # Start the PostgreSQL database
-docker-compose up -d
+docker-compose up -d postgres
 
 # Check if the database is running
 docker-compose ps
@@ -52,11 +106,13 @@ docker-compose down
 docker-compose down -v
 ```
 
-Before starting the database, create a `.env` file in the root directory (provided by @B3sler).
+Before starting, create a `.env` file in the root directory from `.env.example` and configure your database credentials.
 
 The database will be available at `localhost:5432` and data is persisted in a Docker volume.
 
 ## Quickstart 🚀
+
+For local development (Option 2):
 
 ```bash
 # Clone and install
@@ -76,6 +132,27 @@ npm run --workspace frontend dev
 
 # Backend (NestJS dev)
 npm run --workspace backend dev
+```
+
+## Docker Commands 🐳
+
+See [DOCKER.md](DOCKER.md) for comprehensive Docker documentation.
+
+```bash
+# Development mode (with hot-reload)
+docker-compose up
+
+# Production mode
+docker-compose -f docker-compose.prod.yml up
+
+# Stop services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# Rebuild after changes
+docker-compose build
 ```
 
 ## Common tasks 🧰
