@@ -10,6 +10,21 @@ This guide explains how to run Listion using Docker and Docker Compose. Both fro
 
 ## Quick Start
 
+### Method 1: Quick Start Script (Easiest)
+
+Use the provided script for the fastest setup:
+
+```bash
+./docker-start.sh
+```
+
+This script will:
+1. Check if `.env` exists (creates from example if not)
+2. Install npm dependencies if needed
+3. Start all Docker services
+
+### Method 2: Manual Setup
+
 ### 1. Setup Environment Variables
 
 Copy the example environment file and configure your settings:

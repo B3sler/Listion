@@ -46,6 +46,17 @@ You can run Listion in two ways:
 
 Run the complete application stack with Docker. See [DOCKER.md](DOCKER.md) for detailed instructions.
 
+**Quick Start with Script:**
+```bash
+# Clone the repository
+git clone https://github.com/B3sler/Listion.git
+cd Listion
+
+# Run the quick start script
+./docker-start.sh
+```
+
+**Manual Start:**
 ```bash
 # Clone and setup
 git clone https://github.com/B3sler/Listion.git
