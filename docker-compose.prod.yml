@@ -1,25 +1,18 @@
-version: "3.8"
-
-# Production Docker Compose Configuration
-# Use this file for production deployments
-
 services:
   postgres:
     image: postgres:15
     container_name: listion-postgres-prod
     restart: always
-    env_file:
-      - .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-listion}
+      POSTGRES_USER: ${POSTGRES_USER:-listion_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - listion-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-listion_user} -d ${POSTGRES_DB:-listion}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,17 +24,15 @@ services:
       target: production
     container_name: listion-backend-prod
     restart: always
-    env_file:
-      - .env
     environment:
       NODE_ENV: production
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: ${POSTGRES_USER}
-      DB_PASS: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
-      JWT_SECRET: ${JWT_SECRET}
+      DB_USER: ${POSTGRES_USER:-listion_user}
+      DB_PASS: ${POSTGRES_PASSWORD:-changeme}
+      DB_NAME: ${POSTGRES_DB:-listion}
+      JWT_SECRET: ${JWT_SECRET:-supersecret_change_in_production}
     expose:
       - "3000"
     depends_on:

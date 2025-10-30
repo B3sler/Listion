@@ -1,12 +1,8 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:15
     container_name: listion-postgres
     restart: always
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-listion}
       POSTGRES_USER: ${POSTGRES_USER:-listion_user}
@@ -30,8 +26,6 @@ services:
       target: ${BUILD_TARGET:-development}
     container_name: listion-backend
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3000}

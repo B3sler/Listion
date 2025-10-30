@@ -7,22 +7,17 @@ echo "🐳 Listion Docker Quick Start"
 echo "=============================="
 echo ""
 
-# Check if .env exists
+# Create .env from example if it doesn't exist
 if [ ! -f ".env" ]; then
     echo "📝 Creating .env file from .env.example..."
     cp .env.example .env
-    echo "⚠️  Please edit .env file and set your database password and JWT secret!"
-    echo "    Then run this script again."
-    exit 1
+    echo "✅ .env file created with default values"
+    echo ""
 fi
 
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then
     echo "📦 Installing dependencies with npm..."
-    # Check for package-lock.json to confirm npm is used
-    if [ ! -f "package-lock.json" ]; then
-        echo "⚠️  Warning: package-lock.json not found. Using npm anyway..."
-    fi
     npm install
 else
     echo "✅ Dependencies already installed"
@@ -34,7 +29,7 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Allow specifying compose file via environment variable or argument
+# Allow specifying compose file via argument
 COMPOSE_FILE="${1:-docker-compose.yml}"
 
 echo ""

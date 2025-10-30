@@ -46,18 +46,14 @@ You can run Listion in two ways:
 
 Run the complete application stack with Docker. See [DOCKER.md](DOCKER.md) for detailed instructions.
 
-**Quick Start with Script:**
+**Quick Start (Easiest):**
 ```bash
 # Clone the repository
 git clone https://github.com/B3sler/Listion.git
 cd Listion
 
-# Run the quick start script (development mode)
+# Run the quick start script - it handles everything automatically
 ./docker-start.sh
-
-# Or for production mode
-# npm run build
-# ./docker-start.sh docker-compose.prod.simple.yml
 ```
 
 **Manual Start:**
@@ -65,16 +61,11 @@ cd Listion
 # Clone and setup
 git clone https://github.com/B3sler/Listion.git
 cd Listion
-cp .env.example .env
-# Edit .env with your configuration
 
-# Install dependencies (required for Docker development)
+# Install dependencies
 npm install
 
 # Start all services (database, backend, frontend)
-docker compose up
-
-# Or run in background
 docker compose up -d
 ```
 
@@ -108,25 +99,28 @@ npm run dev
 
 ### With Docker Compose (Both Options)
 
-The application uses PostgreSQL as its database:
+The application uses PostgreSQL as its database. Default credentials are configured automatically:
 
 ```bash
-# Start the PostgreSQL database
-docker-compose up -d postgres
+# Start the PostgreSQL database only
+docker compose up -d postgres
 
 # Check if the database is running
-docker-compose ps
+docker compose ps
 
 # Stop the database
-docker-compose down
+docker compose down
 
 # Stop and remove all data
-docker-compose down -v
+docker compose down -v
 ```
 
-Before starting, create a `.env` file in the root directory from `.env.example` and configure your database credentials.
+The database will be available at `localhost:5432` with these default credentials:
+- Database: `listion`
+- User: `listion_user`
+- Password: `changeme`
 
-The database will be available at `localhost:5432` and data is persisted in a Docker volume.
+To customize, create a `.env` file (copied from `.env.example`) with your preferred values.
 
 ## Quickstart 🚀
 
@@ -157,12 +151,12 @@ npm run --workspace backend dev
 See [DOCKER.md](DOCKER.md) for comprehensive Docker documentation.
 
 ```bash
-# Development mode (with hot-reload)
-npm install  # Required first!
-docker compose up
+# Quick start (handles everything)
+./docker-start.sh
 
-# Production mode
-docker compose -f docker-compose.prod.yml up
+# Or manual start
+npm install
+docker compose up -d
 
 # Stop services
 docker compose down
