@@ -52,8 +52,12 @@ Run the complete application stack with Docker. See [DOCKER.md](DOCKER.md) for d
 git clone https://github.com/B3sler/Listion.git
 cd Listion
 
-# Run the quick start script
+# Run the quick start script (development mode)
 ./docker-start.sh
+
+# Or for production mode
+# npm run build
+# ./docker-start.sh docker-compose.prod.simple.yml
 ```
 
 **Manual Start:**

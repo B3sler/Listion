@@ -15,7 +15,11 @@ This guide explains how to run Listion using Docker and Docker Compose. Both fro
 Use the provided script for the fastest setup:
 
 ```bash
+# Development mode (default)
 ./docker-start.sh
+
+# Production mode (simplified)
+./docker-start.sh docker-compose.prod.simple.yml
 ```
 
 This script will:
