@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
+import { createPinia } from 'pinia'
 import LWorkspace from './LWorkspace.vue'
 
 const router = createRouter({
@@ -13,9 +14,17 @@ const router = createRouter({
 
 describe('LWorkspace', () => {
   it('should render without crashing', async () => {
+    const pinia = createPinia()
     const wrapper = mount(LWorkspace, {
       global: {
-        plugins: [router],
+        plugins: [router, pinia],
+        stubs: {
+          LContextMenu: true,
+          LCreateBitModal: true,
+          LBit: true,
+          LTaskbar: true,
+          LMenu: true,
+        },
       },
     })
     await router.isReady()
@@ -23,9 +32,17 @@ describe('LWorkspace', () => {
   })
 
   it('should display workspace text', async () => {
+    const pinia = createPinia()
     const wrapper = mount(LWorkspace, {
       global: {
-        plugins: [router],
+        plugins: [router, pinia],
+        stubs: {
+          LContextMenu: true,
+          LCreateBitModal: true,
+          LBit: true,
+          LTaskbar: true,
+          LMenu: true,
+        },
       },
     })
     await router.isReady()
