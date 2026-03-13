@@ -5,11 +5,16 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Development stage - source and node_modules are mounted as volumes
+# Development stage
 FROM base AS development
+WORKDIR /app
+COPY package*.json ./
+COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
+RUN npm install
 ENV NODE_ENV=development
 EXPOSE 3000
-CMD ["sh", "-c", "cd /app/backend && npm run dev"]
+CMD ["sh", "-c", "cd /app/backend && npx ts-node-dev --poll --respawn --transpile-only src/main.ts"]
 
 # Builder stage for production
 FROM base AS builder

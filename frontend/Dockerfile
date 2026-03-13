@@ -5,8 +5,13 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Development stage - source and node_modules are mounted as volumes
+# Development stage
 FROM base AS development
+WORKDIR /app
+COPY package*.json ./
+COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
+RUN npm install
 ENV NODE_ENV=development
 EXPOSE 5173
 CMD ["sh", "-c", "cd /app/frontend && npm run dev -- --host 0.0.0.0"]

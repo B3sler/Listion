@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme.ts'
@@ -50,8 +50,8 @@ const features = [
         </div>
 
         <button
-          @click="navigateToLogin"
           class="group relative px-8 py-4 bg-brand hover:bg-blue-500 text-white text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          @click="navigateToLogin"
         >
           <span class="flex items-center gap-2"> Login > </span>
         </button>
@@ -72,10 +72,10 @@ const features = [
           <p class="text-text2 text-sm">
             by
             <a
-              href="https://github.com/B3sler"
-              target="_blank"
-              rel="noopener"
               class="underline hover:text-blue-400"
+              href="https://github.com/B3sler"
+              rel="noopener"
+              target="_blank"
               >@B3sler</a
             >
           </p>

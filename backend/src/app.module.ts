@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { JwtModule } from '@nestjs/jwt'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { APP_GUARD } from '@nestjs/core'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { User } from './modules/user/user.entity'
@@ -14,6 +16,7 @@ import { BitController } from './modules/bit/bit.controller'
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }) as unknown as import('@nestjs/common').DynamicModule,
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
@@ -31,6 +34,6 @@ import { BitController } from './modules/bit/bit.controller'
     }),
   ],
   controllers: [AppController, AuthController, BitController],
-  providers: [AppService, UserService, BitService],
+  providers: [AppService, UserService, BitService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
