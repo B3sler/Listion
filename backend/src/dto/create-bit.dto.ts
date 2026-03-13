@@ -1,9 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 
 export class CreateBitDto {
-  @ApiProperty({ example: 1, description: 'UserId to whom the task belongs' })
-  user!: number
-
   @ApiProperty({ example: 'Go shopping', description: 'Short text describing the task' })
   title!: string
 

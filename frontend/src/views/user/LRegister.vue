@@ -99,7 +99,7 @@ function navigateToLogin() {
             type="submit"
             class="mt-2 bg-brand text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
           >
-            Login
+            Register
           </button>
         </form>
         <div class="w-full flex justify-between mt-4 text-sm">
