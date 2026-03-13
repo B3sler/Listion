@@ -5,12 +5,10 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Development stage - uses mounted volumes from host
+# Development stage - source and node_modules are mounted as volumes
 FROM base AS development
 ENV NODE_ENV=development
 EXPOSE 5173
-# Note: Source code and node_modules are mounted as volumes in docker-compose.yml
-# This allows for hot-reload during development
 CMD ["sh", "-c", "cd /app/frontend && npm run dev -- --host 0.0.0.0"]
 
 # Builder stage for production
@@ -21,8 +19,7 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies from the root (workspace aware)
-# Note: If this fails in your environment, run `npm install` on the host first
-RUN npm install --verbose 2>&1 || (echo "Warning: npm install had issues but continuing..." && true)
+RUN npm install
 
 # Build the frontend
 WORKDIR /app/frontend

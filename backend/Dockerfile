@@ -5,12 +5,10 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
-# Development stage - uses mounted volumes from host
+# Development stage - source and node_modules are mounted as volumes
 FROM base AS development
 ENV NODE_ENV=development
 EXPOSE 3000
-# Note: Source code and node_modules are mounted as volumes in docker-compose.yml
-# This allows for hot-reload during development
 CMD ["sh", "-c", "cd /app/backend && npm run dev"]
 
 # Builder stage for production
@@ -21,12 +19,11 @@ WORKDIR /app
 COPY . .
 
 # Install dependencies from the root (workspace aware)
-# Note: If this fails in your environment, run `npm install` on the host first
-RUN npm install --verbose 2>&1 || (echo "Warning: npm install had issues but continuing..." && true)
+RUN npm install
 
 # Build the backend
 WORKDIR /app/backend
-RUN npm run build --verbose || node ../node_modules/typescript/lib/tsc.js -p tsconfig.build.json || npx --yes typescript@latest tsc -p tsconfig.build.json
+RUN npm run build
 
 # Production stage
 FROM base AS production
@@ -38,7 +35,7 @@ COPY package*.json ./
 COPY backend/package*.json ./backend/
 
 # Install production dependencies
-RUN npm install --omit=dev --verbose 2>&1 || (echo "Warning: npm install had issues but continuing..." && true)
+RUN npm install --omit=dev
 
 # Copy built files from builder
 COPY --from=builder /app/backend/dist ./backend/dist
