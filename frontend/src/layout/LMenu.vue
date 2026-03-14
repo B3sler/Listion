@@ -1,194 +1,236 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
+import { LogOut } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/userStore'
-import router from '@/router'
 
 const isOpen = ref(false)
+const menuRef = ref<HTMLElement | null>(null)
 const userStore = useUserStore()
+const router = useRouter()
 
-function handleLogout() {
-  userStore.logout()
-  router.push('/login')
+const displayName = computed(
+  () => userStore.user?.name || userStore.user?.email || 'Unknown',
+)
+
+const initials = computed(() => {
+  const name = userStore.user?.name || userStore.user?.email || '?'
+  return name
+    .split(/[\s@._-]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0].toUpperCase())
+    .join('')
+})
+
+async function handleLogout() {
+  await userStore.logout()
   isOpen.value = false
+  router.push('/login')
 }
+
+function handleClickOutside(e: MouseEvent) {
+  if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
+    isOpen.value = false
+  }
+}
+
+function handleEscape(e: KeyboardEvent) {
+  if (e.key === 'Escape') isOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+  document.addEventListener('keydown', handleEscape)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+  document.removeEventListener('keydown', handleEscape)
+})
 </script>
 
 <template>
-  <div class="fixed top-2 right-4 z-[9999]">
-    <button @click="isOpen = !isOpen" class="background group" aria-label="Open Menu" type="button">
-      <div class="menu__icon w-8 h-8 p-1">
-        <span
-          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-top"
-        ></span>
-        <span
-          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-scaled"
-        ></span>
-        <span
-          class="menu__bar block w-full h-0.75 rounded transition duration-400 group-hover:menu__bar-bottom"
-        ></span>
+  <div ref="menuRef" class="fixed top-3 right-4 z-[9999]">
+    <button
+      class="menu-btn"
+      type="button"
+      :aria-expanded="isOpen"
+      aria-label="Menü öffnen"
+      @click="isOpen = !isOpen"
+    >
+      <div class="menu__icon">
+        <span class="menu__bar" :class="{ 'menu__bar--top-open': isOpen }" />
+        <span class="menu__bar" :class="{ 'menu__bar--mid-open': isOpen }" />
+        <span class="menu__bar" :class="{ 'menu__bar--bot-open': isOpen }" />
       </div>
     </button>
-    <div
-      v-if="isOpen"
-      class="absolute animate-fade-in right-0 p-3 mt-2 w-56 bg-surface2 rounded-lg shadow-lg border border-gray-200 flex flex-col items-end py-2 z-[9999]"
-    >
-      <div class="mb-4 text-text1 font-semibold text-lg">
-        {{ userStore.user?.name || userStore.user?.email || 'unknown' }}
-      </div>
-      <button
-        @click="handleLogout"
-        class="self-center w-40 px-6 py-3 bg-gradient-to-br from-surface3 to-surface4 text-text0 font-semibold text-base rounded-xl shadow-lg hover:shadow-sm hover:shadow-red-100 hover:scale-105"
-        type="button"
+
+    <Transition name="dropdown">
+      <div
+        v-if="isOpen"
+        class="dropdown"
+        role="menu"
       >
-        Logout
-      </button>
-    </div>
+        <div class="dropdown__header">
+          <div class="avatar">{{ initials }}</div>
+          <span class="dropdown__name">{{ displayName }}</span>
+        </div>
+
+        <div class="dropdown__body">
+          <button
+            class="menu-item"
+            type="button"
+            role="menuitem"
+            @click="handleLogout"
+          >
+            <LogOut :size="15" class="shrink-0" />
+            Logout
+          </button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
+/* ── Trigger button ─────────────────────────────────────── */
+.menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background-color: var(--surface2);
+  border: 1px solid var(--surface3);
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+
+.menu-btn:hover {
+  background-color: var(--surface3);
+}
+
+/* ── Hamburger icon ─────────────────────────────────────── */
 .menu__icon {
-  width: 32px;
-  height: 32px;
-  padding: 4px;
+  width: 18px;
+  height: 12px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-}
-
-.menu__icon span {
-  display: block;
-  width: 100%;
-  height: 0.125rem;
-  border-radius: 2px;
-  background-color: var(--text1);
-  box-shadow: 0.5px 2px 0 hsla(0, 0%, 0%, 0.2);
-  transition: background-color 0.4s;
-  position: relative;
-}
-
-.menu__icon span + span {
-  margin-top: 0.375rem;
+  justify-content: space-between;
 }
 
 .menu__bar {
-  animation: ease 0.8s menu-icon-top-2 forwards;
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--text1);
+  transform-origin: center;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
 }
 
-.menu__bar + .menu__bar {
-  animation: ease 0.8s menu-icon-scaled-2 forwards;
+.menu__bar--top-open {
+  transform: translateY(5px) rotate(45deg);
 }
 
-.menu__bar + .menu__bar + .menu__bar {
-  animation: ease 0.8s menu-icon-bottom-2 forwards;
+.menu__bar--mid-open {
+  opacity: 0;
+  transform: scaleX(0);
 }
 
-.group:hover .menu__bar:first-child {
-  animation: ease 0.8s menu-icon-top forwards;
+.menu__bar--bot-open {
+  transform: translateY(-5px) rotate(-45deg);
 }
 
-.group:hover .menu__bar:nth-child(2) {
-  animation: ease 0.8s menu-icon-scaled forwards;
+/* ── Dropdown panel ─────────────────────────────────────── */
+.dropdown {
+  position: absolute;
+  right: 0;
+  margin-top: 8px;
+  width: 220px;
+  border-radius: 12px;
+  background-color: var(--surface2);
+  border: 1px solid var(--surface3);
+  box-shadow:
+    0 4px 6px -1px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.05)),
+    0 10px 15px -3px hsl(var(--surface-shadow) / var(--shadow-strength));
+  overflow: hidden;
 }
 
-.group:hover .menu__bar:last-child {
-  animation: ease 0.8s menu-icon-bottom forwards;
-  background-color: rgb(22, 189, 11);
+.dropdown__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--surface3);
 }
 
-@keyframes menu-icon-top {
-  0% {
-    top: 0;
-    transform: rotate(0);
-  }
-  50% {
-    top: 0.5rem;
-    transform: rotate(0);
-  }
-  100% {
-    top: 0.5rem;
-    transform: rotate(45deg);
-  }
+.dropdown__name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@keyframes menu-icon-top-2 {
-  0% {
-    top: 0.5rem;
-    transform: rotate(45deg);
-  }
-  50% {
-    top: 0.5rem;
-    transform: rotate(0);
-  }
-  100% {
-    top: 0;
-    transform: rotate(0);
-  }
+.dropdown__body {
+  padding: 6px;
 }
 
-@keyframes menu-icon-bottom {
-  0% {
-    bottom: 0;
-    transform: rotate(0);
-  }
-  50% {
-    bottom: 0.5rem;
-    transform: rotate(0);
-  }
-  100% {
-    bottom: 0.5rem;
-    transform: rotate(135deg);
-  }
+/* ── Avatar ─────────────────────────────────────────────── */
+.avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--brand);
+  color: hsl(0 0% 100%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@keyframes menu-icon-bottom-2 {
-  0% {
-    bottom: 0.5rem;
-    transform: rotate(135deg);
-  }
-  50% {
-    bottom: 0.5rem;
-    transform: rotate(0);
-  }
-  100% {
-    bottom: 0;
-    transform: rotate(0);
-  }
+/* ── Menu item ──────────────────────────────────────────── */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--text1);
+  cursor: pointer;
+  transition: background-color 0.15s;
+  text-align: left;
 }
 
-@keyframes menu-icon-scaled {
-  50% {
-    transform: scale(0);
-  }
-  100% {
-    transform: scale(0);
-  }
+.menu-item:hover {
+  background-color: var(--surface3);
+  color: var(--text0);
 }
 
-@keyframes menu-icon-scaled-2 {
-  0% {
-    transform: scale(0);
-  }
-  50% {
-    transform: scale(0);
-  }
-  100% {
-    transform: scale(1);
-  }
+/* ── Dropdown transition ────────────────────────────────── */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translatex(+40px);
-  }
-  to {
-    opacity: 1;
-    transform: translatex(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 1s ease-out;
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
 }
 </style>
