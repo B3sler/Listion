@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { LogOut } from 'lucide-vue-next'
+import { LogOut, Sun, Moon } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/userStore'
+import { useTheme } from '@/composables/useTheme.ts'
 
 const isOpen = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 const userStore = useUserStore()
 const router = useRouter()
+const { isDark, toggle: toggleTheme } = useTheme()
 
 const displayName = computed(
   () => userStore.user?.name || userStore.user?.email || 'Unknown',
@@ -78,6 +80,21 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="dropdown__body">
+          <button
+            class="menu-item menu-item--theme"
+            type="button"
+            role="menuitem"
+            :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+            @click="toggleTheme"
+          >
+            <span class="theme-toggle">
+              <Sun :size="15" class="theme-toggle__icon theme-toggle__icon--sun" :class="{ 'theme-toggle__icon--active': !isDark }" />
+              <Moon :size="15" class="theme-toggle__icon theme-toggle__icon--moon" :class="{ 'theme-toggle__icon--active': isDark }" />
+              <span class="theme-toggle__pill" :class="{ 'theme-toggle__pill--dark': isDark }" />
+            </span>
+            {{ isDark ? 'Dark mode' : 'Light mode' }}
+          </button>
+
           <button
             class="menu-item"
             type="button"
@@ -218,6 +235,63 @@ onBeforeUnmount(() => {
 .menu-item:hover {
   background-color: var(--surface3);
   color: var(--text0);
+}
+
+/* ── Theme toggle ───────────────────────────────────────── */
+.menu-item--theme {
+  justify-content: space-between;
+}
+
+.theme-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 48px;
+  height: 24px;
+  border-radius: 999px;
+  background-color: var(--surface3);
+  border: 1px solid var(--surface3);
+  flex-shrink: 0;
+  order: -1;
+}
+
+.theme-toggle__icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+  color: var(--text2);
+  opacity: 0.4;
+}
+
+.theme-toggle__icon--sun {
+  left: 5px;
+}
+
+.theme-toggle__icon--moon {
+  right: 5px;
+}
+
+.theme-toggle__icon--active {
+  opacity: 1;
+  color: var(--text0);
+}
+
+.theme-toggle__pill {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--text1);
+  transition: transform 0.25s ease;
+}
+
+.theme-toggle__pill--dark {
+  transform: translateX(24px);
 }
 
 /* ── Dropdown transition ────────────────────────────────── */
