@@ -12,6 +12,9 @@ import { AuthController } from './modules/user/auth.controller'
 import { Bit } from './modules/bit/bit.entity'
 import { BitService } from './modules/bit/bit.service'
 import { BitController } from './modules/bit/bit.controller'
+import { BitConnection } from './modules/connection/connection.entity'
+import { ConnectionService } from './modules/connection/connection.service'
+import { ConnectionController } from './modules/connection/connection.controller'
 
 @Module({
   imports: [
@@ -24,16 +27,16 @@ import { BitController } from './modules/bit/bit.controller'
       username: process.env.DB_USER || 'listion',
       password: process.env.DB_PASS,
       database: process.env.DB_NAME || 'listion',
-      entities: [User, Bit],
+      entities: [User, Bit, BitConnection],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
-    TypeOrmModule.forFeature([User, Bit]),
+    TypeOrmModule.forFeature([User, Bit, BitConnection]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  controllers: [AppController, AuthController, BitController],
-  providers: [AppService, UserService, BitService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  controllers: [AppController, AuthController, BitController, ConnectionController],
+  providers: [AppService, UserService, BitService, ConnectionService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

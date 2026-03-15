@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
 import LBit from '@/components/LBit.vue'
 import LCreateBitModal from '@/components/LCreateBitModal.vue'
@@ -9,6 +9,7 @@ import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
 import { ScanSearch, ZoomIn, ZoomOut, Fullscreen } from 'lucide-vue-next'
 import { useBitStore } from '@/stores/bitStore'
+import { useConnectionStore, type Side } from '@/stores/connectionStore'
 
 type ContextMenuState = {
   visible: boolean
@@ -37,6 +38,7 @@ const {
 } = useCanvas(containerRef)
 
 const bitStore = useBitStore()
+const connectionStore = useConnectionStore()
 
 // canvas-space coordinates of the last right-click
 const contextCanvasPos = ref({ x: 0, y: 0 })
@@ -89,6 +91,141 @@ const handleTouchEndWithLongPress = (event: TouchEvent) => {
   handleTouchEnd(event)
 }
 
+// ── snap & connection logic ─────────────────────────────────────────
+const SNAP_THRESHOLD = 50 // world-space pixels
+
+// Dot positions relative to bit center (bit is 144×144, centered at bit.x/bit.y)
+// Diagonal dots at midpoints of the 45° edges: (126,18), (126,126), (18,126), (18,18)
+// Offset from center (72,72): ±54 on each axis
+const DOT_OFFSETS: Record<Side, { x: number; y: number }> = {
+  'top':          { x: 0,     y: -70.5 },
+  'top-right':    { x: 54,    y: -54   },
+  'right':        { x: 70.5,  y: 0     },
+  'bottom-right': { x: 54,    y: 54    },
+  'bottom':       { x: 0,     y: 70.5  },
+  'bottom-left':  { x: -54,   y: 54    },
+  'left':         { x: -70.5, y: 0     },
+  'top-left':     { x: -54,   y: -54   },
+}
+
+const SIDES: Side[] = ['top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left', 'top-left']
+
+// Only the geometrically opposite side may connect — the one rule that guarantees no overlap
+const OPPOSITE: Record<Side, Side> = {
+  'top':          'bottom',
+  'top-right':    'bottom-left',
+  'right':        'left',
+  'bottom-right': 'top-left',
+  'bottom':       'top',
+  'bottom-left':  'top-right',
+  'left':         'right',
+  'top-left':     'bottom-right',
+}
+
+function getOccupiedSides(bitId: number): Set<Side> {
+  const occupied = new Set<Side>()
+  for (const conn of connectionStore.connections) {
+    if (conn.fromBitId === bitId) occupied.add(conn.fromSide)
+    if (conn.toBitId === bitId) occupied.add(conn.toSide)
+  }
+  return occupied
+}
+
+interface SnapInfo {
+  fromBitId: number
+  fromSide: Side
+  toBitId: number
+  toSide: Side
+  snappedX: number
+  snappedY: number
+}
+
+const activeSnap = ref<SnapInfo | null>(null)
+const snapHighlights = ref<Map<number, Side>>(new Map())
+const newConnectionIds = ref<Set<number>>(new Set())
+
+function onBitDragMove(id: number, x: number, y: number) {
+  const otherBits = bitStore.bits.filter((b) => b.id !== id)
+  const draggedOccupied = getOccupiedSides(id)
+  let best: { dist: number; snap: SnapInfo } | null = null
+
+  for (const fromSide of SIDES) {
+    if (draggedOccupied.has(fromSide)) continue
+    const toSide = OPPOSITE[fromSide]
+    const fromDot = { x: x + DOT_OFFSETS[fromSide].x, y: y + DOT_OFFSETS[fromSide].y }
+    for (const other of otherBits) {
+      if (getOccupiedSides(other.id).has(toSide)) continue
+      const toDot = { x: other.x! + DOT_OFFSETS[toSide].x, y: other.y! + DOT_OFFSETS[toSide].y }
+      const dist = Math.hypot(fromDot.x - toDot.x, fromDot.y - toDot.y)
+      if (dist < SNAP_THRESHOLD && (!best || dist < best.dist)) {
+        best = {
+          dist,
+          snap: {
+            fromBitId: id,
+            fromSide,
+            toBitId: other.id,
+            toSide,
+            snappedX: toDot.x - DOT_OFFSETS[fromSide].x,
+            snappedY: toDot.y - DOT_OFFSETS[fromSide].y,
+          },
+        }
+      }
+    }
+  }
+
+  const newHighlights = new Map<number, Side>()
+  if (best) {
+    activeSnap.value = best.snap
+    newHighlights.set(best.snap.fromBitId, best.snap.fromSide)
+    newHighlights.set(best.snap.toBitId, best.snap.toSide)
+  } else {
+    activeSnap.value = null
+  }
+  snapHighlights.value = newHighlights
+}
+
+// ── connection rendering ────────────────────────────────────────────
+const CP_DIST = 90
+
+// Diagonal control point offsets at 45°: CP_DIST / √2 ≈ 63.6
+const D = Math.round(CP_DIST / Math.SQRT2)
+const CP_OFFSETS: Record<Side, { x: number; y: number }> = {
+  'top':          { x: 0,        y: -CP_DIST },
+  'top-right':    { x: D,        y: -D       },
+  'right':        { x: CP_DIST,  y: 0        },
+  'bottom-right': { x: D,        y: D        },
+  'bottom':       { x: 0,        y: CP_DIST  },
+  'bottom-left':  { x: -D,       y: D        },
+  'left':         { x: -CP_DIST, y: 0        },
+  'top-left':     { x: -D,       y: -D       },
+}
+
+const connectionPaths = computed(() =>
+  connectionStore.connections
+    .map((conn) => {
+      const from = bitStore.bits.find((b) => b.id === conn.fromBitId)
+      const to   = bitStore.bits.find((b) => b.id === conn.toBitId)
+      if (!from || !to || from.x == null || from.y == null || to.x == null || to.y == null) return null
+
+      const fx = from.x + DOT_OFFSETS[conn.fromSide].x
+      const fy = from.y + DOT_OFFSETS[conn.fromSide].y
+      const tx = to.x   + DOT_OFFSETS[conn.toSide].x
+      const ty = to.y   + DOT_OFFSETS[conn.toSide].y
+      const cp1x = fx + CP_OFFSETS[conn.fromSide].x
+      const cp1y = fy + CP_OFFSETS[conn.fromSide].y
+      const cp2x = tx + CP_OFFSETS[conn.toSide].x
+      const cp2y = ty + CP_OFFSETS[conn.toSide].y
+
+      return {
+        id: conn.id,
+        d: `M ${fx} ${fy} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${tx} ${ty}`,
+        fx, fy, tx, ty,
+        isNew: newConnectionIds.value.has(conn.id),
+      }
+    })
+    .filter(Boolean),
+)
+
 // ── bit actions ────────────────────────────────────────────────────
 const showCreateModal = ref(false)
 
@@ -120,8 +257,44 @@ const onModalConfirm = async (data: {
   }
 }
 
-const onBitMoveEnd = (id: number, x: number, y: number) => {
-  bitStore.updateBit(id, { x: Math.round(x), y: Math.round(y) })
+const onBitMoveEnd = async (id: number, x: number, y: number) => {
+  const snap = activeSnap.value
+  activeSnap.value = null
+  snapHighlights.value = new Map()
+
+  // Final resting position (snapped or free)
+  const finalX = snap ? snap.snappedX : x
+  const finalY = snap ? snap.snappedY : y
+
+  // Break any existing connections whose dots are now too far apart
+  const toBreak = connectionStore.connections.filter((conn) => {
+    if (conn.fromBitId !== id && conn.toBitId !== id) return false
+    const mySide   = conn.fromBitId === id ? conn.fromSide : conn.toSide
+    const otherId  = conn.fromBitId === id ? conn.toBitId  : conn.fromBitId
+    const otherSide = conn.fromBitId === id ? conn.toSide  : conn.fromSide
+    const other = bitStore.bits.find((b) => b.id === otherId)
+    if (!other || other.x == null || other.y == null) return true
+    const myDot    = { x: finalX + DOT_OFFSETS[mySide].x,    y: finalY + DOT_OFFSETS[mySide].y }
+    const otherDot = { x: other.x + DOT_OFFSETS[otherSide].x, y: other.y + DOT_OFFSETS[otherSide].y }
+    return Math.hypot(myDot.x - otherDot.x, myDot.y - otherDot.y) > SNAP_THRESHOLD
+  })
+  await Promise.all(toBreak.map((c) => connectionStore.deleteConnection(c.id)))
+
+  if (snap && snap.fromBitId === id) {
+    await bitStore.updateBit(id, { x: Math.round(snap.snappedX), y: Math.round(snap.snappedY) })
+    const newConn = await connectionStore.createConnection({
+      fromBitId: snap.fromBitId,
+      fromSide:  snap.fromSide,
+      toBitId:   snap.toBitId,
+      toSide:    snap.toSide,
+    })
+    newConnectionIds.value = new Set([...newConnectionIds.value, newConn.id])
+    setTimeout(() => {
+      newConnectionIds.value = new Set([...newConnectionIds.value].filter((i) => i !== newConn.id))
+    }, 700)
+  } else {
+    bitStore.updateBit(id, { x: Math.round(x), y: Math.round(y) })
+  }
 }
 
 const onBitRename = (id: number, title: string) => {
@@ -154,6 +327,7 @@ onMounted(() => {
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('mousemove', handleMouseMove)
   bitStore.fetchBits()
+  connectionStore.fetchConnections()
 })
 
 onUnmounted(() => {
@@ -187,13 +361,67 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- ── connections ── -->
+      <svg
+        class="absolute pointer-events-none"
+        style="inset: 0; width: 0; height: 0; overflow: visible"
+      >
+        <defs>
+          <filter id="conn-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <g v-for="path in connectionPaths" :key="path!.id">
+          <!-- glow layer -->
+          <path
+            :d="path!.d"
+            fill="none"
+            stroke="rgba(148,163,184,0.25)"
+            stroke-width="4"
+            filter="url(#conn-glow)"
+          />
+          <!-- main line -->
+          <path
+            :d="path!.d"
+            fill="none"
+            stroke="rgba(148,163,184,0.55)"
+            stroke-width="1.5"
+            stroke-dasharray="5 4"
+            stroke-linecap="round"
+            :class="{ 'conn-draw': path!.isNew }"
+          />
+          <!-- flash on new connection -->
+          <path
+            v-if="path!.isNew"
+            :d="path!.d"
+            fill="none"
+            stroke="rgba(200,210,255,0.9)"
+            stroke-width="3"
+            stroke-linecap="round"
+            class="conn-flash"
+          />
+          <!-- endpoint dots -->
+          <circle
+            :cx="path!.fx" :cy="path!.fy" r="3" fill="rgba(148,163,184,0.7)"
+            :class="{ 'conn-dot-pop': path!.isNew }"
+          />
+          <circle
+            :cx="path!.tx" :cy="path!.ty" r="3" fill="rgba(148,163,184,0.7)"
+            :class="{ 'conn-dot-pop': path!.isNew }"
+          />
+        </g>
+      </svg>
+
       <!-- ── bits ── -->
       <LBit
         v-for="bit in bitStore.bits"
         :key="bit.id"
         :bit="bit"
         :zoom="zoom"
+        :highlight-side="snapHighlights.get(bit.id) ?? null"
         @move-end="onBitMoveEnd"
+        @drag-move="onBitDragMove"
         @rename="onBitRename"
         @delete="(id) => bitStore.deleteBit(id)"
       />
@@ -266,5 +494,33 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ── connection animations ── */
+@keyframes conn-draw {
+  from { stroke-dashoffset: 200; opacity: 0; }
+  to   { stroke-dashoffset: 0;   opacity: 1; }
+}
+@keyframes conn-flash {
+  0%   { opacity: 0.9; stroke-width: 6; }
+  60%  { opacity: 0.4; stroke-width: 2; }
+  100% { opacity: 0;   stroke-width: 1; }
+}
+@keyframes conn-dot-pop {
+  0%   { r: 0;  opacity: 0; }
+  50%  { r: 6;  opacity: 1; }
+  100% { r: 3;  opacity: 0.7; }
+}
+
+.conn-draw {
+  stroke-dasharray: 5 4;
+  stroke-dashoffset: 200;
+  animation: conn-draw 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+}
+.conn-flash {
+  animation: conn-flash 0.65s ease-out forwards;
+}
+.conn-dot-pop {
+  animation: conn-dot-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 </style>

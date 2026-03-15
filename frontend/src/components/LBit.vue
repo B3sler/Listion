@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { Bit } from '@/stores/bitStore'
+import type { Side } from '@/stores/connectionStore'
 
 const props = defineProps<{
   bit: Bit
   zoom: number
+  highlightSide?: Side | null
 }>()
 
 const emit = defineEmits<{
   moveEnd: [id: number, x: number, y: number]
+  dragMove: [id: number, x: number, y: number]
   rename: [id: number, title: string]
   delete: [id: number]
 }>()
@@ -70,6 +73,7 @@ function startDrag(e: MouseEvent) {
   const onMove = (ev: MouseEvent) => {
     dragX.value = ox + (ev.clientX - sx) / props.zoom
     dragY.value = oy + (ev.clientY - sy) / props.zoom
+    emit('dragMove', props.bit.id, dragX.value, dragY.value)
   }
   const onUp = () => {
     isDragging.value = false
@@ -147,11 +151,15 @@ function cancelEdit() { isEditing.value = false }
         opacity="0.55" class="lbit__border"
       />
 
-      <!-- connector dots — midpoints of flat edges -->
-      <circle cx="72"    cy="1.5"   r="2.5" :fill="theme.color" class="lbit__dot" />
-      <circle cx="142.5" cy="72"    r="2.5" :fill="theme.color" class="lbit__dot" />
-      <circle cx="72"    cy="142.5" r="2.5" :fill="theme.color" class="lbit__dot" />
-      <circle cx="1.5"   cy="72"    r="2.5" :fill="theme.color" class="lbit__dot" />
+      <!-- connector dots — all 8 sides -->
+      <circle cx="72"  cy="1.5"  :r="highlightSide === 'top'          ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'top'          }]" />
+      <circle cx="126" cy="18"   :r="highlightSide === 'top-right'    ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'top-right'    }]" />
+      <circle cx="142.5" cy="72" :r="highlightSide === 'right'        ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'right'        }]" />
+      <circle cx="126" cy="126"  :r="highlightSide === 'bottom-right' ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'bottom-right' }]" />
+      <circle cx="72"  cy="142.5" :r="highlightSide === 'bottom'      ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'bottom'      }]" />
+      <circle cx="18"  cy="126"  :r="highlightSide === 'bottom-left'  ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'bottom-left'  }]" />
+      <circle cx="1.5" cy="72"   :r="highlightSide === 'left'         ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'left'         }]" />
+      <circle cx="18"  cy="18"   :r="highlightSide === 'top-left'     ? 5 : 2.5" :fill="theme.color" :class="['lbit__dot', { 'lbit__dot--snap': highlightSide === 'top-left'     }]" />
     </svg>
 
     <!-- ── content ── -->
@@ -211,6 +219,8 @@ function cancelEdit() { isEditing.value = false }
     drop-shadow(0 0 6px v-bind(statusShadow));
   animation: lbit-enter 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   transition:
+    left      0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    top       0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
     filter    0.3s ease,
     transform 0.25s ease;
 }
@@ -241,10 +251,19 @@ function cancelEdit() { isEditing.value = false }
 /* ── connector dots: hidden → visible on hover ── */
 .lbit__dot {
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, r 0.15s ease;
 }
 .lbit:hover .lbit__dot {
   opacity: 0.7;
+}
+.lbit__dot--snap {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 5px v-bind(statusColor));
+  animation: dot-pulse 0.6s ease-in-out infinite alternate;
+}
+@keyframes dot-pulse {
+  from { opacity: 0.8; }
+  to   { opacity: 1;   }
 }
 
 /* ── layout ── */
