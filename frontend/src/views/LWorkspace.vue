@@ -351,8 +351,8 @@ onUnmounted(() => {
   >
     <!-- ── canvas transform layer ── -->
     <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
-      <!-- workspace hint text -->
-      <div class="p-5">
+      <!-- workspace hint text — only when no bits exist -->
+      <div v-if="bitStore.bits.length === 0" class="p-5">
         <div class="max-w-7xl">
           <h1 class="text-3xl font-bold text-text0 mb-4">Workspace</h1>
           <p class="text-text1 text-base">
