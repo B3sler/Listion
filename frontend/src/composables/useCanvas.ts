@@ -134,6 +134,8 @@ export function useCanvas(containerRef: Ref<HTMLElement | null>) {
 
   return {
     zoom,
+    panX,
+    panY,
     canvasTransform,
     isDragging,
     zoomIn,

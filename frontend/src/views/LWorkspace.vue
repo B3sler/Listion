@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
+import LBit from '@/components/LBit.vue'
+import LCreateBitModal from '@/components/LCreateBitModal.vue'
 import { useTheme } from '@/composables/useTheme.ts'
 import { useCanvas } from '@/composables/useCanvas.ts'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
 import { ScanSearch, ZoomIn, ZoomOut, Fullscreen } from 'lucide-vue-next'
+import { useBitStore } from '@/stores/bitStore'
 
 type ContextMenuState = {
   visible: boolean
@@ -16,6 +19,9 @@ type ContextMenuState = {
 const containerRef = ref<HTMLElement | null>(null)
 
 const {
+  zoom,
+  panX,
+  panY,
   canvasTransform,
   isDragging,
   zoomIn,
@@ -30,6 +36,10 @@ const {
   handleTouchEnd,
 } = useCanvas(containerRef)
 
+const bitStore = useBitStore()
+
+// canvas-space coordinates of the last right-click
+const contextCanvasPos = ref({ x: 0, y: 0 })
 const contextMenu = ref<ContextMenuState>({ visible: false, x: 0, y: 0 })
 
 const showContextMenu = (x: number, y: number) => {
@@ -42,16 +52,27 @@ const closeContextMenu = () => {
 
 const handleContextMenu = (event: MouseEvent) => {
   event.preventDefault()
+  contextCanvasPos.value = {
+    x: (event.clientX - panX.value) / zoom.value,
+    y: (event.clientY - panY.value) / zoom.value,
+  }
   showContextMenu(event.clientX, event.clientY)
 }
 
+// ── long-press (touch) ─────────────────────────────────────────────
 let longPressTimer: number | null = null
 const LONG_PRESS_DURATION = 500
 
 const handleTouchStartWithLongPress = (event: TouchEvent) => {
   if (event.touches.length === 1) {
     const touch = event.touches[0]!
-    longPressTimer = window.setTimeout(() => showContextMenu(touch.clientX, touch.clientY), LONG_PRESS_DURATION)
+    longPressTimer = window.setTimeout(() => {
+      contextCanvasPos.value = {
+        x: (touch.clientX - panX.value) / zoom.value,
+        y: (touch.clientY - panY.value) / zoom.value,
+      }
+      showContextMenu(touch.clientX, touch.clientY)
+    }, LONG_PRESS_DURATION)
   } else {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null }
   }
@@ -68,16 +89,51 @@ const handleTouchEndWithLongPress = (event: TouchEvent) => {
   handleTouchEnd(event)
 }
 
+// ── bit actions ────────────────────────────────────────────────────
+const showCreateModal = ref(false)
+
 const createBit = () => {
-  console.log('Create bit was selected')
-  alert('Create bit - Function will be implemented')
+  closeContextMenu()
+  showCreateModal.value = true
+}
+
+const onModalConfirm = async (data: {
+  title: string
+  status: number
+  priority: number | undefined
+  dueDate: string | undefined
+  notes: string | undefined
+}) => {
+  showCreateModal.value = false
+  try {
+    await bitStore.createBit({
+      title: data.title,
+      x: contextCanvasPos.value.x,
+      y: contextCanvasPos.value.y,
+      status: data.status,
+      priority: data.priority,
+      dueDate: data.dueDate,
+      notes: data.notes,
+    })
+  } catch (e) {
+    console.error('Failed to create bit:', e)
+  }
+}
+
+const onBitMoveEnd = (id: number, x: number, y: number) => {
+  bitStore.updateBit(id, { x: Math.round(x), y: Math.round(y) })
+}
+
+const onBitRename = (id: number, title: string) => {
+  bitStore.updateBit(id, { title })
 }
 
 const menuItems = [
   { label: 'Create Bit', icon: '+', action: createBit },
-  { label: 'Create Packet', icon: '◼️', action: createBit },
+  { label: 'Create Packet', icon: '◼', action: () => closeContextMenu() },
 ]
 
+// ── theme & controls ───────────────────────────────────────────────
 const { initTheme, applyTheme, isDark } = useTheme()
 
 const showControls = ref(false)
@@ -97,6 +153,7 @@ onMounted(() => {
   applyTheme()
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('mousemove', handleMouseMove)
+  bitStore.fetchBits()
 })
 
 onUnmounted(() => {
@@ -118,7 +175,9 @@ onUnmounted(() => {
     @touchend="handleTouchEndWithLongPress"
     :style="{ cursor: isDragging ? 'grabbing' : 'default' }"
   >
+    <!-- ── canvas transform layer ── -->
     <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
+      <!-- workspace hint text -->
       <div class="p-5">
         <div class="max-w-7xl">
           <h1 class="text-3xl font-bold text-text0 mb-4">Workspace</h1>
@@ -127,8 +186,20 @@ onUnmounted(() => {
           </p>
         </div>
       </div>
+
+      <!-- ── bits ── -->
+      <LBit
+        v-for="bit in bitStore.bits"
+        :key="bit.id"
+        :bit="bit"
+        :zoom="zoom"
+        @move-end="onBitMoveEnd"
+        @rename="onBitRename"
+        @delete="(id) => bitStore.deleteBit(id)"
+      />
     </div>
 
+    <!-- ── zoom controls ── -->
     <div class="absolute bottom-4 left-4 z-50">
       <div
         class="flex flex-col items-start"
@@ -170,8 +241,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <LTaskbar></LTaskbar>
-    <LMenu></LMenu>
+    <LTaskbar />
+    <LMenu />
+    <LCreateBitModal
+      v-if="showCreateModal"
+      @confirm="onModalConfirm"
+      @cancel="showCreateModal = false"
+    />
     <LContextMenu
       v-if="contextMenu.visible"
       :x="contextMenu.x"
