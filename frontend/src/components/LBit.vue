@@ -14,6 +14,7 @@ const emit = defineEmits<{
   dragMove: [id: number, x: number, y: number]
   rename: [id: number, title: string]
   delete: [id: number]
+  openDetail: [id: number]
 }>()
 
 const isDragging = ref(false)
@@ -22,6 +23,7 @@ const dragY = ref(props.bit.y)
 const isEditing = ref(false)
 const editTitle = ref(props.bit.title)
 const editInput = ref<HTMLInputElement | null>(null)
+let clickTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
   () => [props.bit.x, props.bit.y] as const,
@@ -68,16 +70,26 @@ function startDrag(e: MouseEvent) {
   if (e.button !== 0 || e.shiftKey) return
   e.stopPropagation()
   isDragging.value = true
+  let hasMoved = false
   const sx = e.clientX, sy = e.clientY
   const ox = dragX.value,  oy = dragY.value
   const onMove = (ev: MouseEvent) => {
+    if (Math.abs(ev.clientX - sx) > 4 || Math.abs(ev.clientY - sy) > 4) hasMoved = true
     dragX.value = ox + (ev.clientX - sx) / props.zoom
     dragY.value = oy + (ev.clientY - sy) / props.zoom
     emit('dragMove', props.bit.id, dragX.value, dragY.value)
   }
   const onUp = () => {
     isDragging.value = false
-    emit('moveEnd', props.bit.id, dragX.value, dragY.value)
+    if (hasMoved) {
+      emit('moveEnd', props.bit.id, dragX.value, dragY.value)
+    } else {
+      // single click — wait briefly to distinguish from dblclick
+      clickTimer = setTimeout(() => {
+        if (!isEditing.value) emit('openDetail', props.bit.id)
+        clickTimer = null
+      }, 210)
+    }
     window.removeEventListener('mousemove', onMove)
     window.removeEventListener('mouseup', onUp)
   }
@@ -86,7 +98,11 @@ function startDrag(e: MouseEvent) {
 }
 
 // ── edit ──────────────────────────────────────────────────────────
-function startEdit(e: MouseEvent) { e.stopPropagation(); isEditing.value = true }
+function startEdit(e: MouseEvent) {
+  e.stopPropagation()
+  if (clickTimer) { clearTimeout(clickTimer); clickTimer = null }
+  isEditing.value = true
+}
 function commitEdit() {
   const t = editTitle.value.trim()
   if (t && t !== props.bit.title) emit('rename', props.bit.id, t)

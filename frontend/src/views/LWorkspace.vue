@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
 import LBit from '@/components/LBit.vue'
-import LCreateBitModal from '@/components/LCreateBitModal.vue'
+import LBitPanel from '@/components/LBitPanel.vue'
 import { useTheme } from '@/composables/useTheme.ts'
 import { useCanvas } from '@/composables/useCanvas.ts'
 import LTaskbar from '@/layout/LTaskbar.vue'
@@ -54,9 +54,10 @@ const closeContextMenu = () => {
 
 const handleContextMenu = (event: MouseEvent) => {
   event.preventDefault()
+  const rect = containerRef.value!.getBoundingClientRect()
   contextCanvasPos.value = {
-    x: (event.clientX - panX.value) / zoom.value,
-    y: (event.clientY - panY.value) / zoom.value,
+    x: (event.clientX - rect.left - panX.value) / zoom.value,
+    y: (event.clientY - rect.top - panY.value) / zoom.value,
   }
   showContextMenu(event.clientX, event.clientY)
 }
@@ -69,9 +70,10 @@ const handleTouchStartWithLongPress = (event: TouchEvent) => {
   if (event.touches.length === 1) {
     const touch = event.touches[0]!
     longPressTimer = window.setTimeout(() => {
+      const rect = containerRef.value!.getBoundingClientRect()
       contextCanvasPos.value = {
-        x: (touch.clientX - panX.value) / zoom.value,
-        y: (touch.clientY - panY.value) / zoom.value,
+        x: (touch.clientX - rect.left - panX.value) / zoom.value,
+        y: (touch.clientY - rect.top - panY.value) / zoom.value,
       }
       showContextMenu(touch.clientX, touch.clientY)
     }, LONG_PRESS_DURATION)
@@ -226,34 +228,74 @@ const connectionPaths = computed(() =>
     .filter(Boolean),
 )
 
-// ── bit actions ────────────────────────────────────────────────────
-const showCreateModal = ref(false)
+// ── bit panel ──────────────────────────────────────────────────────
+const showPanel    = ref(false)
+const panelMode    = ref<'create' | 'edit'>('create')
+const panelBitId   = ref<number | null>(null)
+const panelBit     = computed(() =>
+  panelBitId.value !== null
+    ? bitStore.bits.find((b) => b.id === panelBitId.value)
+    : undefined,
+)
 
 const createBit = () => {
   closeContextMenu()
-  showCreateModal.value = true
+  panelMode.value  = 'create'
+  panelBitId.value = null
+  showPanel.value  = true
 }
 
-const onModalConfirm = async (data: {
+const openBitDetail = (id: number) => {
+  panelMode.value  = 'edit'
+  panelBitId.value = id
+  showPanel.value  = true
+}
+
+const onPanelConfirm = async (data: {
   title: string
   status: number
   priority: number | undefined
   dueDate: string | undefined
   notes: string | undefined
 }) => {
-  showCreateModal.value = false
+  if (panelMode.value === 'create') {
+    showPanel.value = false
+    try {
+      await bitStore.createBit({
+        title: data.title,
+        x: contextCanvasPos.value.x,
+        y: contextCanvasPos.value.y,
+        status: data.status,
+        priority: data.priority,
+        dueDate: data.dueDate,
+        notes: data.notes,
+      })
+    } catch (e) {
+      console.error('Failed to create bit:', e)
+    }
+  } else if (panelBitId.value !== null) {
+    try {
+      await bitStore.updateBit(panelBitId.value, {
+        title: data.title,
+        status: data.status,
+        priority: data.priority,
+        dueDate: data.dueDate,
+        notes: data.notes,
+      })
+      showPanel.value = false
+    } catch (e) {
+      console.error('Failed to update bit:', e)
+    }
+  }
+}
+
+const onPanelDelete = async () => {
+  if (panelBitId.value === null) return
   try {
-    await bitStore.createBit({
-      title: data.title,
-      x: contextCanvasPos.value.x,
-      y: contextCanvasPos.value.y,
-      status: data.status,
-      priority: data.priority,
-      dueDate: data.dueDate,
-      notes: data.notes,
-    })
+    await bitStore.deleteBit(panelBitId.value)
+    showPanel.value = false
   } catch (e) {
-    console.error('Failed to create bit:', e)
+    console.error('Failed to delete bit:', e)
   }
 }
 
@@ -337,6 +379,20 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- root: clips the workspace overflow when it shifts right -->
+  <div style="position:relative; width:100vw; height:100vh; overflow:hidden;">
+
+    <!-- ── panel: fixed overlay, slides in from left ── -->
+    <LBitPanel
+      v-if="showPanel"
+      :mode="panelMode"
+      :bit="panelBit"
+      @confirm="onPanelConfirm"
+      @cancel="showPanel = false"
+      @delete="onPanelDelete"
+    />
+
+    <!-- ── workspace: full size, shifts right when panel opens ── -->
   <div
     ref="containerRef"
     class="w-full h-screen overflow-hidden bg-surface1 relative"
@@ -347,7 +403,11 @@ onUnmounted(() => {
     @touchstart="handleTouchStartWithLongPress"
     @touchmove="handleTouchMoveWithLongPress"
     @touchend="handleTouchEndWithLongPress"
-    :style="{ cursor: isDragging ? 'grabbing' : 'default' }"
+    :style="{
+      cursor: isDragging ? 'grabbing' : 'default',
+      transform: showPanel ? 'translateX(300px)' : 'translateX(0)',
+      transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+    }"
   >
     <!-- ── canvas transform layer ── -->
     <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
@@ -424,6 +484,7 @@ onUnmounted(() => {
         @drag-move="onBitDragMove"
         @rename="onBitRename"
         @delete="(id) => bitStore.deleteBit(id)"
+        @open-detail="openBitDetail"
       />
     </div>
 
@@ -469,20 +530,19 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <LTaskbar />
-    <LMenu />
-    <LCreateBitModal
-      v-if="showCreateModal"
-      @confirm="onModalConfirm"
-      @cancel="showCreateModal = false"
-    />
-    <LContextMenu
-      v-if="contextMenu.visible"
-      :x="contextMenu.x"
-      :y="contextMenu.y"
-      :items="menuItems"
-      @close="closeContextMenu"
-    />
+  </div>
+
+  <!-- fixed UI — outside transformed workspace so position:fixed works correctly -->
+  <LTaskbar />
+  <LMenu />
+  <LContextMenu
+    v-if="contextMenu.visible"
+    :x="contextMenu.x"
+    :y="contextMenu.y"
+    :items="menuItems"
+    @close="closeContextMenu"
+  />
+
   </div>
 </template>
 
@@ -523,4 +583,5 @@ onUnmounted(() => {
 .conn-dot-pop {
   animation: conn-dot-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+
 </style>
