@@ -27,7 +27,6 @@ const {
   isDragging,
   zoomIn,
   zoomOut,
-  resetView,
   handleMouseDown,
   handleMouseMove,
   handleMouseUp,
@@ -50,6 +49,41 @@ const showContextMenu = (x: number, y: number) => {
 
 const closeContextMenu = () => {
   contextMenu.value.visible = false
+}
+
+const BIT_HALF = 72 // bits are 144×144 centered at bit.x / bit.y
+
+function resetViewToBits() {
+  const bitsWithPos = bitStore.bits.filter((b) => b.x != null && b.y != null)
+
+  if (bitsWithPos.length === 0) {
+    zoom.value = 1
+    panX.value = 0
+    panY.value = 0
+    return
+  }
+
+  const el = containerRef.value
+  if (!el) return
+  const { width, height } = el.getBoundingClientRect()
+
+  const minX = Math.min(...bitsWithPos.map((b) => b.x! - BIT_HALF))
+  const maxX = Math.max(...bitsWithPos.map((b) => b.x! + BIT_HALF))
+  const minY = Math.min(...bitsWithPos.map((b) => b.y! - BIT_HALF))
+  const maxY = Math.max(...bitsWithPos.map((b) => b.y! + BIT_HALF))
+
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
+
+  const PADDING = 80
+  const newZoom = Math.min(
+    3,
+    Math.max(0.25, Math.min((width - PADDING * 2) / (maxX - minX), (height - PADDING * 2) / (maxY - minY))),
+  )
+
+  zoom.value = newZoom
+  panX.value = width / 2 - cx * newZoom
+  panY.value = height / 2 - cy * newZoom
 }
 
 const handleContextMenu = (event: MouseEvent) => {
@@ -512,7 +546,7 @@ onUnmounted(() => {
               <ZoomOut :size="24" />
             </button>
             <button
-              @click="resetView"
+              @click="resetViewToBits"
               class="w-12 h-12 text-text0 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-surface2 active:scale-95"
               title="Reset View"
             >
