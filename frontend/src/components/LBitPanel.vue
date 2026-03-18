@@ -15,16 +15,39 @@ const emit = defineEmits<{
     priority: number | undefined
     dueDate: string | undefined
     notes: string | undefined
+    color: string
   }]
   cancel: []
   delete: []
 }>()
+
+const DEFAULT_COLOR = '#6366f1'
+
+const BIT_COLORS = [
+  '#6366f1', // Indigo
+  '#8b5cf6', // Violet
+  '#a855f7', // Purple
+  '#ec4899', // Pink
+  '#f43f5e', // Rose
+  '#ef4444', // Red
+  '#f97316', // Orange
+  '#f59e0b', // Amber
+  '#eab308', // Yellow
+  '#84cc16', // Lime
+  '#22c55e', // Green
+  '#10b981', // Emerald
+  '#14b8a6', // Teal
+  '#06b6d4', // Cyan
+  '#3b82f6', // Blue
+  '#64748b', // Slate
+] as const
 
 const title    = ref('')
 const status   = ref<0 | 1 | 2>(0)
 const priority = ref<'' | '1' | '2' | '3'>('')
 const dueDate  = ref('')
 const notes    = ref('')
+const color    = ref(DEFAULT_COLOR)
 const titleInput = ref<HTMLInputElement | null>(null)
 
 watch(
@@ -36,12 +59,14 @@ watch(
       priority.value = b.priority ? (String(b.priority) as '1' | '2' | '3') : ''
       dueDate.value  = b.dueDate ? (new Date(b.dueDate).toISOString().split('T')[0] ?? '') : ''
       notes.value    = b.notes ?? ''
+      color.value    = b.color ?? DEFAULT_COLOR
     } else {
       title.value    = ''
       status.value   = 0
       priority.value = ''
       dueDate.value  = ''
       notes.value    = ''
+      color.value    = DEFAULT_COLOR
     }
   },
   { immediate: true },
@@ -66,6 +91,7 @@ function submit() {
     priority: priority.value ? Number(priority.value) : undefined,
     dueDate: dueDate.value || undefined,
     notes: notes.value.trim() || undefined,
+    color: color.value,
   })
 }
 
@@ -82,7 +108,7 @@ const PRIORITY_OPTIONS = [
 ] as const
 
 const STATUS_COLOURS: Record<number, string> = {
-  0: '#818cf8',
+  0: 'rgba(148,163,184,0.75)',
   1: '#fbbf24',
   2: '#34d399',
 }
@@ -124,9 +150,26 @@ const STATUS_COLOURS: Record<number, string> = {
           </div>
         </div>
 
+        <!-- color picker -->
+        <div class="field field--2">
+          <label class="field__label">Color</label>
+          <div class="color-picker">
+            <button
+              v-for="c in BIT_COLORS"
+              :key="c"
+              type="button"
+              class="color-swatch"
+              :class="{ 'color-swatch--active': color === c }"
+              :style="{ background: c }"
+              :title="c"
+              @click="color = c"
+            />
+          </div>
+        </div>
+
         <!-- status + priority row -->
         <div class="field-row">
-          <div class="field field--2">
+          <div class="field field--3">
             <label class="field__label">Status</label>
             <div class="field__box field__box--select">
               <span class="field__dot" :style="{ background: STATUS_COLOURS[status] }" />
@@ -135,7 +178,7 @@ const STATUS_COLOURS: Record<number, string> = {
               </select>
             </div>
           </div>
-          <div class="field field--3">
+          <div class="field field--4">
             <label class="field__label">Priority</label>
             <div class="field__box field__box--select">
               <select v-model="priority" class="field__input field__input--select">
@@ -147,7 +190,7 @@ const STATUS_COLOURS: Record<number, string> = {
         </div>
 
         <!-- due date -->
-        <div class="field field--4">
+        <div class="field field--5">
           <label class="field__label">Due Date</label>
           <div class="field__box">
             <input v-model="dueDate" type="date" class="field__input field__input--date" />
@@ -155,7 +198,7 @@ const STATUS_COLOURS: Record<number, string> = {
         </div>
 
         <!-- notes -->
-        <div class="field field--5">
+        <div class="field field--6">
           <label class="field__label">Notes</label>
           <div class="field__box">
             <textarea
@@ -298,9 +341,10 @@ const STATUS_COLOURS: Record<number, string> = {
 }
 .field--1 { animation-delay: 0.08s; }
 .field--2 { animation-delay: 0.12s; }
-.field--3 { animation-delay: 0.12s; }
+.field--3 { animation-delay: 0.16s; }
 .field--4 { animation-delay: 0.16s; }
 .field--5 { animation-delay: 0.20s; }
+.field--6 { animation-delay: 0.24s; }
 
 /* two-column grid for status + priority */
 .field-row {
@@ -318,7 +362,6 @@ const STATUS_COLOURS: Record<number, string> = {
   padding-left: 2px;
 }
 
-/* input container box */
 .field__box {
   background-color: var(--surface3);
   border-radius: 9px;
@@ -335,7 +378,6 @@ const STATUS_COLOURS: Record<number, string> = {
   position: relative;
 }
 
-/* bare input inside the box */
 .field__input {
   width: 100%;
   background: transparent;
@@ -387,6 +429,36 @@ const STATUS_COLOURS: Record<number, string> = {
   cursor: pointer;
   padding: 0;
   margin: 0;
+}
+
+/* ─────────────────────────────────────────
+   Color Picker
+───────────────────────────────────────── */
+.color-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  padding: 10px;
+  background-color: var(--surface3);
+  border-radius: 9px;
+}
+
+.color-swatch {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  padding: 0;
+  outline: none;
+}
+.color-swatch:hover {
+  transform: scale(1.2);
+}
+.color-swatch--active {
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
 }
 
 /* ─────────────────────────────────────────

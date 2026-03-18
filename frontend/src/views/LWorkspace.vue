@@ -291,6 +291,7 @@ const onPanelConfirm = async (data: {
   priority: number | undefined
   dueDate: string | undefined
   notes: string | undefined
+  color: string
 }) => {
   if (panelMode.value === 'create') {
     showPanel.value = false
@@ -303,6 +304,7 @@ const onPanelConfirm = async (data: {
         priority: data.priority,
         dueDate: data.dueDate,
         notes: data.notes,
+        color: data.color,
       })
     } catch (e) {
       console.error('Failed to create bit:', e)
@@ -315,6 +317,7 @@ const onPanelConfirm = async (data: {
         priority: data.priority,
         dueDate: data.dueDate,
         notes: data.notes,
+        color: data.color,
       })
       showPanel.value = false
     } catch (e) {

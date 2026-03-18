@@ -13,6 +13,7 @@ export interface Bit {
   notes?: string
   workspace?: number
   createdAt: string
+  color?: string
 }
 
 export const useBitStore = defineStore('bit', () => {
@@ -31,6 +32,7 @@ export const useBitStore = defineStore('bit', () => {
     priority?: number
     dueDate?: string
     notes?: string
+    color?: string
   }): Promise<Bit> {
     const res = await api.post<Bit>('/api/bit', {
       ...payload,

@@ -36,4 +36,7 @@ export class UpdateBitDto {
 
   @ApiProperty({ example: 1, description: 'Bit workspace', required: false })
   workspace?: number
+
+  @ApiProperty({ example: '#6366f1', description: 'Hex color of the bit (#rrggbb)', required: false })
+  color?: string
 }

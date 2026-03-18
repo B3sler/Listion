@@ -34,4 +34,7 @@ export class Bit {
 
   @Column({ type: 'int', nullable: true })
   workspace?: number
+
+  @Column({ type: 'varchar', length: 7, nullable: true })
+  color?: string
 }
