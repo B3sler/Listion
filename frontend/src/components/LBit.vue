@@ -7,6 +7,9 @@ const props = defineProps<{
   bit: Bit
   zoom: number
   highlightSide?: Side | null
+  dimmed?: boolean
+  highlightRole?: 'upstream' | 'downstream' | null
+  workflowState?: 'blocked' | 'ready' | null
 }>()
 
 const emit = defineEmits<{
@@ -15,6 +18,8 @@ const emit = defineEmits<{
   rename: [id: number, title: string]
   delete: [id: number]
   openDetail: [id: number]
+  hover: [id: number]
+  hoverEnd: []
 }>()
 
 const isDragging = ref(false)
@@ -174,7 +179,7 @@ function cancelEdit() { isEditing.value = false }
 <template>
   <div
     class="lbit-outer"
-    :class="{ 'lbit-outer--dragging': isDragging }"
+    :class="{ 'lbit-outer--dragging': isDragging, 'lbit-outer--dimmed': dimmed }"
     :style="{
       position: 'absolute',
       left: `${dragX}px`,
@@ -186,6 +191,13 @@ function cancelEdit() { isEditing.value = false }
       cursor: isDragging ? 'grabbing' : 'grab',
     }"
   >
+    <!-- ── workflow state badge (above octagon) ── -->
+    <div
+      v-if="workflowState"
+      class="lbit__state-badge"
+      :class="`lbit__state-badge--${workflowState}`"
+    >{{ workflowState === 'blocked' ? '⊘ Blocked' : '⚡ Ready' }}</div>
+
     <!-- ── octagon body (clipped) ── -->
     <div
       class="lbit"
@@ -193,6 +205,8 @@ function cancelEdit() { isEditing.value = false }
       :style="{ clipPath: `path('${outerPath}')` }"
       @mousedown="startDrag"
       @dblclick="startEdit"
+      @mouseenter="emit('hover', bit.id)"
+      @mouseleave="emit('hoverEnd')"
     >
       <svg
         width="144" height="144"
@@ -262,6 +276,16 @@ function cancelEdit() { isEditing.value = false }
       style="position:absolute;inset:0;overflow:visible;pointer-events:none;"
       xmlns="http://www.w3.org/2000/svg"
     >
+      <!-- Workflow highlight ring (upstream = indigo, downstream = emerald) -->
+      <path
+        v-if="highlightRole"
+        :d="outerPath"
+        fill="none"
+        :stroke="highlightRole === 'upstream' ? 'rgba(99,102,241,0.85)' : 'rgba(16,185,129,0.85)'"
+        stroke-width="3"
+        class="lbit__workflow-ring"
+      />
+
       <!-- Faint dashed track — starts at top-center (12 o'clock), used for measurement -->
       <path
         ref="trackPathRef"
@@ -316,11 +340,16 @@ function cancelEdit() { isEditing.value = false }
 /* ── outer wrapper ── */
 .lbit-outer {
   transition:
-    left  0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-    top   0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    left    0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    top     0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.25s ease;
 }
 .lbit-outer--dragging {
   transition: none !important;
+}
+.lbit-outer--dimmed {
+  opacity: 0.15;
+  pointer-events: none;
 }
 
 /* ── octagon body ── */
@@ -378,8 +407,7 @@ function cancelEdit() { isEditing.value = false }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 32px 20px 28px;
+  padding: 28px 18px 36px;
   pointer-events: none;
   animation: lbit-float 5s ease-in-out infinite;
 }
@@ -387,16 +415,17 @@ function cancelEdit() { isEditing.value = false }
 
 /* ── title ── */
 .lbit__title {
-  color: #e2e8f0;
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  line-height: 1.4;
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
   text-align: center;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.6);
 }
 
 /* ── inline edit ── */
@@ -417,8 +446,13 @@ function cancelEdit() { isEditing.value = false }
 
 /* ── meta ── */
 .lbit__meta {
+  position: absolute;
+  bottom: 22px;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
 }
 .lbit__badge {
@@ -439,6 +473,53 @@ function cancelEdit() { isEditing.value = false }
   letter-spacing: 0.05em;
   color: rgba(148,163,184,0.7);
   text-transform: uppercase;
+}
+
+/* ── workflow state badge ── */
+.lbit__state-badge {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 99px;
+  pointer-events: none;
+  z-index: 10;
+}
+.lbit__state-badge--blocked {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  animation: badge-blocked 2s ease-in-out infinite;
+}
+.lbit__state-badge--ready {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.42);
+  animation: badge-ready 1.4s ease-in-out infinite;
+}
+@keyframes badge-blocked {
+  0%, 100% { opacity: 0.65; }
+  50%       { opacity: 1; }
+}
+@keyframes badge-ready {
+  0%, 100% { opacity: 0.8; box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  50%       { opacity: 1;   box-shadow: 0 0 10px 2px rgba(16,185,129,0.25); }
+}
+
+/* ── workflow ring ── */
+@keyframes workflow-pulse {
+  0%, 100% { opacity: 0.55; stroke-width: 2.5; }
+  50%       { opacity: 1;    stroke-width: 4; }
+}
+.lbit__workflow-ring {
+  animation: workflow-pulse 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 /* ── status ring ── */

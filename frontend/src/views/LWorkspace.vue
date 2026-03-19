@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import LContextMenu from '@/components/LContextMenu.vue'
 import LBit from '@/components/LBit.vue'
 import LBitPanel from '@/components/LBitPanel.vue'
+import LPacketsHud from '@/components/LPacketsHud.vue'
 import { useTheme } from '@/composables/useTheme.ts'
 import { useCanvas } from '@/composables/useCanvas.ts'
 import LTaskbar from '@/layout/LTaskbar.vue'
@@ -180,6 +181,193 @@ const activeSnap = ref<SnapInfo | null>(null)
 const snapHighlights = ref<Map<number, Side>>(new Map())
 const newConnectionIds = ref<Set<number>>(new Set())
 
+// ── workflow highlighting ────────────────────────────────────────────
+const hoveredBitId = ref<number | null>(null)
+const selectedConnectionId = ref<number | null>(null)
+const highlightedPacketBitIds = ref<Set<number>>(new Set())
+
+function getUpstreamIds(bitId: number): Set<number> {
+  const visited = new Set<number>()
+  const queue = [bitId]
+  while (queue.length) {
+    const id = queue.shift()!
+    for (const conn of connectionStore.connections) {
+      if (conn.toBitId === id && !visited.has(conn.fromBitId)) {
+        visited.add(conn.fromBitId)
+        queue.push(conn.fromBitId)
+      }
+    }
+  }
+  return visited
+}
+
+function getDownstreamIds(bitId: number): Set<number> {
+  const visited = new Set<number>()
+  const queue = [bitId]
+  while (queue.length) {
+    const id = queue.shift()!
+    for (const conn of connectionStore.connections) {
+      if (conn.fromBitId === id && !visited.has(conn.toBitId)) {
+        visited.add(conn.toBitId)
+        queue.push(conn.toBitId)
+      }
+    }
+  }
+  return visited
+}
+
+const workflowContext = computed(() => {
+  if (hoveredBitId.value === null) return null
+  return {
+    id: hoveredBitId.value,
+    upstream: getUpstreamIds(hoveredBitId.value),
+    downstream: getDownstreamIds(hoveredBitId.value),
+  }
+})
+
+function getBitHighlightRole(bitId: number): 'upstream' | 'downstream' | null {
+  if (!workflowContext.value) return null
+  if (workflowContext.value.upstream.has(bitId)) return 'upstream'
+  if (workflowContext.value.downstream.has(bitId)) return 'downstream'
+  return null
+}
+
+function isBitDimmed(bitId: number): boolean {
+  // Bit-hover chain takes priority
+  if (workflowContext.value) {
+    const ctx = workflowContext.value
+    return bitId !== ctx.id && !ctx.upstream.has(bitId) && !ctx.downstream.has(bitId)
+  }
+  // Packet highlight
+  if (highlightedPacketBitIds.value.size > 0) {
+    return !highlightedPacketBitIds.value.has(bitId)
+  }
+  return false
+}
+
+function getConnectionOpacity(fromBitId: number, toBitId: number): number {
+  if (workflowContext.value) {
+    const ctx = workflowContext.value
+    const relevant = new Set([ctx.id, ...ctx.upstream, ...ctx.downstream])
+    return relevant.has(fromBitId) && relevant.has(toBitId) ? 1 : 0.06
+  }
+  if (highlightedPacketBitIds.value.size > 0) {
+    const inPacket = highlightedPacketBitIds.value.has(fromBitId) && highlightedPacketBitIds.value.has(toBitId)
+    return inPacket ? 1 : 0.06
+  }
+  return 1
+}
+
+// ── cycle detection (DFS back-edge) ────────────────────────────────
+const cycleConnectionIds = computed(() => {
+  const cycleConnIds = new Set<number>()
+  const state = new Map<number, number>() // 0=unvisited, 1=in stack, 2=done
+
+  function dfs(nodeId: number): void {
+    state.set(nodeId, 1)
+    for (const conn of connectionStore.connections) {
+      if (conn.fromBitId !== nodeId) continue
+      const s = state.get(conn.toBitId) ?? 0
+      if (s === 1) cycleConnIds.add(conn.id)
+      else if (s === 0) dfs(conn.toBitId)
+    }
+    state.set(nodeId, 2)
+  }
+
+  for (const bit of bitStore.bits) {
+    if ((state.get(bit.id) ?? 0) === 0) dfs(bit.id)
+  }
+  return cycleConnIds
+})
+
+// ── blocked / ready state per bit ──────────────────────────────────
+const bitWorkflowState = computed(() => {
+  const states = new Map<number, 'blocked' | 'ready' | null>()
+  for (const bit of bitStore.bits) {
+    if (bit.status === 2) { states.set(bit.id, null); continue }
+    const incoming = connectionStore.connections.filter((c) => c.toBitId === bit.id)
+    if (incoming.length === 0) { states.set(bit.id, null); continue }
+    const allDone = incoming.every((c) => bitStore.bits.find((b) => b.id === c.fromBitId)?.status === 2)
+    states.set(bit.id, allDone ? 'ready' : 'blocked')
+  }
+  return states
+})
+
+// ── packets: connected components (undirected) ──────────────────────
+const packets = computed(() => {
+  if (connectionStore.connections.length === 0) return []
+
+  const adj = new Map<number, Set<number>>()
+  for (const bit of bitStore.bits) adj.set(bit.id, new Set())
+  for (const conn of connectionStore.connections) {
+    adj.get(conn.fromBitId)?.add(conn.toBitId)
+    adj.get(conn.toBitId)?.add(conn.fromBitId)
+  }
+
+  const visited = new Set<number>()
+  const components: number[][] = []
+
+  for (const bit of bitStore.bits) {
+    if (visited.has(bit.id) || (adj.get(bit.id)?.size ?? 0) === 0) continue
+    const component: number[] = []
+    const queue = [bit.id]
+    visited.add(bit.id)
+    while (queue.length) {
+      const id = queue.shift()!
+      component.push(id)
+      for (const neighbor of adj.get(id) ?? []) {
+        if (!visited.has(neighbor)) { visited.add(neighbor); queue.push(neighbor) }
+      }
+    }
+    components.push(component)
+  }
+
+  return components.map((bitIds, i) => ({ index: i + 1, bitIds }))
+})
+
+// ── per-packet stats for HUD ────────────────────────────────────────
+const packetCards = computed(() =>
+  packets.value.map((packet) => {
+    const bits = packet.bitIds.map((id) => bitStore.bits.find((b) => b.id === id)).filter(Boolean)
+    const total = bits.length
+    const done = bits.filter((b) => b!.status === 2).length
+    const inProgress = bits.filter((b) => b!.status === 1).length
+    const blocked = packet.bitIds.filter((id) => bitWorkflowState.value.get(id) === 'blocked').length
+    const ready   = packet.bitIds.filter((id) => bitWorkflowState.value.get(id) === 'ready').length
+    const packetConns = connectionStore.connections.filter(
+      (c) => packet.bitIds.includes(c.fromBitId) && packet.bitIds.includes(c.toBitId),
+    )
+    const cycles = packetConns.filter((c) => cycleConnectionIds.value.has(c.id)).length
+    return {
+      key: Math.min(...packet.bitIds),
+      bitIds: packet.bitIds,
+      index: packet.index,
+      total,
+      done,
+      inProgress,
+      blocked,
+      ready,
+      cycles,
+      percent: total ? Math.round((done / total) * 100) : 0,
+    }
+  }),
+)
+
+function selectConnection(id: number) {
+  selectedConnectionId.value = selectedConnectionId.value === id ? null : id
+}
+
+async function deleteSelectedConnection() {
+  if (selectedConnectionId.value === null) return
+  await connectionStore.deleteConnection(selectedConnectionId.value)
+  selectedConnectionId.value = null
+}
+
+function onWorkspaceMouseDown(e: MouseEvent) {
+  selectedConnectionId.value = null
+  handleMouseDown(e)
+}
+
 function onBitDragMove(id: number, x: number, y: number) {
   const otherBits = bitStore.bits.filter((b) => b.id !== id)
   const draggedOccupied = getOccupiedSides(id)
@@ -252,11 +440,54 @@ const connectionPaths = computed(() =>
       const cp2x = tx + CP_OFFSETS[conn.toSide].x
       const cp2y = ty + CP_OFFSETS[conn.toSide].y
 
+      // Bezier midpoint at t=0.5 (De Casteljau)
+      const mx = 0.125*fx + 0.375*cp1x + 0.375*cp2x + 0.125*tx
+      const my = 0.125*fy + 0.375*cp1y + 0.375*cp2y + 0.125*ty
+
+      // Arrow direction: tangent at t=1 = endpoint - last control point
+      const arrowAngle = Math.atan2(ty - cp2y, tx - cp2x) * 180 / Math.PI
+
+      // 5-state color model
+      const isCycle    = cycleConnectionIds.value.has(conn.id)
+      const fromStatus = from.status
+      const toStatus   = to.status
+
+      let flowColor: string
+      let glowColor: string
+      let dashArray: string | undefined
+      let connClass: string
+
+      if (isCycle) {
+        flowColor = '#f97316'; glowColor = 'rgba(249,115,22,0.45)'; dashArray = '8 4'; connClass = 'conn-cycle'
+      } else if (fromStatus === 2 && toStatus !== 2) {
+        // Source done, target still open → path UNLOCKED
+        flowColor = '#34d399'; glowColor = 'rgba(52,211,153,0.45)'; dashArray = '12 5'; connClass = 'conn-unlocked'
+      } else if (fromStatus === 2) {
+        // Both done → completed path
+        flowColor = 'rgba(16,185,129,0.45)'; glowColor = 'rgba(16,185,129,0.12)'; dashArray = undefined; connClass = ''
+      } else if (fromStatus === 1) {
+        // In progress → active flow
+        flowColor = '#f59e0b'; glowColor = 'rgba(245,158,11,0.4)'; dashArray = '10 6'; connClass = 'conn-flow'
+      } else {
+        // Open → pending
+        flowColor = 'rgba(100,116,139,0.65)'; glowColor = 'rgba(100,116,139,0.18)'; dashArray = '6 5'; connClass = ''
+      }
+
       return {
         id: conn.id,
         d: `M ${fx} ${fy} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${tx} ${ty}`,
-        fx, fy, tx, ty,
+        fx, fy, tx, ty, mx, my,
+        arrowAngle,
         isNew: newConnectionIds.value.has(conn.id),
+        isSelected: selectedConnectionId.value === conn.id,
+        isCycle,
+        connClass,
+        flowColor,
+        glowColor,
+        dashArray,
+        opacity: getConnectionOpacity(conn.fromBitId, conn.toBitId),
+        fromBitId: conn.fromBitId,
+        toBitId: conn.toBitId,
       }
     })
     .filter(Boolean),
@@ -435,7 +666,7 @@ onUnmounted(() => {
     class="w-full h-screen overflow-hidden bg-surface1 relative"
     :class="isDark ? 'bg-dotted-grid-dark' : 'bg-dotted-grid-light'"
     @wheel.prevent="handleWheel"
-    @mousedown="handleMouseDown"
+    @mousedown="onWorkspaceMouseDown"
     @contextmenu="handleContextMenu"
     @touchstart="handleTouchStartWithLongPress"
     @touchmove="handleTouchMoveWithLongPress"
@@ -460,53 +691,103 @@ onUnmounted(() => {
 
       <!-- ── connections ── -->
       <svg
-        class="absolute pointer-events-none"
+        class="absolute"
         style="inset: 0; width: 0; height: 0; overflow: visible"
       >
         <defs>
-          <filter id="conn-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          <filter id="conn-blur" x="-150%" y="-150%" width="400%" height="400%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" />
           </filter>
         </defs>
-        <g v-for="path in connectionPaths" :key="path!.id">
-          <!-- glow layer -->
+
+        <g
+          v-for="path in connectionPaths"
+          :key="path!.id"
+          :style="{ opacity: path!.opacity, transition: 'opacity 0.3s ease' }"
+        >
+          <!-- 1. Glow layer -->
           <path
             :d="path!.d"
             fill="none"
-            stroke="rgba(148,163,184,0.25)"
-            stroke-width="4"
-            filter="url(#conn-glow)"
+            :stroke="path!.glowColor"
+            stroke-width="14"
+            filter="url(#conn-blur)"
+            style="pointer-events:none;"
           />
-          <!-- main line -->
+
+          <!-- 2. Track (faint background line) -->
           <path
             :d="path!.d"
             fill="none"
-            stroke="rgba(148,163,184,0.55)"
+            stroke="rgba(255,255,255,0.05)"
             stroke-width="1.5"
-            stroke-dasharray="5 4"
-            stroke-linecap="round"
-            :class="{ 'conn-draw': path!.isNew }"
+            style="pointer-events:none;"
           />
-          <!-- flash on new connection -->
+
+          <!-- 3. Main flow line -->
+          <path
+            :d="path!.d"
+            fill="none"
+            :stroke="path!.flowColor"
+            :stroke-width="path!.isSelected ? 2.8 : 2"
+            :stroke-dasharray="path!.dashArray"
+            stroke-linecap="round"
+            :class="path!.isNew ? 'conn-draw' : path!.connClass"
+            style="pointer-events:none;"
+          />
+
+          <!-- 4. Arrowhead at target -->
+          <polygon
+            :points="'0,0 -10,-4.5 -10,4.5'"
+            :transform="`translate(${path!.tx},${path!.ty}) rotate(${path!.arrowAngle})`"
+            :fill="path!.flowColor"
+            opacity="0.9"
+            style="pointer-events:none;"
+          />
+
+          <!-- 5. Source dot -->
+          <circle
+            :cx="path!.fx" :cy="path!.fy" r="2.5"
+            :fill="path!.flowColor"
+            opacity="0.8"
+            style="pointer-events:none;"
+            :class="{ 'conn-dot-pop': path!.isNew }"
+          />
+
+          <!-- 6. Flash on new connection -->
           <path
             v-if="path!.isNew"
             :d="path!.d"
             fill="none"
-            stroke="rgba(200,210,255,0.9)"
-            stroke-width="3"
+            stroke="rgba(200,215,255,0.85)"
+            stroke-width="4"
             stroke-linecap="round"
             class="conn-flash"
+            style="pointer-events:none;"
           />
-          <!-- endpoint dots -->
-          <circle
-            :cx="path!.fx" :cy="path!.fy" r="3" fill="rgba(148,163,184,0.7)"
-            :class="{ 'conn-dot-pop': path!.isNew }"
+
+          <!-- 7. Hit area (transparent, clickable) -->
+          <path
+            :d="path!.d"
+            fill="none"
+            stroke="transparent"
+            stroke-width="22"
+            style="cursor:pointer;"
+            @click.stop="selectConnection(path!.id)"
           />
-          <circle
-            :cx="path!.tx" :cy="path!.ty" r="3" fill="rgba(148,163,184,0.7)"
-            :class="{ 'conn-dot-pop': path!.isNew }"
-          />
+
+          <!-- 8. Delete button (when selected) -->
+          <g
+            v-if="path!.isSelected"
+            :transform="`translate(${path!.mx},${path!.my})`"
+            style="cursor:pointer;"
+            @click.stop="deleteSelectedConnection()"
+          >
+            <circle r="14" fill="rgba(12,12,22,0.92)" />
+            <circle r="14" fill="none" stroke="#ef4444" stroke-width="1.5" opacity="0.85" />
+            <line x1="-5" y1="-5" x2="5" y2="5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
+            <line x1="5" y1="-5" x2="-5" y2="5" stroke="#ef4444" stroke-width="2" stroke-linecap="round" />
+          </g>
         </g>
       </svg>
 
@@ -517,11 +798,16 @@ onUnmounted(() => {
         :bit="bit"
         :zoom="zoom"
         :highlight-side="snapHighlights.get(bit.id) ?? null"
+        :dimmed="isBitDimmed(bit.id)"
+        :highlight-role="getBitHighlightRole(bit.id)"
+        :workflow-state="bitWorkflowState.get(bit.id) ?? null"
         @move-end="onBitMoveEnd"
         @drag-move="onBitDragMove"
         @rename="onBitRename"
         @delete="(id) => bitStore.deleteBit(id)"
         @open-detail="openBitDetail"
+        @hover="hoveredBitId = $event"
+        @hover-end="hoveredBitId = null"
       />
     </div>
 
@@ -572,6 +858,12 @@ onUnmounted(() => {
   <!-- fixed UI — outside transformed workspace so position:fixed works correctly -->
   <LTaskbar />
   <LMenu />
+
+  <LPacketsHud
+    :cards="packetCards"
+    @highlight="(ids) => highlightedPacketBitIds = new Set(ids)"
+    @unhighlight="highlightedPacketBitIds = new Set()"
+  />
   <LContextMenu
     v-if="contextMenu.visible"
     :x="contextMenu.x"
@@ -594,31 +886,62 @@ onUnmounted(() => {
 }
 
 /* ── connection animations ── */
+
+/* Draw-in: new connection appears with path reveal */
 @keyframes conn-draw {
-  from { stroke-dashoffset: 200; opacity: 0; }
-  to   { stroke-dashoffset: 0;   opacity: 1; }
+  from { stroke-dasharray: 800; stroke-dashoffset: 800; opacity: 0.4; }
+  to   { stroke-dasharray: 800; stroke-dashoffset: 0;   opacity: 1; }
 }
-@keyframes conn-flash {
-  0%   { opacity: 0.9; stroke-width: 6; }
-  60%  { opacity: 0.4; stroke-width: 2; }
-  100% { opacity: 0;   stroke-width: 1; }
-}
-@keyframes conn-dot-pop {
-  0%   { r: 0;  opacity: 0; }
-  50%  { r: 6;  opacity: 1; }
-  100% { r: 3;  opacity: 0.7; }
+.conn-draw {
+  animation: conn-draw 0.55s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
 }
 
-.conn-draw {
-  stroke-dasharray: 5 4;
-  stroke-dashoffset: 200;
-  animation: conn-draw 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+/* Flow: in-progress — dashes travel source→target */
+@keyframes conn-flow {
+  from { stroke-dashoffset: 16; }
+  to   { stroke-dashoffset: 0; }
+}
+.conn-flow {
+  animation: conn-flow 0.65s linear infinite;
+}
+
+/* Unlocked: source done, target ready — slow emerald pulse */
+@keyframes conn-unlocked {
+  0%, 100% { stroke-dashoffset: 17; opacity: 0.75; }
+  50%       { stroke-dashoffset: 0;  opacity: 1; }
+}
+.conn-unlocked {
+  animation: conn-unlocked 2.2s ease-in-out infinite;
+}
+
+/* Cycle warning: orange-red rapid pulse */
+@keyframes conn-cycle {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+.conn-cycle {
+  animation: conn-cycle 0.75s ease-in-out infinite;
+}
+
+/* Flash: bright burst when connection is created */
+@keyframes conn-flash {
+  0%   { opacity: 0.85; stroke-width: 6; }
+  60%  { opacity: 0.3;  stroke-width: 2; }
+  100% { opacity: 0;    stroke-width: 1; }
 }
 .conn-flash {
   animation: conn-flash 0.65s ease-out forwards;
 }
+
+/* Dot pop: endpoint dot appears with overshoot */
+@keyframes conn-dot-pop {
+  0%   { r: 0;   opacity: 0; }
+  55%  { r: 5.5; opacity: 1; }
+  100% { r: 2.5; opacity: 0.8; }
+}
 .conn-dot-pop {
   animation: conn-dot-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+
 
 </style>
