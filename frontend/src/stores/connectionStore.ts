@@ -2,7 +2,15 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/helpers/api'
 
-export type Side = 'top' | 'top-right' | 'right' | 'bottom-right' | 'bottom' | 'bottom-left' | 'left' | 'top-left'
+export type Side =
+  | 'top'
+  | 'top-right'
+  | 'right'
+  | 'bottom-right'
+  | 'bottom'
+  | 'bottom-left'
+  | 'left'
+  | 'top-left'
 
 export interface BitConnection {
   id: number

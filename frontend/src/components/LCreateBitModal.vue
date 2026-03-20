@@ -3,21 +3,23 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { X, Zap } from 'lucide-vue-next'
 
 const emit = defineEmits<{
-  confirm: [data: {
-    title: string
-    status: number
-    priority: number | undefined
-    dueDate: string | undefined
-    notes: string | undefined
-  }]
+  confirm: [
+    data: {
+      title: string
+      status: number
+      priority: number | undefined
+      dueDate: string | undefined
+      notes: string | undefined
+    },
+  ]
   cancel: []
 }>()
 
-const title    = ref('')
-const status   = ref<0 | 1 | 2>(0)
+const title = ref('')
+const status = ref<0 | 1 | 2>(0)
 const priority = ref<'' | '1' | '2' | '3'>('')
-const dueDate  = ref('')
-const notes    = ref('')
+const dueDate = ref('')
+const notes = ref('')
 const titleInput = ref<HTMLInputElement | null>(null)
 
 onMounted(() => titleInput.value?.focus())
@@ -64,7 +66,7 @@ const STATUS_COLOURS: Record<number, string> = {
     <!-- backdrop -->
     <div
       class="fixed inset-0 z-[2000] flex items-center justify-center"
-      style="background: rgba(0,0,0,0.55); backdrop-filter: blur(4px)"
+      style="background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px)"
       @click.self="emit('cancel')"
     >
       <!-- panel -->
@@ -149,9 +151,7 @@ const STATUS_COLOURS: Record<number, string> = {
           <!-- actions -->
           <div class="flex justify-end gap-2 mt-2">
             <button type="button" class="btn-ghost" @click="emit('cancel')">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="!title.trim()">
-              Create Bit
-            </button>
+            <button type="submit" class="btn-primary" :disabled="!title.trim()">Create Bit</button>
           </div>
         </form>
       </div>
@@ -161,7 +161,11 @@ const STATUS_COLOURS: Record<number, string> = {
 
 <style scoped>
 /* ── fields ── */
-.field { display: flex; flex-direction: column; gap: 5px; }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 
 .field-label {
   font-size: 11.5px;
@@ -187,7 +191,9 @@ const STATUS_COLOURS: Record<number, string> = {
 .field-input:focus {
   border-color: #818cf8;
 }
-.field-input::placeholder { color: var(--color-text2, #6c7086); }
+.field-input::placeholder {
+  color: var(--color-text2, #6c7086);
+}
 
 /* date picker icon colour */
 .field-input[type='date']::-webkit-calendar-picker-indicator {
@@ -213,9 +219,14 @@ select.field-input {
   background: transparent;
   border: 1px solid var(--color-surface3, #313244);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
-.btn-ghost:hover { background: var(--color-surface2, #1e1e2e); color: var(--color-text0, #cdd6f4); }
+.btn-ghost:hover {
+  background: var(--color-surface2, #1e1e2e);
+  color: var(--color-text0, #cdd6f4);
+}
 
 .btn-primary {
   padding: 7px 20px;
@@ -226,13 +237,32 @@ select.field-input {
   background: #6366f1;
   border: none;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
 }
-.btn-primary:hover:not(:disabled) { background: #818cf8; }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:hover:not(:disabled) {
+  background: #818cf8;
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* ── transition ── */
-.modal-fade-enter-active { transition: opacity 0.18s ease, transform 0.18s ease; }
-.modal-fade-leave-active { transition: opacity 0.12s ease, transform 0.12s ease; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; transform: scale(0.96) translateY(6px); }
+.modal-fade-enter-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+.modal-fade-leave-active {
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.96) translateY(6px);
+}
 </style>

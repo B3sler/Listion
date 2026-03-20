@@ -9,14 +9,16 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  confirm: [data: {
-    title: string
-    status: number
-    priority: number | undefined
-    dueDate: string | undefined
-    notes: string | undefined
-    color: string
-  }]
+  confirm: [
+    data: {
+      title: string
+      status: number
+      priority: number | undefined
+      dueDate: string | undefined
+      notes: string | undefined
+      color: string
+    },
+  ]
   cancel: []
   delete: []
 }>()
@@ -42,31 +44,31 @@ const BIT_COLORS = [
   '#64748b', // Slate
 ] as const
 
-const title    = ref('')
-const status   = ref<0 | 1 | 2>(0)
+const title = ref('')
+const status = ref<0 | 1 | 2>(0)
 const priority = ref<'' | '1' | '2' | '3'>('')
-const dueDate  = ref('')
-const notes    = ref('')
-const color    = ref(DEFAULT_COLOR)
+const dueDate = ref('')
+const notes = ref('')
+const color = ref(DEFAULT_COLOR)
 const titleInput = ref<HTMLInputElement | null>(null)
 
 watch(
   () => [props.mode, props.bit] as const,
   ([mode, b]) => {
     if (mode === 'edit' && b) {
-      title.value    = b.title
-      status.value   = (b.status ?? 0) as 0 | 1 | 2
+      title.value = b.title
+      status.value = (b.status ?? 0) as 0 | 1 | 2
       priority.value = b.priority ? (String(b.priority) as '1' | '2' | '3') : ''
-      dueDate.value  = b.dueDate ? (new Date(b.dueDate).toISOString().split('T')[0] ?? '') : ''
-      notes.value    = b.notes ?? ''
-      color.value    = b.color ?? DEFAULT_COLOR
+      dueDate.value = b.dueDate ? (new Date(b.dueDate).toISOString().split('T')[0] ?? '') : ''
+      notes.value = b.notes ?? ''
+      color.value = b.color ?? DEFAULT_COLOR
     } else {
-      title.value    = ''
-      status.value   = 0
+      title.value = ''
+      status.value = 0
       priority.value = ''
-      dueDate.value  = ''
-      notes.value    = ''
-      color.value    = DEFAULT_COLOR
+      dueDate.value = ''
+      notes.value = ''
+      color.value = DEFAULT_COLOR
     }
   },
   { immediate: true },
@@ -116,7 +118,6 @@ const STATUS_COLOURS: Record<number, string> = {
 
 <template>
   <div class="panel">
-
     <!-- header -->
     <div class="panel__header">
       <div class="panel__header-left">
@@ -133,7 +134,6 @@ const STATUS_COLOURS: Record<number, string> = {
     <!-- body -->
     <div class="panel__body">
       <form @submit.prevent="submit" id="bit-panel-form">
-
         <!-- title -->
         <div class="field field--1">
           <label class="field__label">Title</label>
@@ -173,8 +173,13 @@ const STATUS_COLOURS: Record<number, string> = {
             <label class="field__label">Status</label>
             <div class="field__box field__box--select">
               <span class="field__dot" :style="{ background: STATUS_COLOURS[status] }" />
-              <select v-model="status" class="field__input field__input--select field__input--dotted">
-                <option v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+              <select
+                v-model="status"
+                class="field__input field__input--select field__input--dotted"
+              >
+                <option v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value">
+                  {{ o.label }}
+                </option>
               </select>
             </div>
           </div>
@@ -183,7 +188,9 @@ const STATUS_COLOURS: Record<number, string> = {
             <div class="field__box field__box--select">
               <select v-model="priority" class="field__input field__input--select">
                 <option value="">None</option>
-                <option v-for="o in PRIORITY_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+                <option v-for="o in PRIORITY_OPTIONS" :key="o.value" :value="o.value">
+                  {{ o.label }}
+                </option>
               </select>
             </div>
           </div>
@@ -209,7 +216,6 @@ const STATUS_COLOURS: Record<number, string> = {
             />
           </div>
         </div>
-
       </form>
     </div>
 
@@ -222,12 +228,16 @@ const STATUS_COLOURS: Record<number, string> = {
       <div v-else />
       <div class="panel__actions">
         <button type="button" class="btn" @click="emit('cancel')">Cancel</button>
-        <button type="submit" form="bit-panel-form" class="btn btn--primary" :disabled="!title.trim()">
+        <button
+          type="submit"
+          form="bit-panel-form"
+          class="btn btn--primary"
+          :disabled="!title.trim()"
+        >
           {{ mode === 'create' ? 'Create' : 'Save' }}
         </button>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -255,8 +265,14 @@ const STATUS_COLOURS: Record<number, string> = {
 }
 
 @keyframes panel-enter {
-  from { opacity: 0; transform: translateX(-20px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* ─────────────────────────────────────────
@@ -308,7 +324,9 @@ const STATUS_COLOURS: Record<number, string> = {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 .panel__close:hover {
   background-color: var(--surface3);
@@ -339,12 +357,24 @@ const STATUS_COLOURS: Record<number, string> = {
   opacity: 0;
   animation: field-rise 0.22s ease forwards;
 }
-.field--1 { animation-delay: 0.08s; }
-.field--2 { animation-delay: 0.12s; }
-.field--3 { animation-delay: 0.16s; }
-.field--4 { animation-delay: 0.16s; }
-.field--5 { animation-delay: 0.20s; }
-.field--6 { animation-delay: 0.24s; }
+.field--1 {
+  animation-delay: 0.08s;
+}
+.field--2 {
+  animation-delay: 0.12s;
+}
+.field--3 {
+  animation-delay: 0.16s;
+}
+.field--4 {
+  animation-delay: 0.16s;
+}
+.field--5 {
+  animation-delay: 0.2s;
+}
+.field--6 {
+  animation-delay: 0.24s;
+}
 
 /* two-column grid for status + priority */
 .field-row {
@@ -366,7 +396,9 @@ const STATUS_COLOURS: Record<number, string> = {
   background-color: var(--surface3);
   border-radius: 9px;
   border: 1.5px solid transparent;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   overflow: hidden;
 }
 .field__box:has(:focus) {
@@ -448,7 +480,10 @@ const STATUS_COLOURS: Record<number, string> = {
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
   padding: 0;
   outline: none;
 }
@@ -494,7 +529,9 @@ const STATUS_COLOURS: Record<number, string> = {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 .btn:hover {
   background-color: var(--surface3);
@@ -522,12 +559,22 @@ const STATUS_COLOURS: Record<number, string> = {
    Animations
 ───────────────────────────────────────── */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes field-rise {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

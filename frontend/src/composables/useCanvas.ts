@@ -118,7 +118,10 @@ export function useCanvas(containerRef: Ref<HTMLElement | null>) {
       const dx = t2.clientX - t1.clientX
       const dy = t2.clientY - t1.clientY
       const currentDistance = Math.sqrt(dx * dx + dy * dy)
-      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, initialZoom * (currentDistance / initialDistance)))
+      const newZoom = Math.min(
+        MAX_ZOOM,
+        Math.max(MIN_ZOOM, initialZoom * (currentDistance / initialDistance)),
+      )
       const midX = (t1.clientX + t2.clientX) / 2
       const midY = (t1.clientY + t2.clientY) / 2
 

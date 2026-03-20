@@ -23,10 +23,9 @@ const emit = defineEmits<{
   unhighlight: []
 }>()
 
-// ── pagination ────────────────────────────────────────────────────────
 const currentPage = ref(0)
-const totalPages  = computed(() => Math.ceil(props.cards.length / CARDS_PER_PAGE))
-const isPaged     = computed(() => totalPages.value > 1)
+const totalPages = computed(() => Math.ceil(props.cards.length / CARDS_PER_PAGE))
+const isPaged = computed(() => totalPages.value > 1)
 
 const pages = computed(() => {
   const result: PacketCard[][] = []
@@ -47,10 +46,7 @@ watch(
   },
 )
 
-// ── dynamic page height measurement ───────────────────────────────────
-// Instead of a hardcoded constant we measure the first page after render
-// so any card height (with/without chips) snaps correctly.
-const pageHeight  = ref(0)
+const pageHeight = ref(0)
 const firstPageEl = ref<HTMLElement | null>(null)
 
 async function measurePageHeight() {
@@ -60,32 +56,25 @@ async function measurePageHeight() {
   }
 }
 
-// ── drag / snap state ─────────────────────────────────────────────────
 const dragOffset = ref(0)
 const isSnapping = ref(false)
 
 const trackStyle = computed(() => {
-  const h    = pageHeight.value
+  const h = pageHeight.value
   const base = -(currentPage.value * h)
   return {
-    transform:  `translateY(${base + dragOffset.value}px)`,
+    transform: `translateY(${base + dragOffset.value}px)`,
     transition: isSnapping.value ? 'transform 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
     willChange: 'transform',
   }
 })
 
-// Applied to the viewport when paged — height matches one full page exactly
 const viewportStyle = computed(() =>
-  isPaged.value && pageHeight.value > 0
-    ? { height: `${pageHeight.value}px` }
-    : {},
+  isPaged.value && pageHeight.value > 0 ? { height: `${pageHeight.value}px` } : {},
 )
 
-// Applied to every page slot so the track offset aligns correctly
 const pageSlotStyle = computed(() =>
-  isPaged.value && pageHeight.value > 0
-    ? { height: `${pageHeight.value}px` }
-    : {},
+  isPaged.value && pageHeight.value > 0 ? { height: `${pageHeight.value}px` } : {},
 )
 
 function snapToPage(targetPage?: number) {
@@ -101,19 +90,20 @@ function snapToPage(targetPage?: number) {
   }
   dragOffset.value = 0
   isSnapping.value = true
-  setTimeout(() => { isSnapping.value = false }, 420)
+  setTimeout(() => {
+    isSnapping.value = false
+  }, 420)
 }
 
 // Rubber-band resistance at edges
 function resistedOffset(raw: number): number {
   const atStart = currentPage.value === 0
-  const atEnd   = currentPage.value === totalPages.value - 1
+  const atEnd = currentPage.value === totalPages.value - 1
   if (raw > 0 && atStart) return raw * 0.2
-  if (raw < 0 && atEnd)   return raw * 0.2
+  if (raw < 0 && atEnd) return raw * 0.2
   return raw
 }
 
-// ── mouse drag ────────────────────────────────────────────────────────
 let dragStartY = 0
 let isDragging = false
 
@@ -124,7 +114,7 @@ function onMouseDown(e: MouseEvent) {
   dragStartY = e.clientY
   isSnapping.value = false
   window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup',  onMouseUp)
+  window.addEventListener('mouseup', onMouseUp)
 }
 
 function onMouseMove(e: MouseEvent) {
@@ -137,19 +127,17 @@ function onMouseUp() {
   isDragging = false
   snapToPage()
   window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup',  onMouseUp)
+  window.removeEventListener('mouseup', onMouseUp)
 }
 
-// ── wheel ─────────────────────────────────────────────────────────────
 function onWheel(e: WheelEvent) {
   if (!isPaged.value || isSnapping.value) return
   e.preventDefault()
   e.stopPropagation()
   if (e.deltaY > 0) snapToPage(currentPage.value + 1)
-  else              snapToPage(currentPage.value - 1)
+  else snapToPage(currentPage.value - 1)
 }
 
-// ── touch ─────────────────────────────────────────────────────────────
 let touchStartY = 0
 
 function onTouchStart(e: TouchEvent) {
@@ -170,10 +158,9 @@ function onTouchEnd() {
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup',  onMouseUp)
+  window.removeEventListener('mouseup', onMouseUp)
 })
 
-// ── persistent names ──────────────────────────────────────────────────
 const STORAGE_KEY = 'listion-packet-names'
 const packetNames = ref<Record<number, string>>({})
 
@@ -182,21 +169,22 @@ onMounted(() => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) packetNames.value = JSON.parse(raw)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 })
 
 function getPacketName(key: number, index: number): string {
   return packetNames.value[key] ?? `Packet ${index}`
 }
 
-// ── inline rename ─────────────────────────────────────────────────────
 const editingKey = ref<number | null>(null)
-const editValue  = ref('')
-const editInput  = ref<HTMLInputElement | null>(null)
+const editValue = ref('')
+const editInput = ref<HTMLInputElement | null>(null)
 
 async function startRename(key: number, index: number) {
   editingKey.value = key
-  editValue.value  = getPacketName(key, index)
+  editValue.value = getPacketName(key, index)
   await nextTick()
   editInput.value?.select()
 }
@@ -215,7 +203,6 @@ function cancelRename() {
   editingKey.value = null
 }
 
-// ── packet highlight ──────────────────────────────────────────────────
 const highlightedKey = ref<number | null>(null)
 
 function toggleHighlight(card: PacketCard) {
@@ -232,12 +219,9 @@ function toggleHighlight(card: PacketCard) {
 <template>
   <Transition name="hud">
     <div v-if="cards.length > 0" class="packets-hud">
-
-      <!-- ── header ── -->
       <div class="hud-header">
         <span class="hud-title">Packets</span>
         <div class="hud-header-right">
-          <!-- Page dots (indicator only) -->
           <div v-if="isPaged" class="pager-dots">
             <span
               v-for="i in totalPages"
@@ -250,7 +234,6 @@ function toggleHighlight(card: PacketCard) {
         </div>
       </div>
 
-      <!-- ── card viewport ── -->
       <div
         class="packet-viewport"
         :class="{ 'packet-viewport--paged': isPaged }"
@@ -266,7 +249,11 @@ function toggleHighlight(card: PacketCard) {
             v-for="(pageCards, pi) in pages"
             :key="pi"
             class="packet-page"
-            :ref="(el) => { if (pi === 0) firstPageEl = el as HTMLElement | null }"
+            :ref="
+              (el) => {
+                if (pi === 0) firstPageEl = el as HTMLElement | null
+              }
+            "
             :style="pageSlotStyle"
           >
             <div
@@ -275,7 +262,6 @@ function toggleHighlight(card: PacketCard) {
               class="packet-card"
               :class="{ 'packet-card--highlighted': highlightedKey === card.key }"
             >
-              <!-- name + actions -->
               <div class="packet-card__header">
                 <template v-if="editingKey === card.key">
                   <input
@@ -290,7 +276,11 @@ function toggleHighlight(card: PacketCard) {
                   />
                 </template>
                 <template v-else>
-                  <button class="packet-name" @click="startRename(card.key, card.index)" @mousedown.stop>
+                  <button
+                    class="packet-name"
+                    @click="startRename(card.key, card.index)"
+                    @mousedown.stop
+                  >
                     {{ getPacketName(card.key, card.index) }}
                     <span class="edit-icon">✎</span>
                   </button>
@@ -300,17 +290,51 @@ function toggleHighlight(card: PacketCard) {
                   <button
                     class="highlight-btn"
                     :class="{ 'highlight-btn--active': highlightedKey === card.key }"
-                    :title="highlightedKey === card.key ? 'Highlight entfernen' : 'Auf Canvas hervorheben'"
+                    :title="
+                      highlightedKey === card.key ? 'Highlight entfernen' : 'Auf Canvas hervorheben'
+                    "
                     @click="toggleHighlight(card)"
                     @mousedown.stop
                   >
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
-                      <circle cx="8" cy="8" r="2" fill="currentColor"/>
-                      <line x1="8"    y1="1"    x2="8"    y2="3.5"  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                      <line x1="8"    y1="12.5" x2="8"    y2="15"   stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                      <line x1="1"    y1="8"    x2="3.5"  y2="8"    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                      <line x1="12.5" y1="8"    x2="15"   y2="8"    stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                      <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" />
+                      <circle cx="8" cy="8" r="2" fill="currentColor" />
+                      <line
+                        x1="8"
+                        y1="1"
+                        x2="8"
+                        y2="3.5"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="8"
+                        y1="12.5"
+                        x2="8"
+                        y2="15"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="1"
+                        y1="8"
+                        x2="3.5"
+                        y2="8"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
+                      <line
+                        x1="12.5"
+                        y1="8"
+                        x2="15"
+                        y2="8"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
                     </svg>
                   </button>
                   <span class="packet-fraction">
@@ -319,29 +343,32 @@ function toggleHighlight(card: PacketCard) {
                 </div>
               </div>
 
-              <!-- progress bar -->
               <div class="packet-bar">
                 <div class="packet-bar__fill" :style="{ width: card.percent + '%' }" />
               </div>
 
-              <!-- chips -->
-              <div v-if="card.cycles || card.blocked || card.ready || card.inProgress" class="packet-chips">
-                <span v-if="card.cycles > 0"     class="chip chip--cycle">⚠ cycle</span>
-                <span v-if="card.blocked > 0"    class="chip chip--blocked">{{ card.blocked }} blocked</span>
-                <span v-if="card.ready > 0"      class="chip chip--ready">{{ card.ready }} ready</span>
-                <span v-if="card.inProgress > 0" class="chip chip--progress">{{ card.inProgress }} active</span>
+              <div
+                v-if="card.cycles || card.blocked || card.ready || card.inProgress"
+                class="packet-chips"
+              >
+                <span v-if="card.cycles > 0" class="chip chip--cycle">⚠ cycle</span>
+                <span v-if="card.blocked > 0" class="chip chip--blocked"
+                  >{{ card.blocked }} blocked</span
+                >
+                <span v-if="card.ready > 0" class="chip chip--ready">{{ card.ready }} ready</span>
+                <span v-if="card.inProgress > 0" class="chip chip--progress"
+                  >{{ card.inProgress }} active</span
+                >
               </div>
             </div>
           </div>
         </div>
       </div>
-
     </div>
   </Transition>
 </template>
 
 <style scoped>
-/* ── outer wrapper ── */
 .packets-hud {
   position: fixed;
   bottom: 24px;
@@ -353,7 +380,6 @@ function toggleHighlight(card: PacketCard) {
   gap: 8px;
 }
 
-/* ── header ── */
 .hud-header {
   display: flex;
   align-items: center;
@@ -386,7 +412,6 @@ function toggleHighlight(card: PacketCard) {
   line-height: 16px;
 }
 
-/* ── page dots (indicator) ── */
 .pager-dots {
   display: flex;
   align-items: center;
@@ -398,7 +423,9 @@ function toggleHighlight(card: PacketCard) {
   height: 4px;
   border-radius: 50%;
   background: rgba(148, 163, 184, 0.2);
-  transition: background 0.2s, transform 0.2s;
+  transition:
+    background 0.2s,
+    transform 0.2s;
 }
 
 .pager-dot--active {
@@ -406,7 +433,6 @@ function toggleHighlight(card: PacketCard) {
   transform: scale(1.3);
 }
 
-/* ── viewport: clips the sliding track ── */
 .packet-viewport {
   position: relative;
   cursor: default;
@@ -423,14 +449,12 @@ function toggleHighlight(card: PacketCard) {
   cursor: grabbing;
 }
 
-/* ── track: contains all pages stacked vertically ── */
 .packet-track {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-/* ── page slot ── */
 .packet-page {
   display: flex;
   flex-direction: column;
@@ -438,13 +462,11 @@ function toggleHighlight(card: PacketCard) {
   flex-shrink: 0;
 }
 
-/* In paged mode height is set dynamically via :style; flex-start keeps cards top-aligned */
 .packet-viewport--paged .packet-page {
   align-content: flex-start;
   padding-bottom: 10px;
 }
 
-/* ── individual card ── */
 .packet-card {
   background: rgba(10, 10, 20, 0.84);
   backdrop-filter: blur(16px);
@@ -455,7 +477,9 @@ function toggleHighlight(card: PacketCard) {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   flex-shrink: 0;
 }
 
@@ -465,10 +489,11 @@ function toggleHighlight(card: PacketCard) {
 
 .packet-card--highlighted {
   border-color: rgba(148, 163, 184, 0.42) !important;
-  box-shadow: 0 0 0 1px rgba(148,163,184,0.12), 0 0 20px rgba(148,163,184,0.07);
+  box-shadow:
+    0 0 0 1px rgba(148, 163, 184, 0.12),
+    0 0 20px rgba(148, 163, 184, 0.07);
 }
 
-/* ── card header row ── */
 .packet-card__header {
   display: flex;
   align-items: center;
@@ -477,7 +502,6 @@ function toggleHighlight(card: PacketCard) {
   min-height: 22px;
 }
 
-/* ── packet name button ── */
 .packet-name {
   display: flex;
   align-items: center;
@@ -499,7 +523,9 @@ function toggleHighlight(card: PacketCard) {
   transition: color 0.15s;
 }
 
-.packet-name:hover { color: rgba(226, 232, 240, 0.9); }
+.packet-name:hover {
+  color: rgba(226, 232, 240, 0.9);
+}
 
 .edit-icon {
   font-size: 9px;
@@ -508,9 +534,10 @@ function toggleHighlight(card: PacketCard) {
   transition: opacity 0.15s;
 }
 
-.packet-name:hover .edit-icon { opacity: 0.55; }
+.packet-name:hover .edit-icon {
+  opacity: 0.55;
+}
 
-/* ── rename input ── */
 .packet-name-input {
   flex: 1;
   min-width: 0;
@@ -527,9 +554,10 @@ function toggleHighlight(card: PacketCard) {
   transition: border-color 0.15s;
 }
 
-.packet-name-input:focus { border-color: rgba(148, 163, 184, 0.65); }
+.packet-name-input:focus {
+  border-color: rgba(148, 163, 184, 0.65);
+}
 
-/* ── action group ── */
 .card-actions {
   display: flex;
   align-items: center;
@@ -537,7 +565,6 @@ function toggleHighlight(card: PacketCard) {
   flex-shrink: 0;
 }
 
-/* ── highlight button ── */
 .highlight-btn {
   display: flex;
   align-items: center;
@@ -549,7 +576,10 @@ function toggleHighlight(card: PacketCard) {
   border: 1px solid transparent;
   cursor: pointer;
   color: rgba(148, 163, 184, 0.35);
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .highlight-btn:hover {
@@ -564,7 +594,6 @@ function toggleHighlight(card: PacketCard) {
   border-color: rgba(148, 163, 184, 0.32);
 }
 
-/* ── fraction ── */
 .packet-fraction {
   font-size: 15px;
   font-weight: 700;
@@ -578,7 +607,6 @@ function toggleHighlight(card: PacketCard) {
   color: rgba(148, 163, 184, 0.4);
 }
 
-/* ── progress bar ── */
 .packet-bar {
   width: 100%;
   height: 3px;
@@ -595,7 +623,6 @@ function toggleHighlight(card: PacketCard) {
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.45);
 }
 
-/* ── chips ── */
 .packet-chips {
   display: flex;
   flex-wrap: wrap;
@@ -612,18 +639,47 @@ function toggleHighlight(card: PacketCard) {
   border: 1px solid currentColor;
 }
 
-.chip--cycle    { color: #f97316; background: rgba(249,115,22,0.12); animation: blink-cycle 1s ease-in-out infinite; }
-.chip--blocked  { color: #f87171; background: rgba(248,113,113,0.1); }
-.chip--ready    { color: #34d399; background: rgba(52,211,153,0.1); }
-.chip--progress { color: #fbbf24; background: rgba(251,191,36,0.1); }
-
-@keyframes blink-cycle {
-  0%, 100% { opacity: 0.7; }
-  50%       { opacity: 1; }
+.chip--cycle {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+  animation: blink-cycle 1s ease-in-out infinite;
+}
+.chip--blocked {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+.chip--ready {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+}
+.chip--progress {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
 }
 
-/* ── HUD appear/disappear ── */
-.hud-enter-active { transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1); }
-.hud-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.hud-enter-from, .hud-leave-to { opacity: 0; transform: translateY(12px) scale(0.95); }
+@keyframes blink-cycle {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.hud-enter-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.hud-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.hud-enter-from,
+.hud-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.95);
+}
 </style>

@@ -11,9 +11,7 @@ const userStore = useUserStore()
 const router = useRouter()
 const { isDark, toggle: toggleTheme } = useTheme()
 
-const displayName = computed(
-  () => userStore.user?.name || userStore.user?.email || 'Unknown',
-)
+const displayName = computed(() => userStore.user?.name || userStore.user?.email || 'Unknown')
 
 const initials = computed(() => {
   const name = userStore.user?.name || userStore.user?.email || '?'
@@ -69,11 +67,7 @@ onBeforeUnmount(() => {
     </button>
 
     <Transition name="dropdown">
-      <div
-        v-if="isOpen"
-        class="dropdown"
-        role="menu"
-      >
+      <div v-if="isOpen" class="dropdown" role="menu">
         <div class="dropdown__header">
           <div class="avatar">{{ initials }}</div>
           <span class="dropdown__name">{{ displayName }}</span>
@@ -88,19 +82,22 @@ onBeforeUnmount(() => {
             @click="toggleTheme"
           >
             <span class="theme-toggle">
-              <Sun :size="15" class="theme-toggle__icon theme-toggle__icon--sun" :class="{ 'theme-toggle__icon--active': !isDark }" />
-              <Moon :size="15" class="theme-toggle__icon theme-toggle__icon--moon" :class="{ 'theme-toggle__icon--active': isDark }" />
+              <Sun
+                :size="15"
+                class="theme-toggle__icon theme-toggle__icon--sun"
+                :class="{ 'theme-toggle__icon--active': !isDark }"
+              />
+              <Moon
+                :size="15"
+                class="theme-toggle__icon theme-toggle__icon--moon"
+                :class="{ 'theme-toggle__icon--active': isDark }"
+              />
               <span class="theme-toggle__pill" :class="{ 'theme-toggle__pill--dark': isDark }" />
             </span>
             {{ isDark ? 'Dark mode' : 'Light mode' }}
           </button>
 
-          <button
-            class="menu-item"
-            type="button"
-            role="menuitem"
-            @click="handleLogout"
-          >
+          <button class="menu-item" type="button" role="menuitem" @click="handleLogout">
             <LogOut :size="15" class="shrink-0" />
             Logout
           </button>

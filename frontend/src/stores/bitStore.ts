@@ -44,7 +44,10 @@ export const useBitStore = defineStore('bit', () => {
     return res.data
   }
 
-  async function updateBit(id: number, updates: Partial<Omit<Bit, 'id' | 'createdAt'>>): Promise<void> {
+  async function updateBit(
+    id: number,
+    updates: Partial<Omit<Bit, 'id' | 'createdAt'>>,
+  ): Promise<void> {
     await api.put(`/api/bit/${id}`, updates)
     const idx = bits.value.findIndex((b) => b.id === id)
     if (idx !== -1) {
