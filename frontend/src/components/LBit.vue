@@ -191,13 +191,6 @@ function cancelEdit() { isEditing.value = false }
       cursor: isDragging ? 'grabbing' : 'grab',
     }"
   >
-    <!-- ── workflow state badge (above octagon) ── -->
-    <div
-      v-if="workflowState"
-      class="lbit__state-badge"
-      :class="`lbit__state-badge--${workflowState}`"
-    >{{ workflowState === 'blocked' ? '⊘ Blocked' : '⚡ Ready' }}</div>
-
     <!-- ── octagon body (clipped) ── -->
     <div
       class="lbit"
@@ -263,8 +256,15 @@ function cancelEdit() { isEditing.value = false }
         </template>
 
         <div class="lbit__meta">
-          <span class="lbit__badge">{{ statusLabel }}</span>
-          <span v-if="priorityLabel" class="lbit__priority">{{ priorityLabel }}</span>
+          <div class="lbit__meta-row">
+            <span class="lbit__badge">{{ statusLabel }}</span>
+            <span v-if="priorityLabel" class="lbit__priority">{{ priorityLabel }}</span>
+          </div>
+          <div
+            v-if="workflowState"
+            class="lbit__workflow-chip"
+            :class="`lbit__workflow-chip--${workflowState}`"
+          >{{ workflowState === 'blocked' ? '⊘ Blocked' : '⚡ Ready' }}</div>
         </div>
       </div>
     </div>
@@ -447,9 +447,16 @@ function cancelEdit() { isEditing.value = false }
 /* ── meta ── */
 .lbit__meta {
   position: absolute;
-  bottom: 22px;
+  bottom: 18px;
   left: 0;
   right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.lbit__meta-row {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,41 +482,36 @@ function cancelEdit() { isEditing.value = false }
   text-transform: uppercase;
 }
 
-/* ── workflow state badge ── */
-.lbit__state-badge {
-  position: absolute;
-  top: -26px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
+/* ── workflow state chip (inside meta, below status badge) ── */
+.lbit__workflow-chip {
   font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 99px;
   pointer-events: none;
-  z-index: 10;
+  white-space: nowrap;
 }
-.lbit__state-badge--blocked {
+.lbit__workflow-chip--blocked {
   color: #fca5a5;
-  background: rgba(239, 68, 68, 0.14);
-  border: 1px solid rgba(239, 68, 68, 0.38);
-  animation: badge-blocked 2s ease-in-out infinite;
+  background: rgba(239, 68, 68, 0.13);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  animation: chip-blocked 2s ease-in-out infinite;
 }
-.lbit__state-badge--ready {
+.lbit__workflow-chip--ready {
   color: #6ee7b7;
-  background: rgba(16, 185, 129, 0.14);
-  border: 1px solid rgba(16, 185, 129, 0.42);
-  animation: badge-ready 1.4s ease-in-out infinite;
+  background: rgba(16, 185, 129, 0.13);
+  border: 1px solid rgba(16, 185, 129, 0.38);
+  animation: chip-ready 1.4s ease-in-out infinite;
 }
-@keyframes badge-blocked {
+@keyframes chip-blocked {
   0%, 100% { opacity: 0.65; }
   50%       { opacity: 1; }
 }
-@keyframes badge-ready {
-  0%, 100% { opacity: 0.8; box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-  50%       { opacity: 1;   box-shadow: 0 0 10px 2px rgba(16,185,129,0.25); }
+@keyframes chip-ready {
+  0%, 100% { opacity: 0.8; }
+  50%       { opacity: 1; box-shadow: 0 0 8px rgba(16,185,129,0.3); }
 }
 
 /* ── workflow ring ── */
