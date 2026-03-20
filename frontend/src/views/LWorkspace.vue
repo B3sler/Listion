@@ -129,25 +129,45 @@ const handleTouchEndWithLongPress = (event: TouchEvent) => {
 }
 
 // ── snap & connection logic ─────────────────────────────────────────
-const SNAP_THRESHOLD = 50 // world-space pixels
+// Directional snap thresholds — tested separately per axis so flat and diagonal
+// faces feel identical regardless of approach angle.
+const SNAP_APPROACH = 80  // max distance along the face normal (approach direction)
+const SNAP_ALIGN    = 32  // max misalignment perpendicular to the face normal
 
-// Dot positions relative to bit center (bit is 144×144, centered at bit.x/bit.y)
-// Diagonal dots at midpoints of the 45° edges: (126,18), (126,126), (18,126), (18,18)
-// Offset from center (72,72): ±54 on each axis
+// Outward unit normals for each face — used to decompose the face-midpoint delta
+// into approach (towards/away) and alignment (sliding) components.
+const FACE_NORMALS: Record<Side, { nx: number; ny: number }> = {
+  'top':          { nx:  0,            ny: -1           },
+  'top-right':    { nx:  1/Math.SQRT2, ny: -1/Math.SQRT2 },
+  'right':        { nx:  1,            ny:  0           },
+  'bottom-right': { nx:  1/Math.SQRT2, ny:  1/Math.SQRT2 },
+  'bottom':       { nx:  0,            ny:  1           },
+  'bottom-left':  { nx: -1/Math.SQRT2, ny:  1/Math.SQRT2 },
+  'left':         { nx: -1,            ny:  0           },
+  'top-left':     { nx: -1/Math.SQRT2, ny: -1/Math.SQRT2 },
+}
+
+// Face-midpoint offsets relative to bit center (144×144, centered at bit.x/bit.y).
+// Flat faces: ±72 (exact boundary of the 144px octagon).
+// Diagonal faces: actual SVG edge midpoint.
+//   The diagonal straight segment (e.g. top-right) runs from (115.07,7.07)→(136.93,28.93).
+//   Midpoint: (126,18) → offset from center (72,72) = (54,−54).
+//   Using this value means snappedX = other.x + (−54) − 54 = other.x − 108,
+//   which places the two 45° edges exactly flush with zero gap or overlap.
 const DOT_OFFSETS: Record<Side, { x: number; y: number }> = {
-  'top':          { x: 0,     y: -70.5 },
-  'top-right':    { x: 54,    y: -54   },
-  'right':        { x: 70.5,  y: 0     },
-  'bottom-right': { x: 54,    y: 54    },
-  'bottom':       { x: 0,     y: 70.5  },
-  'bottom-left':  { x: -54,   y: 54    },
-  'left':         { x: -70.5, y: 0     },
-  'top-left':     { x: -54,   y: -54   },
+  'top':          { x:   0,  y: -72 },
+  'top-right':    { x:  54,  y: -54 },
+  'right':        { x:  72,  y:   0 },
+  'bottom-right': { x:  54,  y:  54 },
+  'bottom':       { x:   0,  y:  72 },
+  'bottom-left':  { x: -54,  y:  54 },
+  'left':         { x: -72,  y:   0 },
+  'top-left':     { x: -54,  y: -54 },
 }
 
 const SIDES: Side[] = ['top', 'top-right', 'right', 'bottom-right', 'bottom', 'bottom-left', 'left', 'top-left']
 
-// Only the geometrically opposite side may connect — the one rule that guarantees no overlap
+// Only the geometrically opposite side may connect — guarantees no overlap
 const OPPOSITE: Record<Side, Side> = {
   'top':          'bottom',
   'top-right':    'bottom-left',
@@ -159,6 +179,20 @@ const OPPOSITE: Record<Side, Side> = {
   'top-left':     'bottom-right',
 }
 
+// If a side is occupied, its two immediate neighbours are also blocked.
+// This prevents physically impossible or overlapping connections at shared corners.
+const ADJACENT_SIDES: Record<Side, [Side, Side]> = {
+  'top':          ['top-left',     'top-right'    ],
+  'top-right':    ['top',          'right'        ],
+  'right':        ['top-right',    'bottom-right' ],
+  'bottom-right': ['right',        'bottom'       ],
+  'bottom':       ['bottom-right', 'bottom-left'  ],
+  'bottom-left':  ['bottom',       'left'         ],
+  'left':         ['bottom-left',  'top-left'     ],
+  'top-left':     ['left',         'top'          ],
+}
+
+// Returns directly occupied sides
 function getOccupiedSides(bitId: number): Set<Side> {
   const occupied = new Set<Side>()
   for (const conn of connectionStore.connections) {
@@ -166,6 +200,19 @@ function getOccupiedSides(bitId: number): Set<Side> {
     if (conn.toBitId === bitId) occupied.add(conn.toSide)
   }
   return occupied
+}
+
+// Returns sides that cannot accept a new connection:
+// directly occupied + sides adjacent to any occupied side
+function getBlockedSides(bitId: number): Set<Side> {
+  const occupied = getOccupiedSides(bitId)
+  const blocked  = new Set<Side>(occupied)
+  for (const side of occupied) {
+    for (const adj of ADJACENT_SIDES[side]) {
+      blocked.add(adj)
+    }
+  }
+  return blocked
 }
 
 interface SnapInfo {
@@ -177,8 +224,9 @@ interface SnapInfo {
   snappedY: number
 }
 
-const activeSnap = ref<SnapInfo | null>(null)
+const activeSnap     = ref<SnapInfo | null>(null)
 const snapHighlights = ref<Map<number, Side>>(new Map())
+const snapPosMap     = ref<Map<number, { x: number; y: number }>>(new Map())
 const newConnectionIds = ref<Set<number>>(new Set())
 
 // ── workflow highlighting ────────────────────────────────────────────
@@ -369,29 +417,36 @@ function onWorkspaceMouseDown(e: MouseEvent) {
 }
 
 function onBitDragMove(id: number, x: number, y: number) {
-  const otherBits = bitStore.bits.filter((b) => b.id !== id)
-  const draggedOccupied = getOccupiedSides(id)
+  const otherBits      = bitStore.bits.filter((b) => b.id !== id)
+  const draggedBlocked = getBlockedSides(id)
   let best: { dist: number; snap: SnapInfo } | null = null
 
   for (const fromSide of SIDES) {
-    if (draggedOccupied.has(fromSide)) continue
+    if (draggedBlocked.has(fromSide)) continue
     const toSide = OPPOSITE[fromSide]
     const fromDot = { x: x + DOT_OFFSETS[fromSide].x, y: y + DOT_OFFSETS[fromSide].y }
     for (const other of otherBits) {
-      if (getOccupiedSides(other.id).has(toSide)) continue
+      if (getBlockedSides(other.id).has(toSide)) continue
       const toDot = { x: other.x! + DOT_OFFSETS[toSide].x, y: other.y! + DOT_OFFSETS[toSide].y }
-      const dist = Math.hypot(fromDot.x - toDot.x, fromDot.y - toDot.y)
-      if (dist < SNAP_THRESHOLD && (!best || dist < best.dist)) {
-        best = {
-          dist,
-          snap: {
-            fromBitId: id,
-            fromSide,
-            toBitId: other.id,
-            toSide,
-            snappedX: toDot.x - DOT_OFFSETS[fromSide].x,
-            snappedY: toDot.y - DOT_OFFSETS[fromSide].y,
-          },
+      const dx = fromDot.x - toDot.x
+      const dy = fromDot.y - toDot.y
+      const { nx, ny } = FACE_NORMALS[fromSide]
+      const approach = Math.abs(dx * nx + dy * ny)          // distance along face normal
+      const align    = Math.abs(dx * (-ny) + dy * nx)       // perpendicular misalignment
+      if (approach < SNAP_APPROACH && align < SNAP_ALIGN) {
+        const dist = Math.hypot(dx, dy)
+        if (!best || dist < best.dist) {
+          best = {
+            dist,
+            snap: {
+              fromBitId: id,
+              fromSide,
+              toBitId:  other.id,
+              toSide,
+              snappedX: toDot.x - DOT_OFFSETS[fromSide].x,
+              snappedY: toDot.y - DOT_OFFSETS[fromSide].y,
+            },
+          }
         }
       }
     }
@@ -400,10 +455,13 @@ function onBitDragMove(id: number, x: number, y: number) {
   const newHighlights = new Map<number, Side>()
   if (best) {
     activeSnap.value = best.snap
+    // Live preview: visually move the bit to the snap position during drag
+    snapPosMap.value = new Map([[id, { x: best.snap.snappedX, y: best.snap.snappedY }]])
     newHighlights.set(best.snap.fromBitId, best.snap.fromSide)
     newHighlights.set(best.snap.toBitId, best.snap.toSide)
   } else {
     activeSnap.value = null
+    snapPosMap.value = new Map()
   }
   snapHighlights.value = newHighlights
 }
@@ -571,6 +629,7 @@ const onBitMoveEnd = async (id: number, x: number, y: number) => {
   const snap = activeSnap.value
   activeSnap.value = null
   snapHighlights.value = new Map()
+  snapPosMap.value = new Map()
 
   // Final resting position (snapped or free)
   const finalX = snap ? snap.snappedX : x
@@ -586,7 +645,12 @@ const onBitMoveEnd = async (id: number, x: number, y: number) => {
     if (!other || other.x == null || other.y == null) return true
     const myDot    = { x: finalX + DOT_OFFSETS[mySide].x,    y: finalY + DOT_OFFSETS[mySide].y }
     const otherDot = { x: other.x + DOT_OFFSETS[otherSide].x, y: other.y + DOT_OFFSETS[otherSide].y }
-    return Math.hypot(myDot.x - otherDot.x, myDot.y - otherDot.y) > SNAP_THRESHOLD
+    const dx = myDot.x - otherDot.x
+    const dy = myDot.y - otherDot.y
+    const { nx, ny } = FACE_NORMALS[mySide]
+    const approach = Math.abs(dx * nx + dy * ny)
+    const align    = Math.abs(dx * (-ny) + dy * nx)
+    return approach > SNAP_APPROACH || align > SNAP_ALIGN
   })
   await Promise.all(toBreak.map((c) => connectionStore.deleteConnection(c.id)))
 
@@ -798,6 +862,7 @@ onUnmounted(() => {
         :bit="bit"
         :zoom="zoom"
         :highlight-side="snapHighlights.get(bit.id) ?? null"
+        :snap-pos="snapPosMap.get(bit.id) ?? null"
         :dimmed="isBitDimmed(bit.id)"
         :highlight-role="getBitHighlightRole(bit.id)"
         :workflow-state="bitWorkflowState.get(bit.id) ?? null"

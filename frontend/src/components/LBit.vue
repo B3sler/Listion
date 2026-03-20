@@ -10,6 +10,7 @@ const props = defineProps<{
   dimmed?: boolean
   highlightRole?: 'upstream' | 'downstream' | null
   workflowState?: 'blocked' | 'ready' | null
+  snapPos?: { x: number; y: number } | null
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +38,11 @@ watch(
 watch(isEditing, (v) => {
   if (v) { editTitle.value = props.bit.title; setTimeout(() => editInput.value?.select(), 0) }
 })
+
+// While dragging, use the snap-preview position if the parent detected a snap target;
+// otherwise follow the raw drag position.
+const displayX = computed(() => isDragging.value && props.snapPos ? props.snapPos.x : dragX.value)
+const displayY = computed(() => isDragging.value && props.snapPos ? props.snapPos.y : dragY.value)
 
 // ── color helpers ────────────────────────────────────────────────
 const DEFAULT_COLOR = '#6366f1'
@@ -182,8 +188,8 @@ function cancelEdit() { isEditing.value = false }
     :class="{ 'lbit-outer--dragging': isDragging, 'lbit-outer--dimmed': dimmed }"
     :style="{
       position: 'absolute',
-      left: `${dragX}px`,
-      top: `${dragY}px`,
+      left: `${displayX}px`,
+      top: `${displayY}px`,
       width: '144px',
       height: '144px',
       userSelect: 'none',
