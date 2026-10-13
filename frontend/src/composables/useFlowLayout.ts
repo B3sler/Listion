@@ -10,6 +10,8 @@ export const STACK_HEADER_H = 40
 export const STEP_NUM_W = 20
 export const STACK_W = STACK_PAD * 2 + STEP_NUM_W + CAPSULE_W
 export const STEP_PITCH = CAPSULE_H + STEP_GAP
+/** Length of the arrowhead drawn at a dependency's target (LDependencyLayer polygon). */
+export const ARROW_LEN = 9
 /** Space opened between steps while a capsule hovers over a stack. */
 export const INSERT_GAP = STEP_PITCH
 
@@ -132,9 +134,12 @@ export function dependencyGeometry(
   // cubic Bézier at t = 0.5
   const mx = 0.125 * from.x + 0.375 * c1.x + 0.375 * c2.x + 0.125 * to.x
   const my = 0.125 * from.y + 0.375 * c1.y + 0.375 * c2.y + 0.125 * to.y
-  const angle = (Math.atan2(to.y - c2.y, to.x - c2.x) * 180) / Math.PI
+  const rad = Math.atan2(to.y - c2.y, to.x - c2.x)
+  const angle = (rad * 180) / Math.PI
+  // the line stops at the arrowhead's base so it never shows through the tip
+  const end = { x: to.x - ARROW_LEN * Math.cos(rad), y: to.y - ARROW_LEN * Math.sin(rad) }
   return {
-    d: `M ${from.x} ${from.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${to.x} ${to.y}`,
+    d: `M ${from.x} ${from.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}`,
     mx,
     my,
     tx: to.x,

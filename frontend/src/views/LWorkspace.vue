@@ -60,7 +60,6 @@ function toCanvas(clientX: number, clientY: number) {
   }
 }
 
-const selectedBitId = ref<number | null>(null)
 const selectedDependencyId = ref<number | null>(null)
 const highlightedPacketId = ref<number | null>(null)
 
@@ -69,7 +68,7 @@ const baseLayout = computed(() =>
   computeLayout({
     bits: bitStore.bits,
     packets: packetStore.packets,
-    expandedBitId: selectedBitId.value,
+    expandedBitId: null,
   }),
 )
 
@@ -78,9 +77,10 @@ const { bitDrag, packetDrag, linkDrag, startBitPointer, startPacketPointer, star
     toCanvas,
     zoom,
     layout: baseLayout,
+    // a single click on a bit goes straight to its details
     onTapBit: (id) => {
       selectedDependencyId.value = null
-      selectedBitId.value = selectedBitId.value === id ? null : id
+      openBitDetail(id)
     },
     onDropBit: (id, target, pos) => actions.dropBit(id, target, pos, baseLayout.value),
     onMovePacketEnd: (id, x, y) => actions.movePacket(id, x, y),
@@ -95,11 +95,7 @@ const liveLayout = computed(() => {
   const packets = pd
     ? packetStore.packets.map((p) => (p.id === pd.packetId ? { ...p, x: pd.x, y: pd.y } : p))
     : packetStore.packets
-  const layout = computeLayout({
-    bits: bitStore.bits,
-    packets,
-    expandedBitId: selectedBitId.value,
-  })
+  const layout = computeLayout({ bits: bitStore.bits, packets, expandedBitId: null })
   const bd = bitDrag.value
   if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: CAPSULE_H })
   return layout
@@ -249,6 +245,14 @@ function handleContextMenu(event: MouseEvent) {
   showContextMenu(event.clientX, event.clientY)
 }
 
+// Double-click on empty canvas creates a bit there — not on nodes, arrows or the controls
+function handleCanvasDoubleClick(event: MouseEvent) {
+  const target = event.target as Element | null
+  if (target?.closest('[data-node-type], .dep__hit, .dep__delete, .view-controls')) return
+  contextCanvasPos.value = toCanvas(event.clientX, event.clientY)
+  createBit()
+}
+
 let longPressTimer: number | null = null
 const LONG_PRESS_DURATION = 500
 
@@ -302,6 +306,17 @@ function openBitDetail(id: number) {
   showPanel.value = true
 }
 
+/** The status circle ticks a bit off; ticking a done bit re-opens it. */
+async function toggleDone(id: number) {
+  const bit = bitStore.bits.find((b) => b.id === id)
+  if (!bit) return
+  try {
+    await bitStore.updateBit(id, { status: bit.status === 2 ? 0 : 2 })
+  } catch (e) {
+    console.error('Failed to update bit status:', e)
+  }
+}
+
 async function onPanelConfirm(data: {
   title: string
   status: number
@@ -335,7 +350,6 @@ async function onPanelDelete() {
   if (panelBitId.value === null) return
   const id = panelBitId.value
   showPanel.value = false
-  if (selectedBitId.value === id) selectedBitId.value = null
   await actions.deleteBit(id, baseLayout.value)
 }
 
@@ -364,7 +378,6 @@ function openControls() {
 }
 
 function onWorkspaceMouseDown(e: MouseEvent) {
-  selectedBitId.value = null
   selectedDependencyId.value = null
   showControls.value = false
   handleMouseDown(e)
@@ -407,6 +420,7 @@ onUnmounted(() => {
       @wheel.prevent="handleWheel"
       @mousedown="onWorkspaceMouseDown"
       @contextmenu="handleContextMenu"
+      @dblclick="handleCanvasDoubleClick"
       @touchstart="handleTouchStartWithLongPress"
       @touchmove="handleTouchMoveWithLongPress"
       @touchend="handleTouchEndWithLongPress"
@@ -421,8 +435,8 @@ onUnmounted(() => {
           <div class="max-w-7xl">
             <h1 class="text-[2rem] text-text0 mb-2">Workspace</h1>
             <p class="text-text2 text-[0.9375rem] leading-relaxed">
-              Right-click or long-press to create a bit. Drag a bit under another to build a packet;
-              drag from the handle to draw a dependency.
+              Double-click, right-click or long-press to create a bit. Drag a bit under another to
+              build a packet; drag from the handle to draw a dependency.
             </p>
           </div>
         </div>
@@ -450,7 +464,6 @@ onUnmounted(() => {
           :states="flow.bitState"
           :cycle-bit-ids="flow.cycleBitIds"
           :summary="flow.packetSummary.get(s.packet.id)!"
-          :expanded-bit-id="selectedBitId"
           :gap-index="s.gapIndex"
           :highlighted="highlightedPacketId === s.packet.id"
           :dimmed="highlightedPacketId !== null && highlightedPacketId !== s.packet.id"
@@ -458,6 +471,7 @@ onUnmounted(() => {
           @header-pointerdown="(e) => startPacketPointer(e, s.packet.id)"
           @bit-pointerdown="(e, id) => startBitPointer(e, id)"
           @bit-open="openBitDetail"
+          @bit-toggle-done="toggleDone"
           @linkstart="(e, from) => startLinkPointer(e, from)"
           @rename="(name) => actions.renamePacket(s.packet.id, name)"
         />
@@ -474,7 +488,6 @@ onUnmounted(() => {
           <LBitCapsule
             :bit="bit"
             :state="flow.bitState.get(bit.id) ?? null"
-            :expanded="selectedBitId === bit.id"
             :in-cycle="flow.cycleBitIds.has(bit.id)"
             :lifted="bitDrag?.bitId === bit.id"
             :dimmed="isBitDimmed(bit.id)"
@@ -485,6 +498,7 @@ onUnmounted(() => {
             "
             @pointerdown="(e) => startBitPointer(e, bit.id)"
             @open="openBitDetail(bit.id)"
+            @toggle-done="toggleDone(bit.id)"
             @linkstart="(e) => startLinkPointer(e, { type: 'bit', id: bit.id })"
           />
         </div>
@@ -497,7 +511,6 @@ onUnmounted(() => {
           <LBitCapsule
             :bit="floatingBit"
             :state="flow.bitState.get(floatingBit.id) ?? null"
-            :expanded="false"
             lifted
           />
         </div>

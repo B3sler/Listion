@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DependencyItem } from '@/types/flow'
+import { ARROW_LEN } from '@/composables/useFlowLayout'
 
 defineProps<{
   items: DependencyItem[]
@@ -12,11 +13,14 @@ const emit = defineEmits<{
   remove: [id: number]
 }>()
 
+// Solid colours: a translucent arrowhead lets the line underneath show through
 const COLORS: Record<DependencyItem['state'], string> = {
-  pending: 'rgba(148,163,184,0.7)',
-  done: 'rgba(52,211,153,0.85)',
-  cycle: 'rgba(249,115,22,0.9)',
+  pending: '#94a3b8',
+  done: '#34d399',
+  cycle: '#f97316',
 }
+
+const ARROW_POINTS = `0,0 ${-ARROW_LEN},-4.5 ${-ARROW_LEN},4.5`
 
 function onArrowKey(e: KeyboardEvent, id: number) {
   if (e.key === 'Enter' || e.key === ' ') {
@@ -54,7 +58,7 @@ function onDeleteKey(e: KeyboardEvent, id: number) {
         :stroke="COLORS[item.state]"
       />
       <polygon
-        points="0,0 -9,-4.5 -9,4.5"
+        :points="ARROW_POINTS"
         :transform="`translate(${item.tx},${item.ty}) rotate(${item.angle})`"
         :fill="COLORS[item.state]"
       />

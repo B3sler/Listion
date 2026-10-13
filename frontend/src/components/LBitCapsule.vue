@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Check, Lock } from 'lucide-vue-next'
+import { Check, Flag, Lock } from 'lucide-vue-next'
 import type { Bit } from '@/stores/bitStore'
 import type { WorkflowState } from '@/types/flow'
 
 const props = defineProps<{
   bit: Bit
   state: WorkflowState
-  expanded: boolean
   inCycle?: boolean
   lifted?: boolean
   dimmed?: boolean
@@ -17,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   pointerdown: [e: PointerEvent]
   open: []
+  toggleDone: []
   linkstart: [e: PointerEvent]
 }>()
 
@@ -24,32 +24,17 @@ const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High
 const STATUS_LABEL: Record<number, string> = { 0: 'Open', 1: 'In progress', 2: 'Done' }
 
 const color = computed(() => props.bit.color ?? '#6366f1')
-
-const meta = computed(() => {
-  const parts: string[] = []
-  if (props.bit.dueDate) {
-    parts.push(
-      new Date(props.bit.dueDate).toLocaleDateString(undefined, {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'numeric',
-      }),
-    )
-  }
-  if (props.bit.priority) parts.push(PRIORITY_LABEL[props.bit.priority] ?? '')
-  const lines = props.bit.notes?.split('\n').filter((l) => l.trim()).length ?? 0
-  if (lines > 0) parts.push(lines === 1 ? '1 note' : `${lines} notes`)
-  if (parts.length === 0)
-    parts.push(props.bit.status === 2 ? 'Done' : props.bit.status === 1 ? 'In progress' : 'Open')
-  return parts.join(' · ')
-})
+const isDone = computed(() => props.bit.status === 2)
+const priorityLabel = computed(() =>
+  props.bit.priority ? PRIORITY_LABEL[props.bit.priority] : undefined,
+)
 
 const ariaLabel = computed(() => {
   const parts = [props.bit.title, STATUS_LABEL[props.bit.status] ?? 'Open']
+  if (priorityLabel.value) parts.push(`${priorityLabel.value} priority`)
   if (props.state === 'blocked') parts.push('blocked')
   if (props.state === 'ready') parts.push('ready')
   if (props.inCycle) parts.push('in a cycle')
-  if (props.expanded) parts.push(meta.value)
   return parts.join(', ')
 })
 </script>
@@ -58,7 +43,6 @@ const ariaLabel = computed(() => {
   <div
     class="capsule"
     :class="{
-      'capsule--expanded': expanded,
       'capsule--ready': state === 'ready',
       'capsule--blocked': state === 'blocked',
       'capsule--cycle': inCycle,
@@ -72,21 +56,36 @@ const ariaLabel = computed(() => {
     tabindex="0"
     role="button"
     :aria-label="ariaLabel"
-    :aria-expanded="expanded"
     @pointerdown="emit('pointerdown', $event)"
     @mousedown.left.exact.stop
-    @dblclick.stop="emit('open')"
     @keydown.enter.prevent="emit('open')"
   >
     <div class="capsule__row">
-      <span class="capsule__dot" :class="`capsule__dot--s${bit.status}`">
-        <Check v-if="bit.status === 2" :size="10" :stroke-width="3" />
-      </span>
+      <!-- the status dot is its own control: tick it off without opening or dragging -->
+      <button
+        class="capsule__check pressable"
+        :class="`capsule__check--s${bit.status}`"
+        type="button"
+        :aria-label="isDone ? 'Mark as open' : 'Mark as done'"
+        :aria-pressed="isDone"
+        @pointerdown.stop
+        @mousedown.left.exact.stop
+        @click.stop="emit('toggleDone')"
+        @keydown.enter.stop
+      >
+        <Check v-if="isDone" :size="10" :stroke-width="3" />
+      </button>
       <span class="capsule__title">{{ bit.title }}</span>
       <Lock v-if="state === 'blocked'" :size="11" class="capsule__lock" aria-hidden="true" />
-    </div>
-    <div class="capsule__meta-wrap" :class="{ 'capsule__meta-wrap--open': expanded }">
-      <div class="capsule__meta">{{ meta }}</div>
+      <Flag
+        v-if="priorityLabel"
+        :size="12"
+        :stroke-width="2.25"
+        fill="currentColor"
+        class="capsule__prio"
+        :class="`capsule__prio--${bit.priority}`"
+        aria-hidden="true"
+      />
     </div>
     <button
       class="capsule__handle"
@@ -134,9 +133,6 @@ const ariaLabel = computed(() => {
     inset 0 1px 0 var(--material-edge),
     0 0 0 3px color-mix(in srgb, var(--brand) 45%, transparent);
 }
-.capsule--expanded {
-  border-radius: 16px;
-}
 .capsule--ready {
   box-shadow:
     inset 0 1px 0 var(--material-edge),
@@ -174,23 +170,57 @@ const ariaLabel = computed(() => {
   min-width: 0;
 }
 
-.capsule__dot {
+.capsule__check {
+  position: relative;
   width: 17px;
   height: 17px;
   flex-shrink: 0;
+  padding: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1.5px solid var(--c);
+  background: transparent;
   color: #fff;
-  transition: background 0.2s ease;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform var(--press-duration) ease-out;
 }
-.capsule__dot--s1 {
+/* a larger invisible hit area around the 17px dot */
+.capsule__check::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+}
+.capsule__check:hover {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+}
+.capsule__check--s1 {
   background: conic-gradient(var(--c) 0 50%, transparent 50% 100%);
 }
-.capsule__dot--s2 {
+.capsule__check--s2,
+.capsule__check--s2:hover {
   background: var(--c);
+}
+.capsule__check:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.capsule__prio {
+  flex-shrink: 0;
+}
+.capsule__prio--1 {
+  color: #3b82f6;
+}
+.capsule__prio--2 {
+  color: #f59e0b;
+}
+.capsule__prio--3 {
+  color: #ef4444;
 }
 
 .capsule__title {
@@ -207,28 +237,6 @@ const ariaLabel = computed(() => {
 .capsule__lock {
   flex-shrink: 0;
   color: #f87171;
-}
-
-/* grid-rows trick: animates height between 0 and the 20px detail line */
-.capsule__meta-wrap {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--spring-duration) var(--ease-spring);
-}
-.capsule__meta-wrap--open {
-  grid-template-rows: 1fr;
-}
-.capsule__meta {
-  overflow: hidden;
-  padding-left: 24px;
-  font-size: 0.6875rem;
-  line-height: 14px;
-  color: var(--text2);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.capsule__meta-wrap--open .capsule__meta {
-  height: 20px;
 }
 
 /* arrow handle: appears on hover at the right edge */

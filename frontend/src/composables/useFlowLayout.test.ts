@@ -5,6 +5,7 @@ import {
   computeLayout,
   dependencyGeometry,
   stackGeometry,
+  ARROW_LEN,
   unionRect,
   STACK_W,
 } from './useFlowLayout'
@@ -74,9 +75,11 @@ describe('computeLayout', () => {
 })
 
 describe('dependencyGeometry', () => {
-  it('zeichnet eine horizontale Bézier mit Mittelpunkt', () => {
+  it('zeichnet eine horizontale Bézier, die an der Basis der Pfeilspitze endet', () => {
     const g = dependencyGeometry({ x: 0, y: 0 }, { x: 200, y: 0 })
-    expect(g.d).toBe('M 0 0 C 100 0 100 0 200 0')
+    // the line stops ARROW_LEN before the tip, so it never shows through the arrowhead
+    expect(g.d).toBe(`M 0 0 C 100 0 100 0 ${200 - ARROW_LEN} 0`)
+    expect(g.tx).toBe(200)
     expect(g.mx).toBe(100)
     expect(g.angle).toBe(0)
   })
