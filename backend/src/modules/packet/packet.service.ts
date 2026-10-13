@@ -4,6 +4,8 @@ import { In, Repository } from 'typeorm'
 import { Packet } from './packet.entity.js'
 import { Bit } from '../bit/bit.entity.js'
 import { Dependency } from '../dependency/dependency.entity.js'
+import { Flow } from '../flow/flow.entity.js'
+import { pruneEmptyFlows } from '../flow/flow-membership.js'
 import { CreatePacketDto } from '../../dto/create-packet.dto.js'
 import { UpdatePacketDto } from '../../dto/update-packet.dto.js'
 
@@ -17,6 +19,8 @@ export class PacketService {
     private readonly bits: Repository<Bit>,
     @InjectRepository(Dependency)
     private readonly deps: Repository<Dependency>,
+    @InjectRepository(Flow)
+    private readonly flows: Repository<Flow>,
   ) {}
 
   findAll(userId: number): Promise<Packet[]> {
@@ -27,6 +31,20 @@ export class PacketService {
     const packet = await this.packets.findOne({ where: { id, user: userId } })
     if (!packet) throw new NotFoundException('Packet not found')
     return packet
+  }
+
+  /** 404 unless the flow exists and belongs to the user. */
+  async assertFlow(flowId: number, userId: number): Promise<void> {
+    const flow = await this.flows.findOne({ where: { id: flowId, user: userId } })
+    if (!flow) throw new NotFoundException('Flow not found')
+  }
+
+  pruneEmptyFlows(flowIds: (number | null | undefined)[], userId: number): Promise<void> {
+    return pruneEmptyFlows(flowIds, userId, {
+      flows: this.flows,
+      bits: this.bits,
+      packets: this.packets,
+    })
   }
 
   async create(dto: CreatePacketDto, userId: number): Promise<Packet> {
@@ -42,14 +60,22 @@ export class PacketService {
     )
     await this.assign(packet.id, dto.bitIds, userId)
     await this.dissolveSmall(previousPackets(owned, packet.id), userId)
+    await this.pruneEmptyFlows(
+      owned.map((b) => b.flowId),
+      userId,
+    )
     return packet
   }
 
   async update(id: number, userId: number, dto: UpdatePacketDto): Promise<Packet> {
-    await this.findOne(id, userId)
+    const packet = await this.findOne(id, userId)
+    if (typeof dto.flowId === 'number') await this.assertFlow(dto.flowId, userId)
     // TypeORM rejects an UPDATE without values, so an empty PUT body is a no-op here.
     if (Object.keys(dto).length > 0) {
       await this.packets.update({ id, user: userId }, dto)
+    }
+    if (dto.flowId !== undefined && dto.flowId !== packet.flowId) {
+      await this.pruneEmptyFlows([packet.flowId], userId)
     }
     return this.findOne(id, userId)
   }
@@ -64,6 +90,10 @@ export class PacketService {
     }
     await this.assign(id, bitIds, userId)
     await this.dissolveSmall(previousPackets(owned, id), userId)
+    await this.pruneEmptyFlows(
+      owned.map((b) => b.flowId),
+      userId,
+    )
     return this.findOne(id, userId)
   }
 
@@ -80,8 +110,9 @@ export class PacketService {
     if (bit.packetId === packetId) return
     const members = await this.bits.find({ where: { packetId, user: userId } })
     const order = members.length > 0 ? Math.max(...members.map((m) => m.order)) + 1 : 0
-    await this.bits.update({ id: bitId, user: userId }, { packetId, order })
+    await this.bits.update({ id: bitId, user: userId }, { packetId, order, flowId: null })
     await this.dropOwnPacketDeps(bitId, packetId, userId)
+    await this.pruneEmptyFlows([bit.flowId], userId)
     if (bit.packetId != null) await this.dissolveSmall([bit.packetId], userId)
   }
 
@@ -101,15 +132,21 @@ export class PacketService {
   }
 
   private async dissolve(id: number, userId: number): Promise<void> {
-    await this.bits.update({ packetId: id, user: userId }, { packetId: null, order: 0 })
+    const packet = await this.packets.findOne({ where: { id, user: userId } })
+    // freed bits keep the packet's flow, so dissolving a stack inside a flow keeps it there
+    await this.bits.update(
+      { packetId: id, user: userId },
+      { packetId: null, order: 0, flowId: packet?.flowId ?? null },
+    )
     await this.deps.delete({ userId, fromType: 'packet', fromId: id })
     await this.deps.delete({ userId, toType: 'packet', toId: id })
     await this.packets.delete({ id, user: userId })
+    await this.pruneEmptyFlows([packet?.flowId], userId)
   }
 
   private async assign(packetId: number, bitIds: number[], userId: number): Promise<void> {
     for (const [order, id] of bitIds.entries()) {
-      await this.bits.update({ id, user: userId }, { packetId, order })
+      await this.bits.update({ id, user: userId }, { packetId, order, flowId: null })
       await this.dropOwnPacketDeps(id, packetId, userId)
     }
   }

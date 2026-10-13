@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Bit } from './bit.entity.js'
@@ -33,14 +33,27 @@ export class BitService {
   }
 
   async update(id: number, userId: number, updateBitDto: UpdateBitDto): Promise<Bit> {
-    await this.findOne(id, userId) // throws 404 if not found or not owned
-    const { packetId, ...fields } = updateBitDto
-    if (typeof packetId === 'number') await this.packetService.findOne(packetId, userId) // validate before any write
-    if (Object.keys(fields).length > 0) {
-      await this.bitRepository.update({ id, user: userId }, fields)
+    const bit = await this.findOne(id, userId) // throws 404 if not found or not owned
+    const { packetId, flowId, ...fields } = updateBitDto
+    // validate before any write
+    if (typeof packetId === 'number') await this.packetService.findOne(packetId, userId)
+    if (typeof flowId === 'number') {
+      await this.packetService.assertFlow(flowId, userId)
+      const inPacketAfter =
+        typeof packetId === 'number' || (bit.packetId != null && packetId !== null)
+      if (inPacketAfter) {
+        throw new BadRequestException('Bits inside a packet belong to a flow through their packet')
+      }
     }
     if (packetId === null) await this.packetService.detachBit(id, userId)
-    else if (packetId !== undefined) await this.packetService.attachBit(id, packetId, userId)
+    const write = flowId === undefined ? fields : { ...fields, flowId }
+    if (Object.keys(write).length > 0) {
+      await this.bitRepository.update({ id, user: userId }, write)
+    }
+    if (typeof packetId === 'number') await this.packetService.attachBit(id, packetId, userId)
+    if (flowId !== undefined && flowId !== bit.flowId) {
+      await this.packetService.pruneEmptyFlows([bit.flowId], userId)
+    }
     return this.findOne(id, userId)
   }
 
@@ -50,5 +63,6 @@ export class BitService {
     await this.deps.delete({ userId, toType: 'bit', toId: id })
     await this.bitRepository.delete({ id, user: userId })
     if (bit.packetId != null) await this.packetService.dissolveSmall([bit.packetId], userId)
+    await this.packetService.pruneEmptyFlows([bit.flowId], userId)
   }
 }
