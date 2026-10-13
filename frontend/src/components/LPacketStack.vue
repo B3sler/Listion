@@ -13,7 +13,6 @@ const props = defineProps<{
   states: Map<number, WorkflowState>
   cycleBitIds: Set<number>
   summary: PacketSummary
-  expandedBitId: number | null
   gapIndex: number | null
   highlighted?: boolean
   dimmed?: boolean
@@ -24,14 +23,12 @@ const emit = defineEmits<{
   headerPointerdown: [e: PointerEvent]
   bitPointerdown: [e: PointerEvent, bitId: number]
   bitOpen: [bitId: number]
+  bitToggleDone: [bitId: number]
   linkstart: [e: PointerEvent, from: NodeRef]
   rename: [name: string]
 }>()
 
-const geometry = computed(() => {
-  const expanded = props.members.findIndex((b) => b.id === props.expandedBitId)
-  return stackGeometry(props.members.length, expanded === -1 ? null : expanded, props.gapIndex)
-})
+const geometry = computed(() => stackGeometry(props.members.length, null, props.gapIndex))
 
 const editing = ref(false)
 const draft = ref('')
@@ -102,10 +99,10 @@ function commitRename() {
       <LBitCapsule
         :bit="bit"
         :state="states.get(bit.id) ?? null"
-        :expanded="expandedBitId === bit.id"
         :in-cycle="cycleBitIds.has(bit.id)"
         @pointerdown="emit('bitPointerdown', $event, bit.id)"
         @open="emit('bitOpen', bit.id)"
+        @toggle-done="emit('bitToggleDone', bit.id)"
         @linkstart="emit('linkstart', $event, { type: 'bit', id: bit.id })"
       />
     </div>

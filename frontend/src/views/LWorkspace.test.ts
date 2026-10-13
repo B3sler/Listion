@@ -93,4 +93,16 @@ describe('LWorkspace', () => {
     expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(3)
     expect(wrapper.text()).toContain('Release')
   })
+
+  it('Doppelklick auf eine freie Fläche öffnet „New Bit“, auf einer Kapsel nicht', async () => {
+    const wrapper = mount(LWorkspace, { global: { plugins: [router, createPinia()] } })
+    await router.isReady()
+    await new Promise((r) => setTimeout(r, 0))
+
+    await wrapper.find('[data-node-type="bit"]').trigger('dblclick')
+    expect(wrapper.text()).not.toContain('New Bit')
+
+    await wrapper.find('.bg-surface1').trigger('dblclick')
+    expect(wrapper.text()).toContain('New Bit')
+  })
 })

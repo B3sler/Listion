@@ -19,33 +19,55 @@ const bit = (id: number, status = 0, order = 0): Bit => ({
 })
 
 describe('LBitCapsule', () => {
-  it('zeigt Titel, markiert blocked und öffnet per Doppelklick', async () => {
-    const w = mount(LBitCapsule, { props: { bit: bit(1), state: 'blocked', expanded: false } })
+  it('zeigt Titel, markiert blocked und öffnet per Enter', async () => {
+    const w = mount(LBitCapsule, { props: { bit: bit(1), state: 'blocked' } })
     expect(w.text()).toContain('Task 1')
     expect(w.attributes('data-node-type')).toBe('bit')
     expect(w.attributes('data-node-id')).toBe('1')
     expect(w.classes()).toContain('capsule--blocked')
-    await w.trigger('dblclick')
+    await w.trigger('keydown', { key: 'Enter' })
     expect(w.emitted('open')).toHaveLength(1)
   })
 
-  it('zeigt Details nur aufgeklappt', () => {
-    const closed = mount(LBitCapsule, { props: { bit: bit(1), state: null, expanded: false } })
-    const open = mount(LBitCapsule, { props: { bit: bit(1), state: null, expanded: true } })
-    expect(closed.find('.capsule__meta-wrap').classes()).not.toContain('capsule__meta-wrap--open')
-    expect(open.find('.capsule__meta-wrap').classes()).toContain('capsule__meta-wrap--open')
-    expect(open.text()).toContain('High')
+  it('klappt keine Details mehr auf', () => {
+    const w = mount(LBitCapsule, { props: { bit: bit(1), state: null } })
+    expect(w.find('.capsule__meta-wrap').exists()).toBe(false)
+    expect(w.attributes('aria-expanded')).toBeUndefined()
   })
 
-  it('liefert Titel und Zustand als aria-label', () => {
-    const blocked = mount(LBitCapsule, {
-      props: { bit: bit(1), state: 'blocked', expanded: false },
+  it('der Status-Kreis hakt ab, ohne einen Drag oder das Panel auszulösen', async () => {
+    const w = mount(LBitCapsule, { props: { bit: bit(1), state: null } })
+    const check = w.find('.capsule__check')
+    expect(check.attributes('aria-label')).toBe('Mark as done')
+    await check.trigger('pointerdown')
+    await check.trigger('click')
+    expect(w.emitted('pointerdown')).toBeUndefined()
+    expect(w.emitted('open')).toBeUndefined()
+    expect(w.emitted('toggleDone')).toHaveLength(1)
+
+    const done = mount(LBitCapsule, { props: { bit: bit(2, 2), state: null } })
+    expect(done.find('.capsule__check').attributes('aria-label')).toBe('Mark as open')
+  })
+
+  it('zeigt die Priorität als farbige Flagge, ohne Priorität keine', () => {
+    const high = mount(LBitCapsule, { props: { bit: bit(1), state: null } })
+    expect(high.find('.capsule__prio').classes()).toContain('capsule__prio--3')
+    const low = mount(LBitCapsule, { props: { bit: { ...bit(1), priority: 1 }, state: null } })
+    expect(low.find('.capsule__prio').classes()).toContain('capsule__prio--1')
+    const none = mount(LBitCapsule, {
+      props: { bit: { ...bit(1), priority: undefined }, state: null },
     })
+    expect(none.find('.capsule__prio').exists()).toBe(false)
+  })
+
+  it('liefert Titel, Zustand und Priorität als aria-label', () => {
+    const blocked = mount(LBitCapsule, { props: { bit: bit(1), state: 'blocked' } })
     const label = blocked.attributes('aria-label') ?? ''
     expect(label).toContain('Task 1')
     expect(label).toContain('blocked')
+    expect(label).toContain('High priority')
 
-    const done = mount(LBitCapsule, { props: { bit: bit(2, 2), state: null, expanded: false } })
+    const done = mount(LBitCapsule, { props: { bit: bit(2, 2), state: null } })
     expect(done.attributes('aria-label')).toContain('Done')
   })
 })
@@ -59,9 +81,14 @@ describe('LPacketStack', () => {
     states: new Map(),
     cycleBitIds: new Set<number>(),
     summary: { total: 2, done: 1, inProgress: 0, blocked: 0, ready: 1, cycles: 0, percent: 50 },
-    expandedBitId: null,
     gapIndex: null,
   }
+
+  it('reicht das Abhaken eines Schritts weiter', async () => {
+    const w = mount(LPacketStack, { props })
+    await w.findAll('.capsule__check')[1]!.trigger('click')
+    expect(w.emitted('bitToggleDone')).toEqual([[2]])
+  })
 
   it('zeigt Name, Fortschritt und nummerierte Schritte', () => {
     const w = mount(LPacketStack, { props })
@@ -111,6 +138,15 @@ describe('LDependencyLayer', () => {
     expect(w.emitted('remove')).toEqual([[4]])
   })
 
+  it('zeichnet die Pfeilspitze deckend, damit die Linie nicht durchscheint', () => {
+    for (const state of ['pending', 'done', 'cycle'] as const) {
+      const w = mount(LDependencyLayer, {
+        props: { items: [{ ...item, state }], preview: null, selectedId: null },
+      })
+      expect(w.find('polygon').attributes('fill')).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+  })
+
   it('löscht den ✕-Knopf per Enter', async () => {
     const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: 4 } })
     await w.find('.dep__delete').trigger('keydown', { key: 'Enter' })
@@ -150,7 +186,6 @@ describe('Pan-Gesten über Knoten', () => {
     states: new Map(),
     cycleBitIds: new Set<number>(),
     summary: { total: 1, done: 1, inProgress: 0, blocked: 0, ready: 0, cycles: 0, percent: 100 },
-    expandedBitId: null,
     gapIndex: null,
   }
 
@@ -170,7 +205,7 @@ describe('Pan-Gesten über Knoten', () => {
       '.capsule',
       (host) =>
         void mount(LBitCapsule, {
-          props: { bit: bit(1), state: null, expanded: false },
+          props: { bit: bit(1), state: null },
           attachTo: host,
         }),
     ],
@@ -179,7 +214,7 @@ describe('Pan-Gesten über Knoten', () => {
       '.capsule__handle',
       (host) =>
         void mount(LBitCapsule, {
-          props: { bit: bit(1), state: null, expanded: false },
+          props: { bit: bit(1), state: null },
           attachTo: host,
         }),
     ],
