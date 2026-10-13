@@ -12,9 +12,8 @@ import { AuthController } from './modules/user/auth.controller.js'
 import { Bit } from './modules/bit/bit.entity.js'
 import { BitService } from './modules/bit/bit.service.js'
 import { BitController } from './modules/bit/bit.controller.js'
-import { BitConnection } from './modules/connection/connection.entity.js'
-import { ConnectionService } from './modules/connection/connection.service.js'
-import { ConnectionController } from './modules/connection/connection.controller.js'
+import { Packet } from './modules/packet/packet.entity.js'
+import { Dependency } from './modules/dependency/dependency.entity.js'
 
 @Module({
   imports: [
@@ -27,16 +26,16 @@ import { ConnectionController } from './modules/connection/connection.controller
       username: process.env.DB_USER || 'listion',
       password: process.env.DB_PASS,
       database: process.env.DB_NAME || 'listion',
-      entities: [User, Bit, BitConnection],
+      entities: [User, Bit, Packet, Dependency],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
-    TypeOrmModule.forFeature([User, Bit, BitConnection]),
+    TypeOrmModule.forFeature([User, Bit, Packet, Dependency]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  controllers: [AppController, AuthController, BitController, ConnectionController],
-  providers: [AppService, UserService, BitService, ConnectionService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  controllers: [AppController, AuthController, BitController],
+  providers: [AppService, UserService, BitService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
