@@ -4,6 +4,7 @@ import type { Bit } from '@/stores/bitStore'
 import LBitCapsule from './LBitCapsule.vue'
 import LPacketStack from './LPacketStack.vue'
 import LDependencyLayer from './LDependencyLayer.vue'
+import depLayerSource from './LDependencyLayer.vue?raw'
 
 const bit = (id: number, status = 0, order = 0): Bit => ({
   id,
@@ -114,6 +115,18 @@ describe('LDependencyLayer', () => {
     const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: 4 } })
     await w.find('.dep__delete').trigger('keydown', { key: 'Enter' })
     expect(w.emitted('remove')).toEqual([[4]])
+  })
+})
+
+describe('LDependencyLayer Größe', () => {
+  // jsdom does not apply scoped styles or paint, so the rule is checked in the SFC source.
+  // Chrome does not paint a 0x0 svg's contents, so the arrows would vanish.
+  it('root svg ist nicht 0x0, sonst zeichnet Chrome keine Pfeile', () => {
+    const rule = depLayerSource.match(/\.deps\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toMatch(/width:\s*1px/)
+    expect(rule).toMatch(/height:\s*1px/)
+    expect(rule).not.toMatch(/width:\s*0\s*;/)
+    expect(rule).not.toMatch(/height:\s*0\s*;/)
   })
 })
 
