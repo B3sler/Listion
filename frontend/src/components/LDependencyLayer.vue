@@ -92,8 +92,9 @@ function onDeleteKey(e: KeyboardEvent, id: number) {
 .deps {
   position: absolute;
   inset: 0;
-  width: 0;
-  height: 0;
+  /* Not 0x0: Chrome does not paint the contents of a zero-size svg, so the arrows would vanish. */
+  width: 1px;
+  height: 1px;
   overflow: visible;
   pointer-events: none;
 }
