@@ -2,12 +2,8 @@ import { ref, type ComputedRef, type Ref } from 'vue'
 import { VelocityTracker, project } from '@/helpers/motion'
 import type { NodeRef } from '@/types/flow'
 import { CAPSULE_H, CAPSULE_W, type FlowLayout } from './useFlowLayout'
+import type { Point } from './useFlowGroups'
 import { findSnapTarget, type SnapTarget } from './useStackDrag'
-
-interface Point {
-  x: number
-  y: number
-}
 
 export interface FlowGestureOptions {
   toCanvas(clientX: number, clientY: number): Point
@@ -17,6 +13,8 @@ export interface FlowGestureOptions {
   onDropBit(bitId: number, target: SnapTarget | null, pos: Point): Promise<void>
   onMovePacketEnd(packetId: number, x: number, y: number): Promise<void>
   onCreateDependency(from: NodeRef, to: NodeRef): void
+  onLassoEnd(points: Point[]): void
+  onMoveFlowEnd(flowId: number, dx: number, dy: number): Promise<void>
 }
 
 // Free drops glide a little: objects on a table, not a scroll view
@@ -35,6 +33,9 @@ export function useFlowGestures(opts: FlowGestureOptions) {
   )
   const packetDrag = ref<{ packetId: number; x: number; y: number } | null>(null)
   const linkDrag = ref<{ from: NodeRef; x: number; y: number } | null>(null)
+  const lasso = ref<Point[] | null>(null)
+  const flowDrag = ref<{ flowId: number; dx: number; dy: number } | null>(null)
+  let cancelActive: (() => void) | null = null
 
   /**
    * Window-level tracking: the pressed element may unmount mid-drag (a capsule leaving
@@ -54,6 +55,12 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     const tracker = new VelocityTracker()
     tracker.add(sx, sy)
 
+    const cancel = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== e.pointerId) return
       if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < threshold) return
@@ -63,9 +70,8 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     }
     const onUp = (ev: PointerEvent) => {
       if (ev.pointerId !== e.pointerId) return
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
+      cancel()
+      cancelActive = null
       const v = ev.type === 'pointercancel' ? { x: 0, y: 0 } : tracker.velocity()
       const z = opts.zoom.value
       handlers.end(ev, moved, { x: v.x / z, y: v.y / z })
@@ -73,6 +79,8 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
+    cancelActive = cancel
+    return cancel
   }
 
   function startBitPointer(e: PointerEvent, bitId: number) {
@@ -170,5 +178,64 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     })
   }
 
-  return { bitDrag, packetDrag, linkDrag, startBitPointer, startPacketPointer, startLinkPointer }
+  function startLasso(e: PointerEvent) {
+    if (e.button !== 0 || e.shiftKey) return
+    e.stopPropagation()
+    e.preventDefault()
+    lasso.value = [opts.toCanvas(e.clientX, e.clientY)]
+    track(e, {
+      move(ev) {
+        lasso.value = [...(lasso.value ?? []), opts.toCanvas(ev.clientX, ev.clientY)]
+      },
+      end(ev, moved) {
+        const points = lasso.value
+        lasso.value = null
+        if (ev.type === 'pointercancel' || !moved || !points) return
+        opts.onLassoEnd(points)
+      },
+    })
+  }
+
+  function cancelLasso() {
+    if (!lasso.value) return
+    cancelActive?.()
+    cancelActive = null
+    lasso.value = null
+  }
+
+  function startFlowPointer(e: PointerEvent, flowId: number) {
+    if (e.button !== 0 || e.shiftKey) return
+    e.stopPropagation()
+    const start = opts.toCanvas(e.clientX, e.clientY)
+    track(e, {
+      move(ev) {
+        const c = opts.toCanvas(ev.clientX, ev.clientY)
+        flowDrag.value = { flowId, dx: c.x - start.x, dy: c.y - start.y }
+      },
+      async end(ev, moved, v) {
+        const drag = flowDrag.value
+        flowDrag.value = null
+        if (!moved || !drag || ev.type === 'pointercancel') return
+        await opts.onMoveFlowEnd(
+          flowId,
+          drag.dx + project(v.x, DECELERATION),
+          drag.dy + project(v.y, DECELERATION),
+        )
+      },
+    })
+  }
+
+  return {
+    bitDrag,
+    packetDrag,
+    linkDrag,
+    lasso,
+    flowDrag,
+    startBitPointer,
+    startPacketPointer,
+    startLinkPointer,
+    startLasso,
+    cancelLasso,
+    startFlowPointer,
+  }
 }
