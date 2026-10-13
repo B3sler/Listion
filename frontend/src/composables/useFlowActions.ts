@@ -201,10 +201,12 @@ export function useFlowActions() {
   function createFlowFromLasso(points: Point[], layout: FlowLayout): Promise<boolean> {
     const hits = lassoHits(points, layout)
     if (hits.bitIds.length + hits.packetIds.length === 0) return Promise.resolve(false)
+    let created = false
     return guarded(async () => {
       await flowStore.createFlow({ bitIds: hits.bitIds, packetIds: hits.packetIds })
+      created = true
       await reloadAll()
-    }).then(() => true)
+    }).then(() => created)
   }
 
   function renameFlow(id: number, name: string): Promise<void> {

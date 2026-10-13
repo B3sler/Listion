@@ -200,6 +200,21 @@ describe('useFlowActions flows', () => {
     expect(api.post).toHaveBeenCalledWith('/api/flow', { bitIds: [1], packetIds: [] })
   })
 
+  it('ein fehlgeschlagenes Anlegen meldet false', async () => {
+    const layout = seed([bit(1, null, 0, 0, 0)], [])
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    api.post.mockRejectedValue(new Error('boom'))
+    const hit = [
+      { x: -10, y: -10 },
+      { x: 300, y: -10 },
+      { x: 300, y: 100 },
+      { x: -10, y: 100 },
+    ]
+    expect(await useFlowActions().createFlowFromLasso(hit, layout)).toBe(false)
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+
   it('ein loses Bit verlässt seinen Flow, wenn es außerhalb des alten Rahmens landet', async () => {
     const layout = seed([{ ...bit(1, null, 0, 0, 0), flowId: 5 }], [])
     useFlowStore().flows = [{ id: 5, name: 'F', color: '#818cf8' }]
