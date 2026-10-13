@@ -8,6 +8,8 @@ export interface Bit {
   status: number
   x: number
   y: number
+  packetId: number | null
+  order: number
   priority?: number
   dueDate?: Date | string
   notes?: string
@@ -44,14 +46,20 @@ export const useBitStore = defineStore('bit', () => {
     return res.data
   }
 
+  // Optimistic: the canvas must not jump back while the request is in flight
   async function updateBit(
     id: number,
-    updates: Partial<Omit<Bit, 'id' | 'createdAt'>>,
+    updates: Partial<Omit<Bit, 'id' | 'createdAt' | 'order'>>,
   ): Promise<void> {
-    await api.put(`/api/bit/${id}`, updates)
     const idx = bits.value.findIndex((b) => b.id === id)
-    if (idx !== -1) {
-      bits.value[idx] = { ...bits.value[idx]!, ...updates }
+    const before = idx !== -1 ? { ...bits.value[idx]! } : null
+    if (idx !== -1) bits.value[idx] = { ...bits.value[idx]!, ...updates }
+    try {
+      await api.put(`/api/bit/${id}`, updates)
+    } catch (e) {
+      const at = bits.value.findIndex((b) => b.id === id)
+      if (before && at !== -1) bits.value[at] = before
+      throw e
     }
   }
 
