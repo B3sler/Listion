@@ -42,4 +42,55 @@ describe('LWorkspace', () => {
     await router.isReady()
     expect(wrapper.text()).toContain('Workspace')
   })
+
+  it('rendert Stapel und lose Kapseln aus den Stores', async () => {
+    const { default: api } = await import('../helpers/api')
+    vi.mocked(api.get).mockImplementation((url: string) =>
+      Promise.resolve({
+        data:
+          url === '/api/bit'
+            ? [
+                {
+                  id: 1,
+                  title: 'Plan',
+                  status: 2,
+                  x: 0,
+                  y: 0,
+                  packetId: 7,
+                  order: 0,
+                  createdAt: '',
+                },
+                {
+                  id: 2,
+                  title: 'Build',
+                  status: 0,
+                  x: 0,
+                  y: 0,
+                  packetId: 7,
+                  order: 1,
+                  createdAt: '',
+                },
+                {
+                  id: 3,
+                  title: 'Loose',
+                  status: 0,
+                  x: 400,
+                  y: 0,
+                  packetId: null,
+                  order: 0,
+                  createdAt: '',
+                },
+              ]
+            : url === '/api/packet'
+              ? [{ id: 7, name: 'Release', x: 0, y: 0 }]
+              : [],
+      }),
+    )
+    const wrapper = mount(LWorkspace, { global: { plugins: [router, createPinia()] } })
+    await router.isReady()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(wrapper.findAll('[data-node-type="packet"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(3)
+    expect(wrapper.text()).toContain('Release')
+  })
 })

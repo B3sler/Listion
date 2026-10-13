@@ -1,22 +1,31 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { Fullscreen, ScanSearch, ZoomIn, ZoomOut } from 'lucide-vue-next'
 import LContextMenu from '@/components/LContextMenu.vue'
-import LBit from '@/components/LBit.vue'
 import LBitPanel from '@/components/LBitPanel.vue'
+import LBitCapsule from '@/components/LBitCapsule.vue'
+import LPacketStack from '@/components/LPacketStack.vue'
+import LDependencyLayer from '@/components/LDependencyLayer.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
-import { useTheme } from '@/composables/useTheme.ts'
-import { useCanvas } from '@/composables/useCanvas.ts'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
-import { ScanSearch, ZoomIn, ZoomOut, Fullscreen } from 'lucide-vue-next'
+import { useTheme } from '@/composables/useTheme.ts'
+import { useCanvas } from '@/composables/useCanvas.ts'
+import {
+  CAPSULE_H,
+  CAPSULE_W,
+  anchor,
+  computeLayout,
+  dependencyGeometry,
+  unionRect,
+} from '@/composables/useFlowLayout'
+import { computeFlowState } from '@/composables/useFlowState'
+import { useFlowGestures } from '@/composables/useFlowGestures'
+import { useFlowActions } from '@/composables/useFlowActions'
 import { useBitStore } from '@/stores/bitStore'
-import { useConnectionStore, type Side } from '@/stores/connectionStore'
-
-type ContextMenuState = {
-  visible: boolean
-  x: number
-  y: number
-}
+import { usePacketStore } from '@/stores/packetStore'
+import { useDependencyStore } from '@/stores/dependencyStore'
+import type { Dependency, DependencyItem, PacketCard } from '@/types/flow'
 
 const containerRef = ref<HTMLElement | null>(null)
 
@@ -28,6 +37,7 @@ const {
   isDragging,
   zoomIn,
   zoomOut,
+  animateView,
   handleMouseDown,
   handleMouseMove,
   handleMouseUp,
@@ -35,539 +45,232 @@ const {
   handleTouchStart,
   handleTouchMove,
   handleTouchEnd,
-  animateView,
 } = useCanvas(containerRef)
 
 const bitStore = useBitStore()
-const connectionStore = useConnectionStore()
+const packetStore = usePacketStore()
+const dependencyStore = useDependencyStore()
+const actions = useFlowActions()
 
-const contextCanvasPos = ref({ x: 0, y: 0 })
-const contextMenu = ref<ContextMenuState>({ visible: false, x: 0, y: 0 })
-
-const showContextMenu = (x: number, y: number) => {
-  contextMenu.value = { visible: true, x, y }
+function toCanvas(clientX: number, clientY: number) {
+  const rect = containerRef.value!.getBoundingClientRect()
+  return {
+    x: (clientX - rect.left - panX.value) / zoom.value,
+    y: (clientY - rect.top - panY.value) / zoom.value,
+  }
 }
 
-const closeContextMenu = () => {
-  contextMenu.value.visible = false
+const selectedBitId = ref<number | null>(null)
+const selectedDependencyId = ref<number | null>(null)
+const highlightedPacketId = ref<number | null>(null)
+
+// Layout of the stored state — what snap detection and drops reason about
+const baseLayout = computed(() =>
+  computeLayout({
+    bits: bitStore.bits,
+    packets: packetStore.packets,
+    expandedBitId: selectedBitId.value,
+  }),
+)
+
+const { bitDrag, packetDrag, linkDrag, startBitPointer, startPacketPointer, startLinkPointer } =
+  useFlowGestures({
+    toCanvas,
+    zoom,
+    layout: baseLayout,
+    onTapBit: (id) => {
+      selectedDependencyId.value = null
+      selectedBitId.value = selectedBitId.value === id ? null : id
+    },
+    onDropBit: (id, target, pos) => actions.dropBit(id, target, pos, baseLayout.value),
+    onMovePacketEnd: (id, x, y) => actions.movePacket(id, x, y),
+    onCreateDependency: (from, to) => {
+      void actions.createDependency(from, to)
+    },
+  })
+
+// Layout including in-flight gestures — what is rendered and where arrows attach
+const liveLayout = computed(() => {
+  const pd = packetDrag.value
+  const packets = pd
+    ? packetStore.packets.map((p) => (p.id === pd.packetId ? { ...p, x: pd.x, y: pd.y } : p))
+    : packetStore.packets
+  const layout = computeLayout({
+    bits: bitStore.bits,
+    packets,
+    expandedBitId: selectedBitId.value,
+  })
+  const bd = bitDrag.value
+  if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: CAPSULE_H })
+  return layout
+})
+
+const flow = computed(() =>
+  computeFlowState(bitStore.bits, packetStore.packets, dependencyStore.dependencies),
+)
+
+const looseBits = computed(() =>
+  liveLayout.value.looseBitIds.map((id) => bitStore.bits.find((b) => b.id === id)!).filter(Boolean),
+)
+
+/** A bit dragged out of a stack floats above everything until it is dropped. */
+const floatingBit = computed(() => {
+  const bd = bitDrag.value
+  if (!bd) return null
+  const bit = bitStore.bits.find((b) => b.id === bd.bitId)
+  return bit && bit.packetId != null && liveLayout.value.packetRects.has(bit.packetId) ? bit : null
+})
+
+const stacks = computed(() =>
+  packetStore.packets
+    .filter((p) => liveLayout.value.membersOf.has(p.id))
+    .map((p) => {
+      const bd = bitDrag.value
+      const rect = liveLayout.value.packetRects.get(p.id)!
+      const target = bd?.target
+      return {
+        packet: p,
+        x: rect.x,
+        y: rect.y,
+        members: (liveLayout.value.membersOf.get(p.id) ?? []).filter((b) => b.id !== bd?.bitId),
+        gapIndex: target?.kind === 'stack' && target.packetId === p.id ? target.index : null,
+      }
+    }),
+)
+
+function packetOfBit(id: number): number | null {
+  return bitStore.bits.find((b) => b.id === id)?.packetId ?? null
 }
 
-const BIT_HALF = 72 // bits are 144×144 centered at bit.x / bit.y
+function isBitDimmed(id: number): boolean {
+  return highlightedPacketId.value !== null && packetOfBit(id) !== highlightedPacketId.value
+}
+
+function isDependencyDimmed(dep: Dependency): boolean {
+  const hp = highlightedPacketId.value
+  if (hp === null) return false
+  const touches = (type: 'bit' | 'packet', id: number) =>
+    type === 'packet' ? id === hp : packetOfBit(id) === hp
+  return !touches(dep.fromType, dep.fromId) && !touches(dep.toType, dep.toId)
+}
+
+const dependencyItems = computed<DependencyItem[]>(() =>
+  dependencyStore.dependencies.flatMap((dep) => {
+    const from = anchor(liveLayout.value, { type: dep.fromType, id: dep.fromId }, 'out')
+    const to = anchor(liveLayout.value, { type: dep.toType, id: dep.toId }, 'in')
+    if (!from || !to) return []
+    const state = flow.value.cycleDependencyIds.has(dep.id)
+      ? 'cycle'
+      : flow.value.sourceDone(dep)
+        ? 'done'
+        : 'pending'
+    return [{ id: dep.id, ...dependencyGeometry(from, to), state, dimmed: isDependencyDimmed(dep) }]
+  }),
+)
+
+const linkPreview = computed(() => {
+  const l = linkDrag.value
+  if (!l) return null
+  const from = anchor(liveLayout.value, l.from, 'out')
+  return from ? dependencyGeometry(from, { x: l.x, y: l.y }).d : null
+})
+
+const packetCards = computed<PacketCard[]>(() =>
+  packetStore.packets
+    .filter((p) => flow.value.packetSummary.has(p.id))
+    .map((p) => ({
+      key: p.id,
+      name: p.name,
+      bitIds: (liveLayout.value.membersOf.get(p.id) ?? []).map((b) => b.id),
+      ...flow.value.packetSummary.get(p.id)!,
+    })),
+)
+
+function focusPacket(id: number) {
+  highlightedPacketId.value = id
+  const rect = liveLayout.value.packetRects.get(id)
+  const el = containerRef.value
+  if (!rect || !el) return
+  const { width, height } = el.getBoundingClientRect()
+  const z = zoom.value
+  animateView(z, width / 2 - (rect.x + rect.w / 2) * z, height / 2 - (rect.y + rect.h / 2) * z)
+}
 
 function resetViewToBits() {
-  const bitsWithPos = bitStore.bits.filter((b) => b.x != null && b.y != null)
-
-  if (bitsWithPos.length === 0) {
+  const el = containerRef.value
+  const bounds = unionRect([
+    ...liveLayout.value.bitRects.values(),
+    ...liveLayout.value.packetRects.values(),
+  ])
+  if (!el || !bounds) {
     animateView(1, 0, 0)
     return
   }
-
-  const el = containerRef.value
-  if (!el) return
   const { width, height } = el.getBoundingClientRect()
-
-  const minX = Math.min(...bitsWithPos.map((b) => b.x! - BIT_HALF))
-  const maxX = Math.max(...bitsWithPos.map((b) => b.x! + BIT_HALF))
-  const minY = Math.min(...bitsWithPos.map((b) => b.y! - BIT_HALF))
-  const maxY = Math.max(...bitsWithPos.map((b) => b.y! + BIT_HALF))
-
-  const cx = (minX + maxX) / 2
-  const cy = (minY + maxY) / 2
-
   const PADDING = 80
-  const newZoom = Math.min(
+  const z = Math.min(
     3,
-    Math.max(
-      0.25,
-      Math.min((width - PADDING * 2) / (maxX - minX), (height - PADDING * 2) / (maxY - minY)),
-    ),
+    Math.max(0.25, Math.min((width - PADDING * 2) / bounds.w, (height - PADDING * 2) / bounds.h)),
   )
-
-  animateView(newZoom, width / 2 - cx * newZoom, height / 2 - cy * newZoom)
+  animateView(
+    z,
+    width / 2 - (bounds.x + bounds.w / 2) * z,
+    height / 2 - (bounds.y + bounds.h / 2) * z,
+  )
 }
 
-const handleContextMenu = (event: MouseEvent) => {
+// --- Context menu (create bit) ---
+type ContextMenuState = { visible: boolean; x: number; y: number }
+const contextMenu = ref<ContextMenuState>({ visible: false, x: 0, y: 0 })
+const contextCanvasPos = ref({ x: 0, y: 0 })
+
+function showContextMenu(clientX: number, clientY: number) {
+  contextCanvasPos.value = toCanvas(clientX, clientY)
+  contextMenu.value = { visible: true, x: clientX, y: clientY }
+}
+
+function closeContextMenu() {
+  contextMenu.value.visible = false
+}
+
+function handleContextMenu(event: MouseEvent) {
   event.preventDefault()
-  const rect = containerRef.value!.getBoundingClientRect()
-  contextCanvasPos.value = {
-    x: (event.clientX - rect.left - panX.value) / zoom.value,
-    y: (event.clientY - rect.top - panY.value) / zoom.value,
-  }
   showContextMenu(event.clientX, event.clientY)
 }
 
 let longPressTimer: number | null = null
 const LONG_PRESS_DURATION = 500
 
-const handleTouchStartWithLongPress = (event: TouchEvent) => {
+function clearLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+function handleTouchStartWithLongPress(event: TouchEvent) {
+  clearLongPress()
   if (event.touches.length === 1) {
     const touch = event.touches[0]!
-    longPressTimer = window.setTimeout(() => {
-      const rect = containerRef.value!.getBoundingClientRect()
-      contextCanvasPos.value = {
-        x: (touch.clientX - rect.left - panX.value) / zoom.value,
-        y: (touch.clientY - rect.top - panY.value) / zoom.value,
-      }
-      showContextMenu(touch.clientX, touch.clientY)
-    }, LONG_PRESS_DURATION)
-  } else {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      longPressTimer = null
-    }
+    longPressTimer = window.setTimeout(
+      () => showContextMenu(touch.clientX, touch.clientY),
+      LONG_PRESS_DURATION,
+    )
   }
   handleTouchStart(event)
 }
 
-const handleTouchMoveWithLongPress = (event: TouchEvent) => {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer)
-    longPressTimer = null
-  }
+function handleTouchMoveWithLongPress(event: TouchEvent) {
+  clearLongPress()
   handleTouchMove(event)
 }
 
-const handleTouchEndWithLongPress = () => {
-  if (longPressTimer) {
-    clearTimeout(longPressTimer)
-    longPressTimer = null
-  }
+function handleTouchEndWithLongPress() {
+  clearLongPress()
   handleTouchEnd()
 }
 
-const SNAP_APPROACH = 80
-const SNAP_ALIGN = 32
-
-const FACE_NORMALS: Record<Side, { nx: number; ny: number }> = {
-  top: { nx: 0, ny: -1 },
-  'top-right': { nx: 1 / Math.SQRT2, ny: -1 / Math.SQRT2 },
-  right: { nx: 1, ny: 0 },
-  'bottom-right': { nx: 1 / Math.SQRT2, ny: 1 / Math.SQRT2 },
-  bottom: { nx: 0, ny: 1 },
-  'bottom-left': { nx: -1 / Math.SQRT2, ny: 1 / Math.SQRT2 },
-  left: { nx: -1, ny: 0 },
-  'top-left': { nx: -1 / Math.SQRT2, ny: -1 / Math.SQRT2 },
-}
-
-// Flat faces: ±72 (octagon boundary). Diagonal faces: ±54 (actual SVG edge midpoint at (126,18)).
-const DOT_OFFSETS: Record<Side, { x: number; y: number }> = {
-  top: { x: 0, y: -72 },
-  'top-right': { x: 54, y: -54 },
-  right: { x: 72, y: 0 },
-  'bottom-right': { x: 54, y: 54 },
-  bottom: { x: 0, y: 72 },
-  'bottom-left': { x: -54, y: 54 },
-  left: { x: -72, y: 0 },
-  'top-left': { x: -54, y: -54 },
-}
-
-const SIDES: Side[] = [
-  'top',
-  'top-right',
-  'right',
-  'bottom-right',
-  'bottom',
-  'bottom-left',
-  'left',
-  'top-left',
-]
-
-const OPPOSITE: Record<Side, Side> = {
-  top: 'bottom',
-  'top-right': 'bottom-left',
-  right: 'left',
-  'bottom-right': 'top-left',
-  bottom: 'top',
-  'bottom-left': 'top-right',
-  left: 'right',
-  'top-left': 'bottom-right',
-}
-
-const ADJACENT_SIDES: Record<Side, [Side, Side]> = {
-  top: ['top-left', 'top-right'],
-  'top-right': ['top', 'right'],
-  right: ['top-right', 'bottom-right'],
-  'bottom-right': ['right', 'bottom'],
-  bottom: ['bottom-right', 'bottom-left'],
-  'bottom-left': ['bottom', 'left'],
-  left: ['bottom-left', 'top-left'],
-  'top-left': ['left', 'top'],
-}
-
-function getOccupiedSides(bitId: number): Set<Side> {
-  const occupied = new Set<Side>()
-  for (const conn of connectionStore.connections) {
-    if (conn.fromBitId === bitId) occupied.add(conn.fromSide)
-    if (conn.toBitId === bitId) occupied.add(conn.toSide)
-  }
-  return occupied
-}
-
-function getBlockedSides(bitId: number): Set<Side> {
-  const occupied = getOccupiedSides(bitId)
-  const blocked = new Set<Side>(occupied)
-  for (const side of occupied) {
-    for (const adj of ADJACENT_SIDES[side]) {
-      blocked.add(adj)
-    }
-  }
-  return blocked
-}
-
-interface SnapInfo {
-  fromBitId: number
-  fromSide: Side
-  toBitId: number
-  toSide: Side
-  snappedX: number
-  snappedY: number
-}
-
-const activeSnap = ref<SnapInfo | null>(null)
-const snapHighlights = ref<Map<number, Side>>(new Map())
-const snapPosMap = ref<Map<number, { x: number; y: number }>>(new Map())
-const newConnectionIds = ref<Set<number>>(new Set())
-
-const hoveredBitId = ref<number | null>(null)
-const selectedConnectionId = ref<number | null>(null)
-const highlightedPacketBitIds = ref<Set<number>>(new Set())
-
-function getUpstreamIds(bitId: number): Set<number> {
-  const visited = new Set<number>()
-  const queue = [bitId]
-  while (queue.length) {
-    const id = queue.shift()!
-    for (const conn of connectionStore.connections) {
-      if (conn.toBitId === id && !visited.has(conn.fromBitId)) {
-        visited.add(conn.fromBitId)
-        queue.push(conn.fromBitId)
-      }
-    }
-  }
-  return visited
-}
-
-function getDownstreamIds(bitId: number): Set<number> {
-  const visited = new Set<number>()
-  const queue = [bitId]
-  while (queue.length) {
-    const id = queue.shift()!
-    for (const conn of connectionStore.connections) {
-      if (conn.fromBitId === id && !visited.has(conn.toBitId)) {
-        visited.add(conn.toBitId)
-        queue.push(conn.toBitId)
-      }
-    }
-  }
-  return visited
-}
-
-const workflowContext = computed(() => {
-  if (hoveredBitId.value === null) return null
-  return {
-    id: hoveredBitId.value,
-    upstream: getUpstreamIds(hoveredBitId.value),
-    downstream: getDownstreamIds(hoveredBitId.value),
-  }
-})
-
-function getBitHighlightRole(bitId: number): 'upstream' | 'downstream' | null {
-  if (!workflowContext.value) return null
-  if (workflowContext.value.upstream.has(bitId)) return 'upstream'
-  if (workflowContext.value.downstream.has(bitId)) return 'downstream'
-  return null
-}
-
-function isBitDimmed(bitId: number): boolean {
-  if (workflowContext.value) {
-    const ctx = workflowContext.value
-    return bitId !== ctx.id && !ctx.upstream.has(bitId) && !ctx.downstream.has(bitId)
-  }
-  if (highlightedPacketBitIds.value.size > 0) {
-    return !highlightedPacketBitIds.value.has(bitId)
-  }
-  return false
-}
-
-function getConnectionOpacity(fromBitId: number, toBitId: number): number {
-  if (workflowContext.value) {
-    const ctx = workflowContext.value
-    const relevant = new Set([ctx.id, ...ctx.upstream, ...ctx.downstream])
-    return relevant.has(fromBitId) && relevant.has(toBitId) ? 1 : 0.06
-  }
-  if (highlightedPacketBitIds.value.size > 0) {
-    const inPacket =
-      highlightedPacketBitIds.value.has(fromBitId) && highlightedPacketBitIds.value.has(toBitId)
-    return inPacket ? 1 : 0.06
-  }
-  return 1
-}
-
-const cycleConnectionIds = computed(() => {
-  const cycleConnIds = new Set<number>()
-  const state = new Map<number, number>() // 0=unvisited, 1=in stack, 2=done
-
-  function dfs(nodeId: number): void {
-    state.set(nodeId, 1)
-    for (const conn of connectionStore.connections) {
-      if (conn.fromBitId !== nodeId) continue
-      const s = state.get(conn.toBitId) ?? 0
-      if (s === 1) cycleConnIds.add(conn.id)
-      else if (s === 0) dfs(conn.toBitId)
-    }
-    state.set(nodeId, 2)
-  }
-
-  for (const bit of bitStore.bits) {
-    if ((state.get(bit.id) ?? 0) === 0) dfs(bit.id)
-  }
-  return cycleConnIds
-})
-
-const bitWorkflowState = computed(() => {
-  const states = new Map<number, 'blocked' | 'ready' | null>()
-  for (const bit of bitStore.bits) {
-    if (bit.status === 2) {
-      states.set(bit.id, null)
-      continue
-    }
-    const incoming = connectionStore.connections.filter((c) => c.toBitId === bit.id)
-    if (incoming.length === 0) {
-      states.set(bit.id, null)
-      continue
-    }
-    const allDone = incoming.every(
-      (c) => bitStore.bits.find((b) => b.id === c.fromBitId)?.status === 2,
-    )
-    states.set(bit.id, allDone ? 'ready' : 'blocked')
-  }
-  return states
-})
-
-const packets = computed(() => {
-  if (connectionStore.connections.length === 0) return []
-
-  const adj = new Map<number, Set<number>>()
-  for (const bit of bitStore.bits) adj.set(bit.id, new Set())
-  for (const conn of connectionStore.connections) {
-    adj.get(conn.fromBitId)?.add(conn.toBitId)
-    adj.get(conn.toBitId)?.add(conn.fromBitId)
-  }
-
-  const visited = new Set<number>()
-  const components: number[][] = []
-
-  for (const bit of bitStore.bits) {
-    if (visited.has(bit.id) || (adj.get(bit.id)?.size ?? 0) === 0) continue
-    const component: number[] = []
-    const queue = [bit.id]
-    visited.add(bit.id)
-    while (queue.length) {
-      const id = queue.shift()!
-      component.push(id)
-      for (const neighbor of adj.get(id) ?? []) {
-        if (!visited.has(neighbor)) {
-          visited.add(neighbor)
-          queue.push(neighbor)
-        }
-      }
-    }
-    components.push(component)
-  }
-
-  return components.map((bitIds, i) => ({ index: i + 1, bitIds }))
-})
-
-const packetCards = computed(() =>
-  packets.value.map((packet) => {
-    const bits = packet.bitIds.map((id) => bitStore.bits.find((b) => b.id === id)).filter(Boolean)
-    const total = bits.length
-    const done = bits.filter((b) => b!.status === 2).length
-    const inProgress = bits.filter((b) => b!.status === 1).length
-    const blocked = packet.bitIds.filter(
-      (id) => bitWorkflowState.value.get(id) === 'blocked',
-    ).length
-    const ready = packet.bitIds.filter((id) => bitWorkflowState.value.get(id) === 'ready').length
-    const packetConns = connectionStore.connections.filter(
-      (c) => packet.bitIds.includes(c.fromBitId) && packet.bitIds.includes(c.toBitId),
-    )
-    const cycles = packetConns.filter((c) => cycleConnectionIds.value.has(c.id)).length
-    return {
-      key: Math.min(...packet.bitIds),
-      bitIds: packet.bitIds,
-      index: packet.index,
-      total,
-      done,
-      inProgress,
-      blocked,
-      ready,
-      cycles,
-      percent: total ? Math.round((done / total) * 100) : 0,
-    }
-  }),
-)
-
-function selectConnection(id: number) {
-  selectedConnectionId.value = selectedConnectionId.value === id ? null : id
-}
-
-async function deleteSelectedConnection() {
-  if (selectedConnectionId.value === null) return
-  await connectionStore.deleteConnection(selectedConnectionId.value)
-  selectedConnectionId.value = null
-}
-
-function onWorkspaceMouseDown(e: MouseEvent) {
-  selectedConnectionId.value = null
-  showControls.value = false
-  handleMouseDown(e)
-}
-
-function onBitDragMove(id: number, x: number, y: number) {
-  const otherBits = bitStore.bits.filter((b) => b.id !== id)
-  const draggedBlocked = getBlockedSides(id)
-  let best: { dist: number; snap: SnapInfo } | null = null
-
-  for (const fromSide of SIDES) {
-    if (draggedBlocked.has(fromSide)) continue
-    const toSide = OPPOSITE[fromSide]
-    const fromDot = { x: x + DOT_OFFSETS[fromSide].x, y: y + DOT_OFFSETS[fromSide].y }
-    for (const other of otherBits) {
-      if (getBlockedSides(other.id).has(toSide)) continue
-      const toDot = { x: other.x! + DOT_OFFSETS[toSide].x, y: other.y! + DOT_OFFSETS[toSide].y }
-      const dx = fromDot.x - toDot.x
-      const dy = fromDot.y - toDot.y
-      const { nx, ny } = FACE_NORMALS[fromSide]
-      const approach = Math.abs(dx * nx + dy * ny)
-      const align = Math.abs(dx * -ny + dy * nx)
-      if (approach < SNAP_APPROACH && align < SNAP_ALIGN) {
-        const dist = Math.hypot(dx, dy)
-        if (!best || dist < best.dist) {
-          best = {
-            dist,
-            snap: {
-              fromBitId: id,
-              fromSide,
-              toBitId: other.id,
-              toSide,
-              snappedX: toDot.x - DOT_OFFSETS[fromSide].x,
-              snappedY: toDot.y - DOT_OFFSETS[fromSide].y,
-            },
-          }
-        }
-      }
-    }
-  }
-
-  const newHighlights = new Map<number, Side>()
-  if (best) {
-    activeSnap.value = best.snap
-    snapPosMap.value = new Map([[id, { x: best.snap.snappedX, y: best.snap.snappedY }]])
-    newHighlights.set(best.snap.fromBitId, best.snap.fromSide)
-    newHighlights.set(best.snap.toBitId, best.snap.toSide)
-  } else {
-    activeSnap.value = null
-    snapPosMap.value = new Map()
-  }
-  snapHighlights.value = newHighlights
-}
-
-const CP_DIST = 90
-const D = Math.round(CP_DIST / Math.SQRT2)
-const CP_OFFSETS: Record<Side, { x: number; y: number }> = {
-  top: { x: 0, y: -CP_DIST },
-  'top-right': { x: D, y: -D },
-  right: { x: CP_DIST, y: 0 },
-  'bottom-right': { x: D, y: D },
-  bottom: { x: 0, y: CP_DIST },
-  'bottom-left': { x: -D, y: D },
-  left: { x: -CP_DIST, y: 0 },
-  'top-left': { x: -D, y: -D },
-}
-
-const connectionPaths = computed(() =>
-  connectionStore.connections
-    .map((conn) => {
-      const from = bitStore.bits.find((b) => b.id === conn.fromBitId)
-      const to = bitStore.bits.find((b) => b.id === conn.toBitId)
-      if (!from || !to || from.x == null || from.y == null || to.x == null || to.y == null)
-        return null
-
-      const fx = from.x + DOT_OFFSETS[conn.fromSide].x
-      const fy = from.y + DOT_OFFSETS[conn.fromSide].y
-      const tx = to.x + DOT_OFFSETS[conn.toSide].x
-      const ty = to.y + DOT_OFFSETS[conn.toSide].y
-      const cp1x = fx + CP_OFFSETS[conn.fromSide].x
-      const cp1y = fy + CP_OFFSETS[conn.fromSide].y
-      const cp2x = tx + CP_OFFSETS[conn.toSide].x
-      const cp2y = ty + CP_OFFSETS[conn.toSide].y
-
-      const mx = 0.125 * fx + 0.375 * cp1x + 0.375 * cp2x + 0.125 * tx
-      const my = 0.125 * fy + 0.375 * cp1y + 0.375 * cp2y + 0.125 * ty
-
-      const arrowAngle = (Math.atan2(ty - cp2y, tx - cp2x) * 180) / Math.PI
-
-      const isCycle = cycleConnectionIds.value.has(conn.id)
-      const fromStatus = from.status
-      const toStatus = to.status
-
-      let flowColor: string
-      let glowColor: string
-      let dashArray: string | undefined
-      let connClass: string
-
-      if (isCycle) {
-        flowColor = '#f97316'
-        glowColor = 'rgba(249,115,22,0.45)'
-        dashArray = '8 4'
-        connClass = 'conn-cycle'
-      } else if (fromStatus === 2 && toStatus !== 2) {
-        flowColor = '#34d399'
-        glowColor = 'rgba(52,211,153,0.45)'
-        dashArray = '12 5'
-        connClass = 'conn-unlocked'
-      } else if (fromStatus === 2) {
-        flowColor = 'rgba(16,185,129,0.45)'
-        glowColor = 'rgba(16,185,129,0.12)'
-        dashArray = undefined
-        connClass = ''
-      } else if (fromStatus === 1) {
-        flowColor = '#f59e0b'
-        glowColor = 'rgba(245,158,11,0.4)'
-        dashArray = '10 6'
-        connClass = 'conn-flow'
-      } else {
-        flowColor = 'rgba(100,116,139,0.65)'
-        glowColor = 'rgba(100,116,139,0.18)'
-        dashArray = '6 5'
-        connClass = ''
-      }
-
-      return {
-        id: conn.id,
-        d: `M ${fx} ${fy} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${tx} ${ty}`,
-        fx,
-        fy,
-        tx,
-        ty,
-        mx,
-        my,
-        arrowAngle,
-        isNew: newConnectionIds.value.has(conn.id),
-        isSelected: selectedConnectionId.value === conn.id,
-        isCycle,
-        connClass,
-        flowColor,
-        glowColor,
-        dashArray,
-        opacity: getConnectionOpacity(conn.fromBitId, conn.toBitId),
-        fromBitId: conn.fromBitId,
-        toBitId: conn.toBitId,
-      }
-    })
-    .filter(Boolean),
-)
-
+// --- Detail panel ---
 const showPanel = ref(false)
 const panelMode = ref<'create' | 'edit'>('create')
 const panelBitId = ref<number | null>(null)
@@ -575,53 +278,41 @@ const panelBit = computed(() =>
   panelBitId.value !== null ? bitStore.bits.find((b) => b.id === panelBitId.value) : undefined,
 )
 
-const createBit = () => {
+function createBit() {
   closeContextMenu()
   panelMode.value = 'create'
   panelBitId.value = null
   showPanel.value = true
 }
 
-const openBitDetail = (id: number) => {
+function openBitDetail(id: number) {
   panelMode.value = 'edit'
   panelBitId.value = id
   showPanel.value = true
 }
 
-const onPanelConfirm = async (data: {
+async function onPanelConfirm(data: {
   title: string
   status: number
   priority: number | undefined
   dueDate: string | undefined
   notes: string | undefined
   color: string
-}) => {
+}) {
   if (panelMode.value === 'create') {
     showPanel.value = false
     try {
       await bitStore.createBit({
-        title: data.title,
-        x: contextCanvasPos.value.x,
-        y: contextCanvasPos.value.y,
-        status: data.status,
-        priority: data.priority,
-        dueDate: data.dueDate,
-        notes: data.notes,
-        color: data.color,
+        ...data,
+        x: contextCanvasPos.value.x - CAPSULE_W / 2,
+        y: contextCanvasPos.value.y - CAPSULE_H / 2,
       })
     } catch (e) {
       console.error('Failed to create bit:', e)
     }
   } else if (panelBitId.value !== null) {
     try {
-      await bitStore.updateBit(panelBitId.value, {
-        title: data.title,
-        status: data.status,
-        priority: data.priority,
-        dueDate: data.dueDate,
-        notes: data.notes,
-        color: data.color,
-      })
+      await bitStore.updateBit(panelBitId.value, data)
       showPanel.value = false
     } catch (e) {
       console.error('Failed to update bit:', e)
@@ -629,71 +320,17 @@ const onPanelConfirm = async (data: {
   }
 }
 
-const onPanelDelete = async () => {
+async function onPanelDelete() {
   if (panelBitId.value === null) return
-  try {
-    await bitStore.deleteBit(panelBitId.value)
-    showPanel.value = false
-  } catch (e) {
-    console.error('Failed to delete bit:', e)
-  }
-}
-
-const onBitMoveEnd = async (id: number, x: number, y: number) => {
-  const snap = activeSnap.value
-  activeSnap.value = null
-  snapHighlights.value = new Map()
-  snapPosMap.value = new Map()
-
-  const finalX = snap ? snap.snappedX : x
-  const finalY = snap ? snap.snappedY : y
-
-  const toBreak = connectionStore.connections.filter((conn) => {
-    if (conn.fromBitId !== id && conn.toBitId !== id) return false
-    const mySide = conn.fromBitId === id ? conn.fromSide : conn.toSide
-    const otherId = conn.fromBitId === id ? conn.toBitId : conn.fromBitId
-    const otherSide = conn.fromBitId === id ? conn.toSide : conn.fromSide
-    const other = bitStore.bits.find((b) => b.id === otherId)
-    if (!other || other.x == null || other.y == null) return true
-    const myDot = { x: finalX + DOT_OFFSETS[mySide].x, y: finalY + DOT_OFFSETS[mySide].y }
-    const otherDot = {
-      x: other.x + DOT_OFFSETS[otherSide].x,
-      y: other.y + DOT_OFFSETS[otherSide].y,
-    }
-    const dx = myDot.x - otherDot.x
-    const dy = myDot.y - otherDot.y
-    const { nx, ny } = FACE_NORMALS[mySide]
-    const approach = Math.abs(dx * nx + dy * ny)
-    const align = Math.abs(dx * -ny + dy * nx)
-    return approach > SNAP_APPROACH || align > SNAP_ALIGN
-  })
-  await Promise.all(toBreak.map((c) => connectionStore.deleteConnection(c.id)))
-
-  if (snap && snap.fromBitId === id) {
-    await bitStore.updateBit(id, { x: Math.round(snap.snappedX), y: Math.round(snap.snappedY) })
-    const newConn = await connectionStore.createConnection({
-      fromBitId: snap.fromBitId,
-      fromSide: snap.fromSide,
-      toBitId: snap.toBitId,
-      toSide: snap.toSide,
-    })
-    newConnectionIds.value = new Set([...newConnectionIds.value, newConn.id])
-    setTimeout(() => {
-      newConnectionIds.value = new Set([...newConnectionIds.value].filter((i) => i !== newConn.id))
-    }, 700)
-  } else {
-    bitStore.updateBit(id, { x: Math.round(x), y: Math.round(y) })
-  }
-}
-
-const onBitRename = (id: number, title: string) => {
-  bitStore.updateBit(id, { title })
+  const id = panelBitId.value
+  showPanel.value = false
+  if (selectedBitId.value === id) selectedBitId.value = null
+  await actions.deleteBit(id, baseLayout.value)
 }
 
 const menuItems = [{ label: 'Create Bit', icon: '+', action: createBit }]
 
-const { initTheme, applyTheme, isDark } = useTheme()
-
+// --- View controls ---
 const showControls = ref(false)
 let hideTimer: number | null = null
 
@@ -711,27 +348,31 @@ function handleLeaveDelay() {
   }, 300)
 }
 
-// Touch has no hover — tapping the trigger expands the controls, tapping the canvas closes them
 function openControls() {
-  if (hideTimer) {
-    clearTimeout(hideTimer)
-    hideTimer = null
-  }
-  showControls.value = true
+  handleEnter()
 }
+
+function onWorkspaceMouseDown(e: MouseEvent) {
+  selectedBitId.value = null
+  selectedDependencyId.value = null
+  showControls.value = false
+  handleMouseDown(e)
+}
+
+const { initTheme, applyTheme, isDark } = useTheme()
 
 onMounted(() => {
   initTheme()
   applyTheme()
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('mousemove', handleMouseMove)
-  bitStore.fetchBits()
-  connectionStore.fetchConnections()
+  actions.reloadAll().catch((e) => console.error('Failed to load workspace:', e))
 })
 
 onUnmounted(() => {
   window.removeEventListener('mouseup', handleMouseUp)
   window.removeEventListener('mousemove', handleMouseMove)
+  clearLongPress()
 })
 </script>
 
@@ -769,136 +410,86 @@ onUnmounted(() => {
           <div class="max-w-7xl">
             <h1 class="text-[2rem] text-text0 mb-2">Workspace</h1>
             <p class="text-text2 text-[0.9375rem] leading-relaxed">
-              Right-click or long-press for options. Shift+Drag or Ctrl+Scroll to navigate.
+              Right-click or long-press to create a bit. Drag a bit under another to build a packet;
+              drag from the handle to draw a dependency.
             </p>
           </div>
         </div>
 
-        <svg class="absolute" style="inset: 0; width: 0; height: 0; overflow: visible">
-          <defs>
-            <filter id="conn-blur" x="-150%" y="-150%" width="400%" height="400%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="5" />
-            </filter>
-          </defs>
-
-          <g
-            v-for="path in connectionPaths"
-            :key="path!.id"
-            :style="{ opacity: path!.opacity, transition: 'opacity 0.3s ease' }"
-          >
-            <path
-              :d="path!.d"
-              fill="none"
-              :stroke="path!.glowColor"
-              stroke-width="14"
-              filter="url(#conn-blur)"
-              style="pointer-events: none"
-            />
-
-            <path
-              :d="path!.d"
-              fill="none"
-              stroke="rgba(255,255,255,0.05)"
-              stroke-width="1.5"
-              style="pointer-events: none"
-            />
-
-            <path
-              :d="path!.d"
-              fill="none"
-              :stroke="path!.flowColor"
-              :stroke-width="path!.isSelected ? 2.8 : 2"
-              :stroke-dasharray="path!.dashArray"
-              stroke-linecap="round"
-              :class="path!.isNew ? 'conn-draw' : path!.connClass"
-              style="pointer-events: none"
-            />
-
-            <polygon
-              :points="'0,0 -10,-4.5 -10,4.5'"
-              :transform="`translate(${path!.tx},${path!.ty}) rotate(${path!.arrowAngle})`"
-              :fill="path!.flowColor"
-              opacity="0.9"
-              style="pointer-events: none"
-            />
-
-            <circle
-              :cx="path!.fx"
-              :cy="path!.fy"
-              r="2.5"
-              :fill="path!.flowColor"
-              opacity="0.8"
-              style="pointer-events: none"
-              :class="{ 'conn-dot-pop': path!.isNew }"
-            />
-
-            <path
-              v-if="path!.isNew"
-              :d="path!.d"
-              fill="none"
-              stroke="rgba(200,215,255,0.85)"
-              stroke-width="4"
-              stroke-linecap="round"
-              class="conn-flash"
-              style="pointer-events: none"
-            />
-
-            <path
-              :d="path!.d"
-              fill="none"
-              stroke="transparent"
-              stroke-width="22"
-              style="cursor: pointer"
-              @click.stop="selectConnection(path!.id)"
-            />
-
-            <g
-              v-if="path!.isSelected"
-              :transform="`translate(${path!.mx},${path!.my})`"
-              style="cursor: pointer"
-              @click.stop="deleteSelectedConnection()"
-            >
-              <circle r="14" fill="rgba(12,12,22,0.92)" />
-              <circle r="14" fill="none" stroke="#ef4444" stroke-width="1.5" opacity="0.85" />
-              <line
-                x1="-5"
-                y1="-5"
-                x2="5"
-                y2="5"
-                stroke="#ef4444"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-              <line
-                x1="5"
-                y1="-5"
-                x2="-5"
-                y2="5"
-                stroke="#ef4444"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-            </g>
-          </g>
-        </svg>
-
-        <LBit
-          v-for="bit in bitStore.bits"
-          :key="bit.id"
-          :bit="bit"
-          :zoom="zoom"
-          :highlight-side="snapHighlights.get(bit.id) ?? null"
-          :snap-pos="snapPosMap.get(bit.id) ?? null"
-          :dimmed="isBitDimmed(bit.id)"
-          :highlight-role="getBitHighlightRole(bit.id)"
-          :workflow-state="bitWorkflowState.get(bit.id) ?? null"
-          @move-end="onBitMoveEnd"
-          @drag-move="onBitDragMove"
-          @rename="onBitRename"
-          @open-detail="openBitDetail"
-          @hover="hoveredBitId = $event"
-          @hover-end="hoveredBitId = null"
+        <LDependencyLayer
+          :items="dependencyItems"
+          :preview="linkPreview"
+          :selected-id="selectedDependencyId"
+          @select="(id) => (selectedDependencyId = selectedDependencyId === id ? null : id)"
+          @remove="
+            (id) => {
+              selectedDependencyId = null
+              actions.deleteDependency(id)
+            }
+          "
         />
+
+        <LPacketStack
+          v-for="s in stacks"
+          :key="s.packet.id"
+          :packet="s.packet"
+          :members="s.members"
+          :x="s.x"
+          :y="s.y"
+          :states="flow.bitState"
+          :cycle-bit-ids="flow.cycleBitIds"
+          :summary="flow.packetSummary.get(s.packet.id)!"
+          :expanded-bit-id="selectedBitId"
+          :gap-index="s.gapIndex"
+          :highlighted="highlightedPacketId === s.packet.id"
+          :dimmed="highlightedPacketId !== null && highlightedPacketId !== s.packet.id"
+          :dragging="packetDrag?.packetId === s.packet.id"
+          @header-pointerdown="(e) => startPacketPointer(e, s.packet.id)"
+          @bit-pointerdown="(e, id) => startBitPointer(e, id)"
+          @bit-open="openBitDetail"
+          @linkstart="(e, from) => startLinkPointer(e, from)"
+          @rename="(name) => actions.renamePacket(s.packet.id, name)"
+        />
+
+        <div
+          v-for="bit in looseBits"
+          :key="bit.id"
+          class="flow-item"
+          :class="{ 'flow-item--dragging': bitDrag?.bitId === bit.id }"
+          :style="{
+            transform: `translate3d(${liveLayout.bitRects.get(bit.id)!.x}px, ${liveLayout.bitRects.get(bit.id)!.y}px, 0)`,
+          }"
+        >
+          <LBitCapsule
+            :bit="bit"
+            :state="flow.bitState.get(bit.id) ?? null"
+            :expanded="selectedBitId === bit.id"
+            :in-cycle="flow.cycleBitIds.has(bit.id)"
+            :lifted="bitDrag?.bitId === bit.id"
+            :dimmed="isBitDimmed(bit.id)"
+            :snap-hint="
+              bitDrag?.target?.kind === 'pair' && bitDrag.target.bitId === bit.id
+                ? bitDrag.target.position
+                : null
+            "
+            @pointerdown="(e) => startBitPointer(e, bit.id)"
+            @open="openBitDetail(bit.id)"
+            @linkstart="(e) => startLinkPointer(e, { type: 'bit', id: bit.id })"
+          />
+        </div>
+
+        <div
+          v-if="floatingBit && bitDrag"
+          class="flow-item flow-item--dragging"
+          :style="{ transform: `translate3d(${bitDrag.x}px, ${bitDrag.y}px, 0)` }"
+        >
+          <LBitCapsule
+            :bit="floatingBit"
+            :state="flow.bitState.get(floatingBit.id) ?? null"
+            :expanded="false"
+            lifted
+          />
+        </div>
       </div>
 
       <div
@@ -955,8 +546,8 @@ onUnmounted(() => {
 
     <LPacketsHud
       :cards="packetCards"
-      @highlight="(ids) => (highlightedPacketBitIds = new Set(ids))"
-      @unhighlight="highlightedPacketBitIds = new Set()"
+      @highlight="focusPacket"
+      @unhighlight="highlightedPacketId = null"
     />
     <LContextMenu
       v-if="contextMenu.visible"
@@ -1051,95 +642,16 @@ onUnmounted(() => {
   }
 }
 
-@keyframes conn-draw {
-  from {
-    stroke-dasharray: 800;
-    stroke-dashoffset: 800;
-    opacity: 0.4;
-  }
-  to {
-    stroke-dasharray: 800;
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
+/* Loose capsules glide to new positions; while dragged they follow the pointer 1:1 */
+.flow-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+  transition: transform var(--spring-duration) var(--ease-spring);
 }
-.conn-draw {
-  animation: conn-draw 0.55s var(--ease-spring) forwards;
-}
-
-@keyframes conn-flow {
-  from {
-    stroke-dashoffset: 16;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-.conn-flow {
-  animation: conn-flow 0.65s linear infinite;
-}
-
-@keyframes conn-unlocked {
-  0%,
-  100% {
-    stroke-dashoffset: 17;
-    opacity: 0.75;
-  }
-  50% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-}
-.conn-unlocked {
-  animation: conn-unlocked 2.2s ease-in-out infinite;
-}
-
-@keyframes conn-cycle {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-.conn-cycle {
-  animation: conn-cycle 1.6s ease-in-out infinite;
-}
-
-@keyframes conn-flash {
-  0% {
-    opacity: 0.85;
-    stroke-width: 6;
-  }
-  60% {
-    opacity: 0.3;
-    stroke-width: 2;
-  }
-  100% {
-    opacity: 0;
-    stroke-width: 1;
-  }
-}
-.conn-flash {
-  animation: conn-flash 0.65s ease-out forwards;
-}
-
-@keyframes conn-dot-pop {
-  0% {
-    r: 0;
-    opacity: 0;
-  }
-  55% {
-    r: 5.5;
-    opacity: 1;
-  }
-  100% {
-    r: 2.5;
-    opacity: 0.8;
-  }
-}
-.conn-dot-pop {
-  animation: conn-dot-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+.flow-item--dragging {
+  transition: none;
+  z-index: 20;
 }
 </style>
