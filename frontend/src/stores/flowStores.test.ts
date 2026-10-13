@@ -12,6 +12,7 @@ vi.mock('@/helpers/api', () => ({ default: api }))
 import { useBitStore } from './bitStore'
 import { usePacketStore } from './packetStore'
 import { useDependencyStore } from './dependencyStore'
+import { useFlowStore } from './flowStore'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -54,5 +55,19 @@ describe('flow stores', () => {
       toId: 2,
     })
     expect(store.dependencies).toHaveLength(1)
+  })
+
+  it('flowStore legt Flows an, benennt optimistisch um und rollt bei Fehler zurück', async () => {
+    const store = useFlowStore()
+    api.post.mockResolvedValue({ data: { id: 4, name: 'Flow 1', color: '#818cf8' } })
+    await store.createFlow({ bitIds: [1], packetIds: [] })
+    expect(api.post).toHaveBeenCalledWith('/api/flow', { bitIds: [1], packetIds: [] })
+    let reject!: (e: Error) => void
+    api.put.mockReturnValue(new Promise((_, r) => (reject = r)))
+    const pending = store.updateFlow(4, { name: 'Release' })
+    expect(store.flows[0]!.name).toBe('Release')
+    reject(new Error('offline'))
+    await expect(pending).rejects.toThrow('offline')
+    expect(store.flows[0]!.name).toBe('Flow 1')
   })
 })

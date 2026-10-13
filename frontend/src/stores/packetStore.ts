@@ -28,7 +28,7 @@ export const usePacketStore = defineStore('packet', () => {
 
   async function updatePacket(
     id: number,
-    updates: Partial<Pick<Packet, 'name' | 'x' | 'y'>>,
+    updates: Partial<Pick<Packet, 'name' | 'x' | 'y' | 'flowId'>>,
   ): Promise<void> {
     const body = { ...updates }
     if (body.x !== undefined) body.x = Math.round(body.x)

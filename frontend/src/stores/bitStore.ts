@@ -10,6 +10,7 @@ export interface Bit {
   y: number
   packetId: number | null
   order: number
+  flowId?: number | null
   priority?: number
   dueDate?: Date | string
   notes?: string

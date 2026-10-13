@@ -10,6 +10,14 @@ export interface Packet {
   name: string
   x: number
   y: number
+  flowId?: number | null
+}
+
+/** A named group of loose bits and packets, drawn as a frame on the canvas. */
+export interface Flow {
+  id: number
+  name: string
+  color: string
 }
 
 /** "to" waits for "from". */
