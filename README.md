@@ -221,7 +221,7 @@ development.
 Create local environment files as needed:
 
 - Frontend (.env.local)
-  - VITE_API_BASE_URL=http://localhost:3000/api
+  - VITE_API_ORIGIN= (optional; leer = `/api` über den Vite-Proxy)
 - Backend (.env)
   - PORT=3000
   - NODE_ENV=development

@@ -216,7 +216,7 @@ All environment variables are documented in `.env.example`. Key variables:
 - `FRONTEND_PORT`: Frontend host port mapping
 
 ### Frontend (Production)
-- `VITE_API_BASE_URL`: API base URL for frontend
+- `VITE_API_ORIGIN`: Optional API origin for the frontend (leave empty: nginx proxies `/api`)
 
 ## Common Tasks
 

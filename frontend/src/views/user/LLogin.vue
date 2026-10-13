@@ -21,15 +21,15 @@ const password = ref('')
 const loginErrorMessage = ref('')
 
 const userStore = useUserStore()
-const { error, isAuthenticated } = storeToRefs(userStore)
+const { error } = storeToRefs(userStore)
 
 async function handleLogin() {
   loginErrorMessage.value = ''
-  await userStore.login(email.value, password.value)
-  if (error.value) {
-    loginErrorMessage.value = error.value
-  } else if (isAuthenticated.value) {
-    router.push('/workspace')
+  try {
+    await userStore.login(email.value, password.value)
+    await router.push('/workspace')
+  } catch {
+    loginErrorMessage.value = error.value || 'Login failed.'
   }
 }
 

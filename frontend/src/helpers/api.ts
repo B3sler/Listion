@@ -1,7 +1,8 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  // Leer = gleicher Origin: im Dev über den Vite-Proxy, in Produktion über nginx
+  baseURL: import.meta.env.VITE_API_ORIGIN ?? '',
   withCredentials: true,
 })
 
