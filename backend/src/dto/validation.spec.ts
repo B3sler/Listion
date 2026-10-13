@@ -3,8 +3,11 @@ import { ValidationPipe, BadRequestException } from '@nestjs/common'
 import { CreateBitDto } from './create-bit.dto.js'
 import { UpdateBitDto } from './update-bit.dto.js'
 import { CreatePacketDto } from './create-packet.dto.js'
+import { UpdatePacketDto } from './update-packet.dto.js'
 import { SetPacketBitsDto } from './set-packet-bits.dto.js'
 import { CreateDependencyDto } from './create-dependency.dto.js'
+import { CreateFlowDto } from './create-flow.dto.js'
+import { UpdateFlowDto } from './update-flow.dto.js'
 import { RegisterDto } from './auth.dto.js'
 
 // Gleiche Konfiguration wie in main.ts
@@ -54,6 +57,24 @@ describe('Request-Validierung', () => {
     await expect(
       validate(CreatePacketDto, { x: 1, y: 2, bitIds: [1, 2], name: '' }),
     ).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('validiert Flows und flowId', async () => {
+    const flow = await validate(CreateFlowDto, { bitIds: [1], packetIds: [], user: 9 })
+    expect(flow).toEqual({ bitIds: [1], packetIds: [] })
+    await expect(
+      validate(CreateFlowDto, { bitIds: [1], packetIds: [], color: 'blue' }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+    await expect(validate(CreateFlowDto, { bitIds: [1, 1], packetIds: [] })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    await expect(validate(UpdateFlowDto, { name: '' })).rejects.toBeInstanceOf(BadRequestException)
+    await expect(validate(UpdateFlowDto, { name: 'x'.repeat(61) })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    expect(await validate(UpdateFlowDto, { color: '#34d399' })).toEqual({ color: '#34d399' })
+    expect(await validate(UpdateBitDto, { flowId: null })).toEqual({ flowId: null })
+    expect(await validate(UpdatePacketDto, { flowId: 3 })).toEqual({ flowId: 3 })
   })
 
   it('lehnt ungültige Werte ab', async () => {

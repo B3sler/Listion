@@ -12,4 +12,14 @@ export class UpdateBitDto extends PartialType(CreateBitDto) {
   @IsOptional()
   @IsInt()
   packetId?: number | null
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: 2,
+    description: 'Put the loose bit into this flow, or null to take it out',
+  })
+  @IsOptional()
+  @IsInt()
+  flowId?: number | null
 }
