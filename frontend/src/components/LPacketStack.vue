@@ -17,6 +17,7 @@ const props = defineProps<{
   highlighted?: boolean
   dimmed?: boolean
   dragging?: boolean
+  dimmedBitIds?: Set<number>
 }>()
 
 const emit = defineEmits<{
@@ -100,6 +101,7 @@ function commitRename() {
         :bit="bit"
         :state="states.get(bit.id) ?? null"
         :in-cycle="cycleBitIds.has(bit.id)"
+        :dimmed="dimmedBitIds?.has(bit.id) ?? false"
         @pointerdown="emit('bitPointerdown', $event, bit.id)"
         @open="emit('bitOpen', bit.id)"
         @toggle-done="emit('bitToggleDone', bit.id)"
