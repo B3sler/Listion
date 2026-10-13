@@ -6,6 +6,8 @@ import LBitPanel from '@/components/LBitPanel.vue'
 import LBitCapsule from '@/components/LBitCapsule.vue'
 import LPacketStack from '@/components/LPacketStack.vue'
 import LDependencyLayer from '@/components/LDependencyLayer.vue'
+import LFlowFrame from '@/components/LFlowFrame.vue'
+import LLassoPath from '@/components/LLassoPath.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
@@ -20,11 +22,15 @@ import {
   unionRect,
 } from '@/composables/useFlowLayout'
 import { computeFlowState } from '@/composables/useFlowState'
+import { flowFrames, pathLength } from '@/composables/useFlowGroups'
+import { matchesFilter } from '@/composables/useFilter'
 import { useFlowGestures } from '@/composables/useFlowGestures'
 import { useFlowActions } from '@/composables/useFlowActions'
 import { useBitStore } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
+import { useFlowStore } from '@/stores/flowStore'
+import { useToolStore } from '@/stores/toolStore'
 import type { Dependency, DependencyItem, PacketCard } from '@/types/flow'
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -50,6 +56,8 @@ const {
 const bitStore = useBitStore()
 const packetStore = usePacketStore()
 const dependencyStore = useDependencyStore()
+const flowStore = useFlowStore()
+const toolStore = useToolStore()
 const actions = useFlowActions()
 
 function toCanvas(clientX: number, clientY: number) {
@@ -72,40 +80,93 @@ const baseLayout = computed(() =>
   }),
 )
 
-const { bitDrag, packetDrag, linkDrag, startBitPointer, startPacketPointer, startLinkPointer } =
-  useFlowGestures({
-    toCanvas,
-    zoom,
-    layout: baseLayout,
-    // a single click on a bit goes straight to its details
-    onTapBit: (id) => {
-      selectedDependencyId.value = null
-      openBitDetail(id)
-    },
-    onDropBit: (id, target, pos) => actions.dropBit(id, target, pos, baseLayout.value, new Map()),
-    onMovePacketEnd: (id, x, y) => actions.movePacket(id, x, y, baseLayout.value, new Map()),
-    onCreateDependency: (from, to) => {
-      void actions.createDependency(from, to)
-    },
-    onLassoEnd: () => {},
-    onMoveFlowEnd: async () => {},
-  })
+// Frames before any gesture — drop membership is judged against these
+const baseFrames = computed(() =>
+  flowFrames(baseLayout.value, bitStore.bits, packetStore.packets, flowStore.flows),
+)
+
+const {
+  bitDrag,
+  packetDrag,
+  linkDrag,
+  lasso,
+  flowDrag,
+  startBitPointer,
+  startPacketPointer,
+  startLinkPointer,
+  startLasso,
+  cancelLasso,
+  startFlowPointer,
+} = useFlowGestures({
+  toCanvas,
+  zoom,
+  layout: baseLayout,
+  // a single click on a bit goes straight to its details
+  onTapBit: (id) => {
+    selectedDependencyId.value = null
+    openBitDetail(id)
+  },
+  onDropBit: (id, target, pos) =>
+    actions.dropBit(id, target, pos, baseLayout.value, baseFrames.value),
+  onMovePacketEnd: (id, x, y) => actions.movePacket(id, x, y, baseLayout.value, baseFrames.value),
+  onCreateDependency: (from, to) => {
+    void actions.createDependency(from, to)
+  },
+  onLassoEnd: (points) => {
+    // a click or a tiny scribble is not a lasso
+    if (pathLength(points) * zoom.value < 10) return
+    void actions.createFlowFromLasso(points, baseLayout.value).then((created) => {
+      if (created) toolStore.setTool('select')
+    })
+  },
+  onMoveFlowEnd: (id, dx, dy) => actions.moveFlow(id, dx, dy),
+})
 
 // Layout including in-flight gestures — what is rendered and where arrows attach
 const liveLayout = computed(() => {
   const pd = packetDrag.value
-  const packets = pd
-    ? packetStore.packets.map((p) => (p.id === pd.packetId ? { ...p, x: pd.x, y: pd.y } : p))
-    : packetStore.packets
-  const layout = computeLayout({ bits: bitStore.bits, packets, expandedBitId: null })
+  const fd = flowDrag.value
+  const inDraggedFlow = (flowId: number | null | undefined) => fd !== null && flowId === fd.flowId
+  const packets = packetStore.packets.map((p) => {
+    if (pd && p.id === pd.packetId) return { ...p, x: pd.x, y: pd.y }
+    if (fd && inDraggedFlow(p.flowId)) return { ...p, x: p.x + fd.dx, y: p.y + fd.dy }
+    return p
+  })
+  const bits = fd
+    ? bitStore.bits.map((b) =>
+        b.packetId == null && inDraggedFlow(b.flowId)
+          ? { ...b, x: b.x + fd.dx, y: b.y + fd.dy }
+          : b,
+      )
+    : bitStore.bits
+  const layout = computeLayout({ bits, packets, expandedBitId: null })
   const bd = bitDrag.value
   if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: CAPSULE_H })
   return layout
 })
 
+// Frames follow their members live, including while one is dragged
+const liveFrames = computed(() =>
+  flowFrames(liveLayout.value, bitStore.bits, packetStore.packets, flowStore.flows),
+)
+
 const flow = computed(() =>
   computeFlowState(bitStore.bits, packetStore.packets, dependencyStore.dependencies),
 )
+
+const filterActive = computed(() => toolStore.activeFilterCount > 0)
+
+/** Bits that do not match the filter (empty when no filter is active). */
+const filterDimmed = computed(() => {
+  const dimmed = new Set<number>()
+  if (!filterActive.value) return dimmed
+  const today = new Date()
+  for (const b of bitStore.bits) {
+    if (!matchesFilter(b, flow.value.bitState.get(b.id) ?? null, toolStore.filters, today))
+      dimmed.add(b.id)
+  }
+  return dimmed
+})
 
 const looseBits = computed(() =>
   liveLayout.value.looseBitIds.map((id) => bitStore.bits.find((b) => b.id === id)!).filter(Boolean),
@@ -141,15 +202,25 @@ function packetOfBit(id: number): number | null {
 }
 
 function isBitDimmed(id: number): boolean {
-  return highlightedPacketId.value !== null && packetOfBit(id) !== highlightedPacketId.value
+  const byHighlight =
+    highlightedPacketId.value !== null && packetOfBit(id) !== highlightedPacketId.value
+  return byHighlight || filterDimmed.value.has(id)
 }
 
 function isDependencyDimmed(dep: Dependency): boolean {
   const hp = highlightedPacketId.value
-  if (hp === null) return false
-  const touches = (type: 'bit' | 'packet', id: number) =>
-    type === 'packet' ? id === hp : packetOfBit(id) === hp
-  return !touches(dep.fromType, dep.fromId) && !touches(dep.toType, dep.toId)
+  if (hp !== null) {
+    const touches = (type: 'bit' | 'packet', id: number) =>
+      type === 'packet' ? id === hp : packetOfBit(id) === hp
+    if (!touches(dep.fromType, dep.fromId) && !touches(dep.toType, dep.toId)) return true
+  }
+  if (!filterActive.value) return false
+  // a packet end matches when at least one of its steps matches
+  const matches = (type: 'bit' | 'packet', id: number) =>
+    type === 'bit'
+      ? !filterDimmed.value.has(id)
+      : (liveLayout.value.membersOf.get(id) ?? []).some((b) => !filterDimmed.value.has(b.id))
+  return !matches(dep.fromType, dep.fromId) && !matches(dep.toType, dep.toId)
 }
 
 const dependencyItems = computed<DependencyItem[]>(() =>
@@ -250,7 +321,12 @@ function handleContextMenu(event: MouseEvent) {
 // Double-click on empty canvas creates a bit there — not on nodes, arrows or the controls
 function handleCanvasDoubleClick(event: MouseEvent) {
   const target = event.target as Element | null
-  if (target?.closest('[data-node-type], .dep__hit, .dep__delete, .view-controls')) return
+  if (
+    target?.closest(
+      '[data-node-type], .dep__hit, .dep__delete, .view-controls, .flow__label, .flow__tools',
+    )
+  )
+    return
   contextCanvasPos.value = toCanvas(event.clientX, event.clientY)
   createBit()
 }
@@ -385,6 +461,12 @@ function onWorkspaceMouseDown(e: MouseEvent) {
   handleMouseDown(e)
 }
 
+function onKeydown(e: KeyboardEvent) {
+  if (!toolStore.handleShortcut(e)) return
+  if (e.key === 'Escape') cancelLasso()
+  if (toolStore.activeTool !== 'flow') cancelLasso()
+}
+
 const { initTheme, applyTheme, isDark } = useTheme()
 
 onMounted(() => {
@@ -392,12 +474,14 @@ onMounted(() => {
   applyTheme()
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('keydown', onKeydown)
   actions.reloadAll().catch((e) => console.error('Failed to load workspace:', e))
 })
 
 onUnmounted(() => {
   window.removeEventListener('mouseup', handleMouseUp)
   window.removeEventListener('mousemove', handleMouseMove)
+  window.removeEventListener('keydown', onKeydown)
   clearLongPress()
 })
 </script>
@@ -438,10 +522,23 @@ onUnmounted(() => {
             <h1 class="text-[2rem] text-text0 mb-2">Workspace</h1>
             <p class="text-text2 text-[0.9375rem] leading-relaxed">
               Double-click, right-click or long-press to create a bit. Drag a bit under another to
-              build a packet; drag from the handle to draw a dependency.
+              build a packet; drag from the handle to draw a dependency. Press F to circle bits into
+              a flow.
             </p>
           </div>
         </div>
+
+        <LFlowFrame
+          v-for="f in flowStore.flows.filter((fl) => liveFrames.has(fl.id))"
+          :key="`flow-${f.id}`"
+          :flow="f"
+          :rect="liveFrames.get(f.id)!"
+          :dragging="flowDrag?.flowId === f.id"
+          @dragstart="(e) => startFlowPointer(e, f.id)"
+          @rename="(name) => actions.renameFlow(f.id, name)"
+          @recolor="(color) => actions.recolorFlow(f.id, color)"
+          @dissolve="actions.dissolveFlow(f.id)"
+        />
 
         <LDependencyLayer
           :items="dependencyItems"
@@ -467,6 +564,7 @@ onUnmounted(() => {
           :cycle-bit-ids="flow.cycleBitIds"
           :summary="flow.packetSummary.get(s.packet.id)!"
           :gap-index="s.gapIndex"
+          :dimmed-bit-ids="filterDimmed"
           :highlighted="highlightedPacketId === s.packet.id"
           :dimmed="highlightedPacketId !== null && highlightedPacketId !== s.packet.id"
           :dragging="packetDrag?.packetId === s.packet.id"
@@ -516,7 +614,12 @@ onUnmounted(() => {
             lifted
           />
         </div>
+
+        <LLassoPath v-if="lasso" :points="lasso" />
       </div>
+
+      <!-- Flow tool: a capture layer above every node, so a lasso can start anywhere -->
+      <div v-if="toolStore.activeTool === 'flow'" class="lasso-capture" @pointerdown="startLasso" />
 
       <div
         class="view-controls material"
@@ -679,5 +782,12 @@ onUnmounted(() => {
 .flow-item--dragging {
   transition: none;
   z-index: 20;
+}
+.lasso-capture {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  cursor: crosshair;
+  touch-action: none;
 }
 </style>

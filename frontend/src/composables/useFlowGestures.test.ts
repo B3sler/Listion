@@ -240,7 +240,7 @@ describe('useFlowGestures', () => {
     g.startFlowPointer(pointer('pointerdown', 100, 100), 5)
     window.dispatchEvent(pointer('pointermove', 140, 130))
     expect(g.flowDrag.value).toEqual({ flowId: 5, dx: 40, dy: 30 })
-    vi.spyOn(performance, 'now').mockReturnValue(10_000) // released after resting: no glide
+    clock = 10_000 // released after resting: no glide
     window.dispatchEvent(pointer('pointerup', 140, 130))
     await Promise.resolve()
     expect(g.flowDrag.value).toBeNull()
