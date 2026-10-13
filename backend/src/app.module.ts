@@ -13,6 +13,8 @@ import { Bit } from './modules/bit/bit.entity.js'
 import { BitService } from './modules/bit/bit.service.js'
 import { BitController } from './modules/bit/bit.controller.js'
 import { Packet } from './modules/packet/packet.entity.js'
+import { PacketService } from './modules/packet/packet.service.js'
+import { PacketController } from './modules/packet/packet.controller.js'
 import { Dependency } from './modules/dependency/dependency.entity.js'
 
 @Module({
@@ -35,7 +37,13 @@ import { Dependency } from './modules/dependency/dependency.entity.js'
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  controllers: [AppController, AuthController, BitController],
-  providers: [AppService, UserService, BitService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  controllers: [AppController, AuthController, BitController, PacketController],
+  providers: [
+    AppService,
+    UserService,
+    BitService,
+    PacketService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
