@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { Bit } from '@/stores/bitStore'
 import LBitCapsule from './LBitCapsule.vue'
@@ -114,5 +114,101 @@ describe('LDependencyLayer', () => {
     const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: 4 } })
     await w.find('.dep__delete').trigger('keydown', { key: 'Enter' })
     expect(w.emitted('remove')).toEqual([[4]])
+  })
+})
+
+describe('Pan-Gesten über Knoten', () => {
+  const depItem = {
+    id: 4,
+    d: 'M 0 0 C 50 0 50 0 100 0',
+    mx: 50,
+    my: 0,
+    tx: 100,
+    ty: 0,
+    angle: 0,
+    state: 'pending' as const,
+    dimmed: false,
+  }
+  const stackProps = {
+    packet: { id: 7, name: 'Release', x: 0, y: 0 },
+    members: [bit(1, 2, 0)],
+    x: 0,
+    y: 0,
+    states: new Map(),
+    cycleBitIds: new Set<number>(),
+    summary: { total: 1, done: 1, inProgress: 0, blocked: 0, ready: 0, cycles: 0, percent: 100 },
+    expandedBitId: null,
+    gapIndex: null,
+  }
+
+  // The host element stands in for the canvas, which pans on shift+left and middle button.
+  function mountInHost(mountFn: (host: HTMLElement) => void) {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const onCanvasMouseDown = vi.fn()
+    host.addEventListener('mousedown', onCanvasMouseDown)
+    mountFn(host)
+    return { host, onCanvasMouseDown }
+  }
+
+  const targets: [string, string, (host: HTMLElement) => void][] = [
+    [
+      'Kapsel',
+      '.capsule',
+      (host) =>
+        void mount(LBitCapsule, {
+          props: { bit: bit(1), state: null, expanded: false },
+          attachTo: host,
+        }),
+    ],
+    [
+      'Kapsel-Griff',
+      '.capsule__handle',
+      (host) =>
+        void mount(LBitCapsule, {
+          props: { bit: bit(1), state: null, expanded: false },
+          attachTo: host,
+        }),
+    ],
+    ['Stapel', '.stack', (host) => void mount(LPacketStack, { props: stackProps, attachTo: host })],
+    [
+      'Stapel-Griff',
+      '.stack__handle',
+      (host) => void mount(LPacketStack, { props: stackProps, attachTo: host }),
+    ],
+    [
+      'Pfeil',
+      '.dep__hit',
+      (host) =>
+        void mount(LDependencyLayer, {
+          props: { items: [depItem], preview: null, selectedId: null },
+          attachTo: host,
+        }),
+    ],
+    [
+      'Pfeil-✕',
+      '.dep__delete',
+      (host) =>
+        void mount(LDependencyLayer, {
+          props: { items: [depItem], preview: null, selectedId: 4 },
+          attachTo: host,
+        }),
+    ],
+  ]
+
+  it.each(targets)('%s: Shift+Links und Mittelklick erreichen die Canvas', (_name, sel, setup) => {
+    const { host, onCanvasMouseDown } = mountInHost(setup)
+    const el = host.querySelector(sel)!
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, shiftKey: true }))
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 1 }))
+    expect(onCanvasMouseDown).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(targets)('%s: normaler Linksklick bleibt am Knoten', (_name, sel, setup) => {
+    const { host, onCanvasMouseDown } = mountInHost(setup)
+    host
+      .querySelector(sel)!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+    expect(onCanvasMouseDown).not.toHaveBeenCalled()
   })
 })
