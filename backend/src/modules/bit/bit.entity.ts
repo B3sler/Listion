@@ -37,4 +37,11 @@ export class Bit {
 
   @Column({ type: 'varchar', length: 7, nullable: true })
   color?: string
+
+  @Column({ type: 'int', nullable: true })
+  packetId?: number | null
+
+  // "order" is an SQL keyword, so the column gets an explicit name
+  @Column({ name: 'stepOrder', type: 'int', default: 0 })
+  order!: number
 }
