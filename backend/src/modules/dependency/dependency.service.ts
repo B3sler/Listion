@@ -38,7 +38,15 @@ export class DependencyService {
       throw new BadRequestException('A packet cannot depend on one of its own bits')
     }
 
-    const existing = await this.deps.findOne({ where: { userId, ...dto } })
+    const existing = await this.deps.findOne({
+      where: {
+        userId,
+        fromType: dto.fromType,
+        fromId: dto.fromId,
+        toType: dto.toType,
+        toId: dto.toId,
+      },
+    })
     if (existing) return existing
     return this.deps.save(this.deps.create({ ...dto, userId }))
   }

@@ -91,4 +91,26 @@ describe('PacketService', () => {
     await service.attachBit(3, p.id, 5)
     expect(member(3)).toMatchObject({ packetId: p.id, order: 2 })
   })
+
+  it('setBits entfernt Abhängigkeiten zwischen einem beitretenden Bit und dem Packet in beide Richtungen', async () => {
+    const { service, deps } = setup()
+    const p = await service.create({ x: 0, y: 0, bitIds: [1, 2] }, 5)
+    await deps.save({ userId: 5, fromType: 'bit', fromId: 3, toType: 'packet', toId: p.id })
+    await deps.save({ userId: 5, fromType: 'packet', fromId: p.id, toType: 'bit', toId: 3 })
+    await deps.save({ userId: 5, fromType: 'bit', fromId: 3, toType: 'bit', toId: 4 })
+    await service.setBits(p.id, 5, [1, 2, 3])
+    expect(deps.rows).toHaveLength(1)
+    expect(deps.rows[0]).toMatchObject({ fromType: 'bit', fromId: 3, toType: 'bit', toId: 4 })
+  })
+
+  it('attachBit entfernt Abhängigkeiten zwischen dem Bit und dem Packet in beide Richtungen', async () => {
+    const { service, deps } = setup()
+    const p = await service.create({ x: 0, y: 0, bitIds: [1, 2] }, 5)
+    await deps.save({ userId: 5, fromType: 'bit', fromId: 3, toType: 'packet', toId: p.id })
+    await deps.save({ userId: 5, fromType: 'packet', fromId: p.id, toType: 'bit', toId: 3 })
+    await deps.save({ userId: 5, fromType: 'packet', fromId: p.id, toType: 'bit', toId: 4 })
+    await service.attachBit(3, p.id, 5)
+    expect(deps.rows).toHaveLength(1)
+    expect(deps.rows[0]).toMatchObject({ toId: 4 })
+  })
 })

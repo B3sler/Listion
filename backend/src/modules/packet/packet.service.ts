@@ -81,6 +81,7 @@ export class PacketService {
     const members = await this.bits.find({ where: { packetId, user: userId } })
     const order = members.length > 0 ? Math.max(...members.map((m) => m.order)) + 1 : 0
     await this.bits.update({ id: bitId, user: userId }, { packetId, order })
+    await this.dropOwnPacketDeps(bitId, packetId, userId)
     if (bit.packetId != null) await this.dissolveSmall([bit.packetId], userId)
   }
 
@@ -109,7 +110,26 @@ export class PacketService {
   private async assign(packetId: number, bitIds: number[], userId: number): Promise<void> {
     for (const [order, id] of bitIds.entries()) {
       await this.bits.update({ id, user: userId }, { packetId, order })
+      await this.dropOwnPacketDeps(id, packetId, userId)
     }
+  }
+
+  /** A bit and its own packet may not depend on each other: drop such arrows when a bit joins. */
+  private async dropOwnPacketDeps(bitId: number, packetId: number, userId: number): Promise<void> {
+    await this.deps.delete({
+      userId,
+      fromType: 'bit',
+      fromId: bitId,
+      toType: 'packet',
+      toId: packetId,
+    })
+    await this.deps.delete({
+      userId,
+      fromType: 'packet',
+      fromId: packetId,
+      toType: 'bit',
+      toId: bitId,
+    })
   }
 
   private async loadOwnedBits(bitIds: number[], userId: number): Promise<Bit[]> {
