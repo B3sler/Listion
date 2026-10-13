@@ -10,11 +10,14 @@ interface Row {
 
 describe('FakeRepository', () => {
   it('filtert nach Gleichheit und In(), aktualisiert und löscht', async () => {
-    const repo = new FakeRepository<Row>([
-      { id: 1, user: 5, tag: 'a' },
-      { id: 2, user: 5 },
-      { id: 3, user: 6, tag: 'a' },
-    ], { tag: null })
+    const repo = new FakeRepository<Row>(
+      [
+        { id: 1, user: 5, tag: 'a' },
+        { id: 2, user: 5 },
+        { id: 3, user: 6, tag: 'a' },
+      ],
+      { tag: null },
+    )
 
     expect((await repo.find({ where: { user: 5 } })).map((r) => r.id)).toEqual([1, 2])
     expect(await repo.count({ where: { id: In([1, 3]) } })).toBe(2)
