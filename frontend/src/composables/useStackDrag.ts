@@ -14,6 +14,10 @@ export function insertIndex(pointerY: number, stackTop: number, count: number): 
   return Math.max(0, Math.min(count, index))
 }
 
+/**
+ * The stack index refers to the stack as rendered during the drag — without the dragged bit —
+ * so rows are counted on the reduced list.
+ */
 export function findSnapTarget(
   probe: { x: number; y: number },
   draggedBitId: number,

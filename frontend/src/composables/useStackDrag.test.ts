@@ -55,6 +55,25 @@ describe('findSnapTarget', () => {
     })
   })
 
+  it('eigene Stapel-Zeilen werden ohne das gezogene Bit gezählt (nach unten)', () => {
+    // bit 1 dragged: rendered stack is [bit 2 (row 0, 140–172), bit 3 (row 1, 176–208)];
+    // y=166 is the lower half of row 0 → insert after bit 2
+    expect(findSnapTarget({ x: 200, y: 166 }, 1, layout)).toEqual({
+      kind: 'stack',
+      packetId: 7,
+      index: 1,
+    })
+  })
+
+  it('eigene Stapel-Zeilen werden ohne das gezogene Bit gezählt (nach oben)', () => {
+    // bit 3 dragged upward to y=150 (upper half of row 0 of [bit 1, bit 2]) → index 0
+    expect(findSnapTarget({ x: 200, y: 150 }, 3, layout)).toEqual({
+      kind: 'stack',
+      packetId: 7,
+      index: 0,
+    })
+  })
+
   it('knapp unter einer losen Kapsel → neues Packet darunter', () => {
     expect(findSnapTarget({ x: 700, y: 100 + 32 + 20 }, 5, layout)).toEqual({
       kind: 'pair',
