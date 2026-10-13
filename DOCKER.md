@@ -84,15 +84,19 @@ docker compose up -d
 
 Changes to files in `./frontend` and `./backend` are automatically detected and the services reload.
 
-### Adding New Packages
+### Adding or Updating Packages
+
+The containers do **not** use your host `node_modules`: `docker-compose.yml` mounts an anonymous volume over `/app/node_modules`, filled from the image at build time. After any change to a `package.json` / `package-lock.json` (new package, dependency update, pulling such a change), rebuild the images and renew that volume:
 
 ```bash
-# Add package on host
+# Add package on host (updates package.json + lock file)
 npm install <package-name>
 
-# Restart containers (uses mounted node_modules)
-docker compose restart
+# Rebuild images and replace the stale node_modules volumes
+docker compose up -d --build --renew-anon-volumes
 ```
+
+`./docker-start.sh` does this automatically. A plain `docker compose restart` or `docker compose up -d` keeps the old dependencies — e.g. after the ESM migration the backend crashed with `Must use import to load ES Module` because the container still ran the old `ts-node-dev` image.
 
 ### Access Container Shells
 

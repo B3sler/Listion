@@ -16,7 +16,10 @@ echo "Starting Listion with Docker..."
 echo "Using compose file: ${COMPOSE_FILE}"
 echo ""
 
-docker compose -f "${COMPOSE_FILE}" up -d
+# --build: rebuild images when package*.json or Dockerfiles changed (cached otherwise)
+# --renew-anon-volumes: node_modules lives in an anonymous volume that shadows the
+#   host folder; without renewing it, containers keep stale dependencies after updates
+docker compose -f "${COMPOSE_FILE}" up -d --build --renew-anon-volumes
 
 echo ""
 echo "Listion is starting!"
