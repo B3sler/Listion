@@ -16,6 +16,8 @@ import { Packet } from './modules/packet/packet.entity.js'
 import { PacketService } from './modules/packet/packet.service.js'
 import { PacketController } from './modules/packet/packet.controller.js'
 import { Dependency } from './modules/dependency/dependency.entity.js'
+import { DependencyService } from './modules/dependency/dependency.service.js'
+import { DependencyController } from './modules/dependency/dependency.controller.js'
 
 @Module({
   imports: [
@@ -37,12 +39,19 @@ import { Dependency } from './modules/dependency/dependency.entity.js'
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  controllers: [AppController, AuthController, BitController, PacketController],
+  controllers: [
+    AppController,
+    AuthController,
+    BitController,
+    PacketController,
+    DependencyController,
+  ],
   providers: [
     AppService,
     UserService,
     BitService,
     PacketService,
+    DependencyService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
