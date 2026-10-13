@@ -36,6 +36,7 @@ export const useBitStore = defineStore('bit', () => {
     dueDate?: string
     notes?: string
     color?: string
+    flowId?: number
   }): Promise<Bit> {
     const res = await api.post<Bit>('/api/bit', {
       ...payload,

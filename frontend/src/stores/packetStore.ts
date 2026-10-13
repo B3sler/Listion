@@ -16,6 +16,7 @@ export const usePacketStore = defineStore('packet', () => {
     x: number
     y: number
     bitIds: number[]
+    flowId?: number
   }): Promise<Packet> {
     const res = await api.post<Packet>('/api/packet', {
       ...payload,

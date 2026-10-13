@@ -22,7 +22,7 @@ import {
   unionRect,
 } from '@/composables/useFlowLayout'
 import { computeFlowState } from '@/composables/useFlowState'
-import { flowFrames, pathLength } from '@/composables/useFlowGroups'
+import { flowAt, flowFrames, pathLength } from '@/composables/useFlowGroups'
 import { matchesFilter } from '@/composables/useFilter'
 import { useFlowGestures } from '@/composables/useFlowGestures'
 import { useFlowActions } from '@/composables/useFlowActions'
@@ -320,6 +320,8 @@ function handleContextMenu(event: MouseEvent) {
 
 // Double-click on empty canvas creates a bit there — not on nodes, arrows or the controls
 function handleCanvasDoubleClick(event: MouseEvent) {
+  // flow mode: the lasso layer owns the canvas, nodes and background do not react
+  if (toolStore.activeTool === 'flow') return
   const target = event.target as Element | null
   if (
     target?.closest(
@@ -406,10 +408,13 @@ async function onPanelConfirm(data: {
   if (panelMode.value === 'create') {
     showPanel.value = false
     try {
+      // a bit created inside a flow frame joins that flow
+      const flowId = flowAt(contextCanvasPos.value, baseFrames.value, flowStore.flows)
       await bitStore.createBit({
         ...data,
         x: contextCanvasPos.value.x - CAPSULE_W / 2,
         y: contextCanvasPos.value.y - CAPSULE_H / 2,
+        ...(flowId !== null ? { flowId } : {}),
       })
     } catch (e) {
       console.error('Failed to create bit:', e)
@@ -567,7 +572,10 @@ onUnmounted(() => {
           :dimmed-bit-ids="filterDimmed"
           :highlighted="highlightedPacketId === s.packet.id"
           :dimmed="highlightedPacketId !== null && highlightedPacketId !== s.packet.id"
-          :dragging="packetDrag?.packetId === s.packet.id"
+          :dragging="
+            packetDrag?.packetId === s.packet.id ||
+            (flowDrag !== null && s.packet.flowId === flowDrag.flowId)
+          "
           @header-pointerdown="(e) => startPacketPointer(e, s.packet.id)"
           @bit-pointerdown="(e, id) => startBitPointer(e, id)"
           @bit-open="openBitDetail"
@@ -580,7 +588,10 @@ onUnmounted(() => {
           v-for="bit in looseBits"
           :key="bit.id"
           class="flow-item"
-          :class="{ 'flow-item--dragging': bitDrag?.bitId === bit.id }"
+          :class="{
+            'flow-item--dragging': bitDrag?.bitId === bit.id,
+            'flow-item--following': flowDrag !== null && bit.flowId === flowDrag.flowId,
+          }"
           :style="{
             transform: `translate3d(${liveLayout.bitRects.get(bit.id)!.x}px, ${liveLayout.bitRects.get(bit.id)!.y}px, 0)`,
           }"
@@ -782,6 +793,10 @@ onUnmounted(() => {
 .flow-item--dragging {
   transition: none;
   z-index: 20;
+}
+/* members of a dragged flow frame follow it 1:1, like the frame itself */
+.flow-item--following {
+  transition: none;
 }
 .lasso-capture {
   position: absolute;

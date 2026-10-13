@@ -150,6 +150,125 @@ describe('LWorkspace', () => {
     wrapper.unmount()
   })
 
+  describe('Flow-Rahmen', () => {
+    const looseInFlow = {
+      id: 3,
+      title: 'Loose',
+      status: 0,
+      x: 400,
+      y: 0,
+      packetId: null,
+      order: 0,
+      flowId: 9,
+      createdAt: '',
+    }
+
+    async function mountWithFlow(extra: { bits?: object[]; packets?: object[] } = {}) {
+      const { default: api } = await import('../helpers/api')
+      vi.mocked(api.get).mockImplementation((url: string) =>
+        Promise.resolve({
+          data:
+            url === '/api/bit'
+              ? [looseInFlow, ...(extra.bits ?? [])]
+              : url === '/api/packet'
+                ? (extra.packets ?? [])
+                : url === '/api/flow'
+                  ? [{ id: 9, name: 'Release Q4', color: '#818cf8' }]
+                  : [],
+        }),
+      )
+      const wrapper = mount(LWorkspace, {
+        global: { plugins: [router, createPinia()] },
+        attachTo: document.body,
+      })
+      await router.isReady()
+      await new Promise((r) => setTimeout(r, 0))
+      return { wrapper, api }
+    }
+
+    it('Mitglieder folgen beim Ziehen des Rahmens ohne Verzögerung', async () => {
+      const { wrapper } = await mountWithFlow({
+        bits: [
+          { ...looseInFlow, id: 1, packetId: 7, flowId: null, x: 0, order: 0 },
+          { ...looseInFlow, id: 2, packetId: 7, flowId: null, x: 0, order: 1 },
+          { ...looseInFlow, id: 4, title: 'Outside', x: 1600, flowId: null },
+        ],
+        packets: [{ id: 7, name: 'Stack', x: 0, y: 200, flowId: 9 }],
+      })
+      const capsule = () => wrapper.findAll('.flow-item').find((c) => c.text().includes('Loose'))!
+      const outsider = () =>
+        wrapper.findAll('.flow-item').find((c) => c.text().includes('Outside'))!
+      const stack = () => wrapper.find('.stack')
+      expect(capsule().classes()).not.toContain('flow-item--following')
+      expect(stack().classes()).not.toContain('stack--dragging')
+
+      wrapper
+        .find('[data-flow-id="9"]')
+        .element.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+        )
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: 90, clientY: 10 }))
+      await wrapper.vm.$nextTick()
+
+      expect(capsule().classes()).toContain('flow-item--following')
+      expect(stack().classes()).toContain('stack--dragging')
+      // a loose bit outside the flow keeps its glide
+      expect(outsider().classes()).not.toContain('flow-item--following')
+
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 90, clientY: 10 }))
+      await wrapper.vm.$nextTick()
+      expect(capsule().classes()).not.toContain('flow-item--following')
+      wrapper.unmount()
+    })
+
+    it('Doppelklick im Flow-Modus öffnet kein „New Bit“', async () => {
+      const { wrapper } = await mountWithFlow()
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+      await wrapper.vm.$nextTick()
+      await wrapper.find('.lasso-capture').trigger('dblclick')
+      expect(wrapper.text()).not.toContain('New Bit')
+      wrapper.unmount()
+    })
+
+    it('ein im Flow-Rahmen angelegtes Bit wird Mitglied des Flows, außerhalb nicht', async () => {
+      const { wrapper, api } = await mountWithFlow()
+      const data = {
+        title: 'Neu',
+        status: 0,
+        priority: undefined,
+        dueDate: undefined,
+        notes: undefined,
+        color: '#6366f1',
+      }
+      const frame = wrapper.find('[data-flow-id="9"]')
+      const m = /translate3d\(([-\d.]+)px, ([-\d.]+)px/.exec(frame.attributes('style') ?? '')!
+      const el = frame.element as HTMLElement
+      const inside = {
+        clientX: Number(m[1]) + parseFloat(el.style.width) / 2,
+        clientY: Number(m[2]) + parseFloat(el.style.height) / 2,
+      }
+      vi.mocked(api.post).mockClear()
+      frame.element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, ...inside }))
+      await wrapper.vm.$nextTick()
+      wrapper.findComponent({ name: 'LBitPanel' }).vm.$emit('confirm', data)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(api.post).toHaveBeenCalledWith('/api/bit', expect.objectContaining({ flowId: 9 }))
+
+      vi.mocked(api.post).mockClear()
+      wrapper
+        .find('.bg-surface1')
+        .element.dispatchEvent(
+          new MouseEvent('dblclick', { bubbles: true, clientX: -2000, clientY: -2000 }),
+        )
+      await wrapper.vm.$nextTick()
+      wrapper.findComponent({ name: 'LBitPanel' }).vm.$emit('confirm', data)
+      await new Promise((r) => setTimeout(r, 0))
+      expect(api.post).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(api.post).mock.calls[0]![1]).not.toHaveProperty('flowId')
+      wrapper.unmount()
+    })
+  })
+
   it('Filter dimmt nicht passende Kapseln', async () => {
     const { default: api } = await import('../helpers/api')
     vi.mocked(api.get).mockImplementation((url: string) =>
