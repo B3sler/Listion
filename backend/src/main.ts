@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
-import { AppModule } from './app.module'
+import { AppModule } from './app.module.js'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 
 async function bootstrap() {

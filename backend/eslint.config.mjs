@@ -9,7 +9,7 @@ export default [
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 2022,
-        sourceType: 'commonjs',
+        sourceType: 'module',
       },
     },
     plugins: {

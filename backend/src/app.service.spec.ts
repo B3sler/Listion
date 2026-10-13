@@ -1,5 +1,6 @@
+import { describe, it, expect, beforeEach } from 'vitest'
 import { Test, TestingModule } from '@nestjs/testing'
-import { AppService } from './app.service'
+import { AppService } from './app.service.js'
 
 describe('AppService', () => {
   let service: AppService
