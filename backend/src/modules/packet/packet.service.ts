@@ -7,6 +7,7 @@ import { Dependency } from '../dependency/dependency.entity.js'
 import { Flow } from '../flow/flow.entity.js'
 import { pruneEmptyFlows } from '../flow/flow-membership.js'
 import { CreatePacketDto } from '../../dto/create-packet.dto.js'
+import { definedOnly } from '../../common/defined-only.js'
 import { UpdatePacketDto } from '../../dto/update-packet.dto.js'
 
 /** Owns packet membership: step order, attach/detach, and the "at least 2 bits" rule. */
@@ -48,6 +49,7 @@ export class PacketService {
   }
 
   async create(dto: CreatePacketDto, userId: number): Promise<Packet> {
+    if (dto.flowId != null) await this.assertFlow(dto.flowId, userId)
     const owned = await this.loadOwnedBits(dto.bitIds, userId)
     const count = await this.packets.count({ where: { user: userId } })
     const packet = await this.packets.save(
@@ -56,6 +58,7 @@ export class PacketService {
         name: dto.name ?? `Packet ${count + 1}`,
         x: dto.x,
         y: dto.y,
+        flowId: dto.flowId ?? null,
       }),
     )
     await this.assign(packet.id, dto.bitIds, userId)
@@ -70,9 +73,11 @@ export class PacketService {
   async update(id: number, userId: number, dto: UpdatePacketDto): Promise<Packet> {
     const packet = await this.findOne(id, userId)
     if (typeof dto.flowId === 'number') await this.assertFlow(dto.flowId, userId)
-    // TypeORM rejects an UPDATE without values, so an empty PUT body is a no-op here.
-    if (Object.keys(dto).length > 0) {
-      await this.packets.update({ id, user: userId }, dto)
+    // A validated DTO carries own keys with value undefined for absent fields, and TypeORM throws
+    // on an UPDATE without values: an empty PUT body is a no-op.
+    const patch = definedOnly(dto)
+    if (Object.keys(patch).length > 0) {
+      await this.packets.update({ id, user: userId }, patch)
     }
     if (dto.flowId !== undefined && dto.flowId !== packet.flowId) {
       await this.pruneEmptyFlows([packet.flowId], userId)

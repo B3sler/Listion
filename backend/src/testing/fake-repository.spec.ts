@@ -29,6 +29,10 @@ describe('FakeRepository', () => {
     const saved = await repo.save(repo.create({ user: 7 }))
     expect(saved.id).toBe(4)
 
+    await repo.update({ id: 1 }, { tag: undefined, user: 5 })
+    expect(repo.rows.find((r) => r.id === 1)!.tag).toBe('b') // undefined is skipped
+    await expect(repo.update({ id: 1 }, { tag: undefined })).rejects.toThrow(/no values/i)
+
     await repo.delete({ user: 5 })
     expect(repo.rows.map((r) => r.id)).toEqual([3, 4])
   })

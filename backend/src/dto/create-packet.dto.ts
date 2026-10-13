@@ -26,6 +26,15 @@ export class CreatePacketDto {
   @IsInt()
   y!: number
 
+  @ApiProperty({
+    required: false,
+    example: 2,
+    description: 'Flow the new stack belongs to (the bits leave their own flows)',
+  })
+  @IsOptional()
+  @IsInt()
+  flowId?: number
+
   @ApiProperty({ type: [Number], example: [1, 2], description: 'Bits in step order (at least 2)' })
   @IsArray()
   @ArrayMinSize(2)

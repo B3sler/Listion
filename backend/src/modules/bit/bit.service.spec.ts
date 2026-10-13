@@ -95,6 +95,30 @@ describe('BitService', () => {
     expect(member(1)).toMatchObject({ packetId: null, flowId: 70, x: 5, y: 6 })
   })
 
+  it('create mit flowId macht das neue Bit zum Mitglied des Flows', async () => {
+    const { service, flows } = await setup()
+    flows.rows.push({ id: 70, user: 5, name: 'A', color: '#818cf8', createdAt: new Date() })
+    const bit = await service.create({ title: 'neu', x: 1, y: 2, flowId: 70 }, 5)
+    expect(bit).toMatchObject({ title: 'neu', flowId: 70 })
+  })
+
+  it('create mit fremdem Flow wirft NotFound und speichert nichts', async () => {
+    const { service, bits, flows } = await setup()
+    flows.rows.push({ id: 80, user: 6, name: 'X', color: '#818cf8', createdAt: new Date() })
+    const before = bits.rows.length
+    await expect(service.create({ title: 'neu', flowId: 80 }, 5)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(bits.rows).toHaveLength(before)
+  })
+
+  it('update mit leerem Body (nur undefined-Felder) lässt das Bit unverändert', async () => {
+    const { service, member } = await setup()
+    const result = await service.update(3, 5, { title: undefined, x: undefined })
+    expect(result).toMatchObject({ id: 3, title: 't' })
+    expect(member(3)).toMatchObject({ title: 't' })
+  })
+
   it('remove löscht einen Flow, der dadurch leer wird', async () => {
     const { service, flows, member } = await setup()
     flows.rows.push({ id: 70, user: 5, name: 'A', color: '#818cf8', createdAt: new Date() })

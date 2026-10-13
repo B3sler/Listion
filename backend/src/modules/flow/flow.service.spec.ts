@@ -69,6 +69,33 @@ describe('FlowService', () => {
     expect(flows.rows[0]!.name).toBe('Release')
   })
 
+  it('update mit leerem Body (nur undefined-Felder) lässt den Flow unverändert', async () => {
+    const { service } = setup()
+    const flow = await service.create({ bitIds: [1], packetIds: [], name: 'Keep' }, 5)
+    const result = await service.update(flow.id, 5, { name: undefined, color: undefined })
+    expect(result).toMatchObject({ id: flow.id, name: 'Keep', color: '#818cf8' })
+  })
+
+  it('vergibt als Standardname die höchste vorhandene Nummer plus eins', async () => {
+    const { service, flows } = setup()
+    flows.rows.push(
+      { id: 40, user: 5, name: 'Flow 2', color: '#818cf8', createdAt: new Date() },
+      { id: 42, user: 6, name: 'Flow 9', color: '#818cf8', createdAt: new Date() },
+    )
+    const flow = await service.create({ bitIds: [1], packetIds: [] }, 5)
+    expect(flow.name).toBe('Flow 3')
+  })
+
+  it('findAll liefert die Flows des Users aufsteigend nach id', async () => {
+    const { service, flows } = setup()
+    flows.rows.push(
+      { id: 3, user: 5, name: 'c', color: '#818cf8', createdAt: new Date() },
+      { id: 1, user: 5, name: 'a', color: '#818cf8', createdAt: new Date() },
+      { id: 2, user: 6, name: 'x', color: '#818cf8', createdAt: new Date() },
+    )
+    expect((await service.findAll(5)).map((f) => f.id)).toEqual([1, 3])
+  })
+
   it('auflösen behält die Mitglieder', async () => {
     const { service, flows, bit, packet } = setup()
     const flow = await service.create({ bitIds: [1], packetIds: [10] }, 5)
