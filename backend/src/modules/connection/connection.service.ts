@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { BitConnection } from './connection.entity'
-import { CreateConnectionDto } from '../../dto/create-connection.dto'
+import { BitConnection } from './connection.entity.js'
+import { CreateConnectionDto } from '../../dto/create-connection.dto.js'
 
 @Injectable()
 export class ConnectionService {

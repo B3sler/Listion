@@ -1,10 +1,10 @@
 import { Controller, Post, Body, Res, UseGuards, Get, Req } from '@nestjs/common'
-import { Response, Request } from 'express'
+import type { Response, Request } from 'express'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 
-import { JwtAuthGuard } from './jwt-auth.guard'
-import { UserService } from './user.service'
+import { JwtAuthGuard } from './jwt-auth.guard.js'
+import { UserService } from './user.service.js'
 
 @Controller('auth')
 @Throttle({ default: { ttl: 60000, limit: 10 } })

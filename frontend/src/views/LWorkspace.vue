@@ -130,12 +130,12 @@ const handleTouchMoveWithLongPress = (event: TouchEvent) => {
   handleTouchMove(event)
 }
 
-const handleTouchEndWithLongPress = (event: TouchEvent) => {
+const handleTouchEndWithLongPress = () => {
   if (longPressTimer) {
     clearTimeout(longPressTimer)
     longPressTimer = null
   }
-  handleTouchEnd(event)
+  handleTouchEnd()
 }
 
 const SNAP_APPROACH = 80

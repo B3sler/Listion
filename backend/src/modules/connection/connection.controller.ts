@@ -1,10 +1,10 @@
 import { Controller, Get, Post, Body, Param, Delete, UseGuards, Req } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import { Request } from 'express'
-import { JwtAuthGuard } from '../user/jwt-auth.guard'
-import { ConnectionService } from './connection.service'
-import { CreateConnectionDto } from '../../dto/create-connection.dto'
-import { BitConnection } from './connection.entity'
+import type { Request } from 'express'
+import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
+import { ConnectionService } from './connection.service.js'
+import { CreateConnectionDto } from '../../dto/create-connection.dto.js'
+import { BitConnection } from './connection.entity.js'
 
 @ApiTags('Connection')
 @Controller('connection')

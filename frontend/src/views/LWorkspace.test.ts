@@ -1,7 +1,18 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import LWorkspace from './LWorkspace.vue'
+
+// Keine echten HTTP-Requests im Test: Stores laden Bits/Verbindungen über den API-Client.
+vi.mock('../helpers/api', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({ data: [] }),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    put: vi.fn().mockResolvedValue({ data: {} }),
+    delete: vi.fn().mockResolvedValue({ data: {} }),
+  },
+}))
 
 const router = createRouter({
   history: createWebHistory(),
@@ -15,7 +26,7 @@ describe('LWorkspace', () => {
   it('should render without crashing', async () => {
     const wrapper = mount(LWorkspace, {
       global: {
-        plugins: [router],
+        plugins: [router, createPinia()],
       },
     })
     await router.isReady()
@@ -25,7 +36,7 @@ describe('LWorkspace', () => {
   it('should display workspace text', async () => {
     const wrapper = mount(LWorkspace, {
       global: {
-        plugins: [router],
+        plugins: [router, createPinia()],
       },
     })
     await router.isReady()

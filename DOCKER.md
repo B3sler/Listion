@@ -172,7 +172,7 @@ Some environments may experience issues with npm install inside Alpine Linux con
    ```
    Then create a simpler Dockerfile that just copies the dist folders.
 
-3. **Alternative**: Use a different base image (e.g., `node:20` instead of `node:20-alpine`) in Dockerfiles, though this increases image size.
+3. **Alternative**: Use a different base image (e.g., `node:24` instead of `node:24-alpine`) in Dockerfiles, though this increases image size.
 
 ## Docker Services Overview
 
@@ -183,14 +183,14 @@ Some environments may experience issues with npm install inside Alpine Linux con
 - **Health Check**: Monitors database availability
 
 ### Backend (backend)
-- **Base**: Node.js 20 Alpine
+- **Base**: Node.js 24 Alpine
 - **Port**: 3000
 - **Development**: Hot-reload with ts-node-dev
 - **Production**: Compiled JavaScript with node
 - **Health Check**: HTTP check on /api endpoint
 
 ### Frontend (frontend)
-- **Base**: Node.js 20 Alpine (dev) / nginx Alpine (prod)
+- **Base**: Node.js 24 Alpine (dev) / nginx Alpine (prod)
 - **Port**: 5173 (dev) / 80 (prod)
 - **Development**: Vite dev server with hot-reload
 - **Production**: Static files served by nginx with API proxy

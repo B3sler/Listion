@@ -31,7 +31,7 @@ Note: This repository is under active development. Some features are planned or 
 ## Requirements ⚙️
 
 ### Local Development
-- Node.js 20+ (LTS recommended)
+- Node.js 22.22+ oder 24.15+ (LTS empfohlen)
 - npm 10+
 
 ### Docker Setup (Recommended)

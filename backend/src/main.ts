@@ -1,9 +1,9 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
-import { AppModule } from './app.module'
+import { AppModule } from './app.module.js'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
-import * as express from 'express'
+import express from 'express'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 

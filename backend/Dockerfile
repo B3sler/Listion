@@ -2,7 +2,7 @@
 # Multi-stage build for development and production
 
 # Base stage with common dependencies
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /app
 
 # Development stage
@@ -14,7 +14,7 @@ COPY frontend/package*.json ./frontend/
 RUN npm install
 ENV NODE_ENV=development
 EXPOSE 3000
-CMD ["sh", "-c", "cd /app/backend && npx ts-node-dev --poll --respawn --transpile-only src/main.ts"]
+CMD ["npm", "run", "dev", "--workspace", "backend"]
 
 # Builder stage for production
 FROM base AS builder

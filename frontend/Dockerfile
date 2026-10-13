@@ -2,7 +2,7 @@
 # Multi-stage build for development and production
 
 # Base stage with common dependencies
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /app
 
 # Development stage

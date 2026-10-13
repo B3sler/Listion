@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import { Request } from 'express'
-import { JwtAuthGuard } from '../user/jwt-auth.guard'
-import { BitService } from './bit.service'
-import { CreateBitDto } from '../../dto/create-bit.dto'
-import { UpdateBitDto } from '../../dto/update-bit.dto'
-import { Bit } from './bit.entity'
+import type { Request } from 'express'
+import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
+import { BitService } from './bit.service.js'
+import { CreateBitDto } from '../../dto/create-bit.dto.js'
+import { UpdateBitDto } from '../../dto/update-bit.dto.js'
+import { Bit } from './bit.entity.js'
 
 @ApiTags('Bit')
 @Controller('bit')

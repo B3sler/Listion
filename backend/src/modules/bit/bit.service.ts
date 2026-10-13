@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { Bit } from './bit.entity'
-import { CreateBitDto } from '../../dto/create-bit.dto'
-import { UpdateBitDto } from '../../dto/update-bit.dto'
+import { Bit } from './bit.entity.js'
+import { CreateBitDto } from '../../dto/create-bit.dto.js'
+import { UpdateBitDto } from '../../dto/update-bit.dto.js'
 
 @Injectable()
 export class BitService {
