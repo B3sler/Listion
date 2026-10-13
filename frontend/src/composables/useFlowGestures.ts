@@ -94,11 +94,16 @@ export function useFlowGestures(opts: FlowGestureOptions) {
       },
       async end(ev, moved, v) {
         const drag = bitDrag.value
-        if (!moved || !drag || ev.type === 'pointercancel') {
+        if (ev.type === 'pointercancel') {
           bitDrag.value = null
-          if (!moved) opts.onTapBit(bitId)
           return
         }
+        if (!moved) {
+          bitDrag.value = null
+          opts.onTapBit(bitId)
+          return
+        }
+        if (!drag) return
         if (!drag.target) {
           // free drop: the capsule glides on from where it was released (CSS spring)
           bitDrag.value = null
@@ -109,8 +114,11 @@ export function useFlowGestures(opts: FlowGestureOptions) {
           return
         }
         // snap drop: keep the floating capsule until the store has the new structure
-        await opts.onDropBit(bitId, drag.target, { x: drag.x, y: drag.y })
-        bitDrag.value = null
+        try {
+          await opts.onDropBit(bitId, drag.target, { x: drag.x, y: drag.y })
+        } finally {
+          bitDrag.value = null
+        }
       },
     })
   }
@@ -152,11 +160,12 @@ export function useFlowGestures(opts: FlowGestureOptions) {
         const p = opts.toCanvas(ev.clientX, ev.clientY)
         linkDrag.value = { from, x: p.x, y: p.y }
       },
-      end(ev) {
+      end(ev, moved) {
         linkDrag.value = null
-        if (ev.type === 'pointercancel') return
+        if (ev.type === 'pointercancel' || !moved) return
         const to = nodeAt(ev.clientX, ev.clientY)
-        if (to) opts.onCreateDependency(from, to)
+        if (!to || (to.type === from.type && to.id === from.id)) return
+        opts.onCreateDependency(from, to)
       },
     })
   }
