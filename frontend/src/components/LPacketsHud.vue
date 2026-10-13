@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { Pencil, TriangleAlert } from 'lucide-vue-next'
+import { TriangleAlert } from 'lucide-vue-next'
 import {
   Spring,
   VelocityTracker,
@@ -9,26 +9,14 @@ import {
   SPRING_DEFAULT,
   SPRING_MOMENTUM,
 } from '@/helpers/motion'
+import type { PacketCard } from '@/types/flow'
 
 const CARDS_PER_PAGE = 3
-
-interface PacketCard {
-  key: number
-  bitIds: number[]
-  index: number
-  total: number
-  done: number
-  inProgress: number
-  blocked: number
-  ready: number
-  cycles: number
-  percent: number
-}
 
 const props = defineProps<{ cards: PacketCard[] }>()
 
 const emit = defineEmits<{
-  highlight: [bitIds: number[]]
+  highlight: [packetId: number]
   unhighlight: []
 }>()
 
@@ -180,47 +168,9 @@ onUnmounted(() => {
   if (wheelIdleTimer) clearTimeout(wheelIdleTimer)
 })
 
-const STORAGE_KEY = 'listion-packet-names'
-const packetNames = ref<Record<number, string>>({})
-
 onMounted(() => {
   measurePageHeight()
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) packetNames.value = JSON.parse(raw)
-  } catch {
-    /* ignore */
-  }
 })
-
-function getPacketName(key: number, index: number): string {
-  return packetNames.value[key] ?? `Packet ${index}`
-}
-
-const editingKey = ref<number | null>(null)
-const editValue = ref('')
-const editInput = ref<HTMLInputElement | null>(null)
-
-async function startRename(key: number, index: number) {
-  editingKey.value = key
-  editValue.value = getPacketName(key, index)
-  await nextTick()
-  editInput.value?.select()
-}
-
-function commitRename() {
-  if (editingKey.value === null) return
-  const trimmed = editValue.value.trim()
-  if (trimmed) {
-    packetNames.value = { ...packetNames.value, [editingKey.value]: trimmed }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(packetNames.value))
-  }
-  editingKey.value = null
-}
-
-function cancelRename() {
-  editingKey.value = null
-}
 
 const highlightedKey = ref<number | null>(null)
 
@@ -230,7 +180,7 @@ function toggleHighlight(card: PacketCard) {
     emit('unhighlight')
   } else {
     highlightedKey.value = card.key
-    emit('highlight', card.bitIds)
+    emit('highlight', card.key)
   }
 }
 </script>
@@ -286,28 +236,9 @@ function toggleHighlight(card: PacketCard) {
               :class="{ 'packet-card--highlighted': highlightedKey === card.key }"
             >
               <div class="packet-card__header">
-                <template v-if="editingKey === card.key">
-                  <input
-                    ref="editInput"
-                    v-model="editValue"
-                    class="packet-name-input"
-                    maxlength="32"
-                    @keydown.enter.prevent="commitRename"
-                    @keydown.escape.prevent="cancelRename"
-                    @blur="commitRename"
-                    @pointerdown.stop
-                  />
-                </template>
-                <template v-else>
-                  <button
-                    class="packet-name"
-                    @click="startRename(card.key, card.index)"
-                    @pointerdown.stop
-                  >
-                    <span class="packet-name__text">{{ getPacketName(card.key, card.index) }}</span>
-                    <Pencil :size="10" class="edit-icon" />
-                  </button>
-                </template>
+                <button class="packet-name" @click="toggleHighlight(card)" @pointerdown.stop>
+                  <span class="packet-name__text">{{ card.name }}</span>
+                </button>
 
                 <div class="card-actions">
                   <button
@@ -571,32 +502,6 @@ function toggleHighlight(card: PacketCard) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.edit-icon {
-  opacity: 0;
-  flex-shrink: 0;
-  color: var(--text2);
-  transition: opacity 0.15s ease;
-}
-
-.packet-name:hover .edit-icon,
-.packet-name:focus-visible .edit-icon {
-  opacity: 0.8;
-}
-
-.packet-name-input {
-  flex: 1;
-  min-width: 0;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text0);
-  background: var(--surface1);
-  border: 1px solid var(--brand);
-  border-radius: 6px;
-  padding: 2px 6px;
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent);
 }
 
 .card-actions {
