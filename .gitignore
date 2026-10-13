@@ -11,6 +11,7 @@ lerna-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+.claude/
 
 # Node
 node_modules/

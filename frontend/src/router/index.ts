@@ -1,13 +1,51 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import AboutView from '../views/AboutView.vue'
+import LWorkspace from '@/views/LWorkspace.vue'
+import LLandingPage from '@/views/LLandingPage.vue'
+import LLogin from '@/views/user/LLogin.vue'
+import LRegister from '@/views/user/LRegister.vue'
+import { useUserStore } from '@/stores/userStore'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'home', component: HomeView },
-    { path: '/about', name: 'about', component: AboutView },
+    {
+      path: '/login',
+      name: 'login',
+      component: LLogin,
+      children: [],
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: LRegister,
+      children: [],
+    },
+    {
+      path: '/',
+      name: 'Home',
+      component: LLandingPage,
+      children: [],
+    },
+    {
+      path: '/workspace',
+      name: 'workspace',
+      component: LWorkspace,
+      children: [],
+    },
   ],
+})
+
+router.beforeEach(async (to, from, next) => {
+  const userStore = useUserStore()
+  const protectedRoutes = ['/workspace']
+  if (protectedRoutes.includes(to.path)) {
+    await userStore.checkAuth()
+    if (!userStore.isAuthenticated) {
+      next('/')
+      return
+    }
+  }
+  next()
 })
 
 export default router

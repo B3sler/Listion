@@ -1,19 +1,34 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
-import { Logger } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { AppModule } from './app.module.js'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import express from 'express'
+import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
 
 async function bootstrap() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not set (see backend/.env.example)')
+  }
+
   const app = await NestFactory.create(AppModule)
 
-  app.enableCors({ origin: true, credentials: true })
+  app.use(helmet())
+  app.use(cookieParser())
+  app.use(express.json())
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    credentials: true,
+  })
   app.setGlobalPrefix('api')
+  // whitelist entfernt unbekannte Felder (z.B. id/user) aus Request-Bodies
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
 
   // Swagger Setup
   const config = new DocumentBuilder()
     .setTitle('Listion API')
-    .setDescription('OpenAPI-Dokumentation für das Listion Backend')
+    .setDescription('OpenAPI documentation for the Listion Backend')
     .setVersion('1.0.0')
     .addBearerAuth()
     .build()
@@ -25,7 +40,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ? Number(process.env.PORT) : 3000
   await app.listen(port)
-  Logger.log(`Backend läuft auf http://localhost:${port}`, 'Bootstrap')
+  Logger.log(`Backend running on http://localhost:${port}`, 'Bootstrap')
   Logger.log(`Swagger UI:       http://localhost:${port}/api/docs`, 'Swagger')
 }
 

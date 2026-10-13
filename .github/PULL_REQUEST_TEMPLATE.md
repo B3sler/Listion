@@ -1,9 +1,11 @@
 <!-- Please read CONTRIBUTING.md before submitting. Provide a clear, focused PR. -->
 
 ## Summary 📝
+
 Brief description of the changes and the motivation.
 
 ## Type of change 🔧
+
 - [ ] Feature
 - [ ] Bug fix
 - [ ] Refactor
@@ -12,10 +14,11 @@ Brief description of the changes and the motivation.
 - [ ] Chore
 
 ## Linked issues 🔗
-Closes #
-Related #
+
+Closes # Related #
 
 ## Test plan 🧪
+
 Describe how reviewers can verify the change locally. Include steps and commands.
 
 ```bash
@@ -37,29 +40,35 @@ npm run --workspace backend build
 ```
 
 Steps to validate:
+
 1. ...
 2. ...
 3. ...
 
 ## Screenshots / Recordings (optional) 📸
+
 Add visuals or terminal output that help review the change.
 
 ## Breaking changes ⚠️
-- [ ] This PR introduces breaking changes
-If yes, describe the impact and provide migration steps:
+
+- [ ] This PR introduces breaking changes If yes, describe the impact and provide migration steps:
 - Impact:
 - Migration:
 
 ## Security considerations 🔐
+
 Note any security-relevant changes (auth, permissions, sensitive data, dependencies).
 
 ## API changes 📡
+
 List any new/changed/removed endpoints and update Swagger annotations if applicable.
 
 ## Deployment notes (optional) 🚀
+
 Any special rollout or config changes (env vars, secrets, migrations)?
 
 ## Checklist ✅
+
 - [ ] Tests added/updated
 - [ ] Linting and type-check pass locally (`npm run lint`, `npm run type-check`)
 - [ ] Builds succeed for changed workspaces

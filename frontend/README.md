@@ -1,45 +1,51 @@
-# frontend
+<img src="./public/listion/listion_written_light.svg" alt="Listion Frontend" height="120" />
 
-This template should help get you started developing with Vue 3 in Vite.
+# Listion Frontend
 
-## Recommended IDE Setup
+The frontend of Listion is a modern, workspace-based todo app focused on flow, clarity, and visual planning.
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Features ✨
 
-## Type Support for `.vue` Imports in TS
+- Drag & drop for tasks and groups
+- Visual task sizing for quick effort estimation
+- Timeline planning and filters
+- Modern UI with dark/light theme
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+## Tech Stack 🛠️
 
-## Customize configuration
+- Vue 3, TypeScript, Vite
+- Pinia, Vue Router
+- Tailwind CSS
+- Vitest for testing
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## Requirements ⚙️
 
-## Project Setup
+- Node.js 20+
+- npm 10+
 
-```sh
+## Quickstart 🚀
+
+```bash
+# Install dependencies
 npm install
-```
 
-### Compile and Hot-Reload for Development
-
-```sh
+# Start development server
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+## Scripts 🔧
 
-```sh
-npm run build
-```
+- `npm run dev` – Vite dev server
+- `npm run build` – Build for production
+- `npm run test:unit` – Unit tests with Vitest
+- `npm run lint` – Linting with ESLint
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+## Development Tips
 
-```sh
-npm run test:unit
-```
+- Recommended IDE: IntelliJ Ultimate or WebStorm
+- Type checking: `vue-tsc`
+- Configuration: see [Vite documentation](https://vite.dev/config/)
 
-### Lint with [ESLint](https://eslint.org/)
+---
 
-```sh
-npm run lint
-```
+For more information and the full project, see the [root README](../README.md)
