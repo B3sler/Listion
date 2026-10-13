@@ -63,7 +63,7 @@ function commitRename() {
     :style="{ transform: `translate3d(${x}px, ${y}px, 0)`, height: `${geometry.height}px` }"
     data-node-type="packet"
     :data-node-id="packet.id"
-    @mousedown.stop
+    @mousedown.left.exact.stop
   >
     <div class="stack__head" @pointerdown="emit('headerPointerdown', $event)">
       <input
@@ -85,7 +85,7 @@ function commitRename() {
         tabindex="-1"
         aria-label="Draw a dependency from this packet"
         @pointerdown.stop.prevent="emit('linkstart', $event, { type: 'packet', id: packet.id })"
-        @mousedown.stop
+        @mousedown.left.exact.stop
       />
     </div>
     <div class="stack__bar">

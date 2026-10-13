@@ -66,7 +66,7 @@ function onDeleteKey(e: KeyboardEvent, id: number) {
         aria-label="Dependency, select"
         @click.stop="emit('select', item.id)"
         @keydown="onArrowKey($event, item.id)"
-        @mousedown.stop
+        @mousedown.left.exact.stop
       />
       <g
         v-if="selectedId === item.id"
@@ -77,7 +77,7 @@ function onDeleteKey(e: KeyboardEvent, id: number) {
         :transform="`translate(${item.mx},${item.my})`"
         @click.stop="emit('remove', item.id)"
         @keydown="onDeleteKey($event, item.id)"
-        @mousedown.stop
+        @mousedown.left.exact.stop
       >
         <circle r="12" class="dep__delete-bg" />
         <line x1="-4" y1="-4" x2="4" y2="4" />

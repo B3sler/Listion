@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Fullscreen, ScanSearch, ZoomIn, ZoomOut } from 'lucide-vue-next'
 import LContextMenu from '@/components/LContextMenu.vue'
 import LBitPanel from '@/components/LBitPanel.vue'
@@ -185,6 +185,16 @@ const packetCards = computed<PacketCard[]>(() =>
       ...flow.value.packetSummary.get(p.id)!,
     })),
 )
+
+// The highlight dims everything else, so it must not outlive its packet
+watch(packetCards, (cards) => {
+  if (
+    highlightedPacketId.value !== null &&
+    !cards.some((c) => c.key === highlightedPacketId.value)
+  ) {
+    highlightedPacketId.value = null
+  }
+})
 
 function focusPacket(id: number) {
   highlightedPacketId.value = id

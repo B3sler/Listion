@@ -174,6 +174,16 @@ onMounted(() => {
 
 const highlightedKey = ref<number | null>(null)
 
+// A highlight cannot outlive its packet: once the card is gone, nothing could clear it
+watch(
+  () => props.cards,
+  (cards) => {
+    if (highlightedKey.value !== null && !cards.some((c) => c.key === highlightedKey.value)) {
+      highlightedKey.value = null
+    }
+  },
+)
+
 function toggleHighlight(card: PacketCard) {
   if (highlightedKey.value === card.key) {
     highlightedKey.value = null

@@ -74,7 +74,7 @@ const ariaLabel = computed(() => {
     :aria-label="ariaLabel"
     :aria-expanded="expanded"
     @pointerdown="emit('pointerdown', $event)"
-    @mousedown.stop
+    @mousedown.left.exact.stop
     @dblclick.stop="emit('open')"
     @keydown.enter.prevent="emit('open')"
   >
@@ -94,7 +94,7 @@ const ariaLabel = computed(() => {
       tabindex="-1"
       aria-label="Draw a dependency from this bit"
       @pointerdown.stop.prevent="emit('linkstart', $event)"
-      @mousedown.stop
+      @mousedown.left.exact.stop
     />
   </div>
 </template>
