@@ -16,6 +16,8 @@ import { Packet } from './modules/packet/packet.entity.js'
 import { PacketService } from './modules/packet/packet.service.js'
 import { PacketController } from './modules/packet/packet.controller.js'
 import { Flow } from './modules/flow/flow.entity.js'
+import { FlowService } from './modules/flow/flow.service.js'
+import { FlowController } from './modules/flow/flow.controller.js'
 import { Dependency } from './modules/dependency/dependency.entity.js'
 import { DependencyService } from './modules/dependency/dependency.service.js'
 import { DependencyController } from './modules/dependency/dependency.controller.js'
@@ -45,6 +47,7 @@ import { DependencyController } from './modules/dependency/dependency.controller
     AuthController,
     BitController,
     PacketController,
+    FlowController,
     DependencyController,
   ],
   providers: [
@@ -52,6 +55,7 @@ import { DependencyController } from './modules/dependency/dependency.controller
     UserService,
     BitService,
     PacketService,
+    FlowService,
     DependencyService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
