@@ -16,8 +16,8 @@ const router = createRouter({
               </div>
             </div>
           </div>
-        `
-      }
+        `,
+      },
     },
     {
       path: '/about',
@@ -34,10 +34,10 @@ const router = createRouter({
               </div>
             </div>
           </div>
-        `
-      }
-    }
-  ]
+        `,
+      },
+    },
+  ],
 })
 
 export default router
