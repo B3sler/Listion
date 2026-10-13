@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { NotFoundException } from '@nestjs/common'
 import { FakeRepository } from '../../testing/fake-repository.js'
 import { BitService } from './bit.service.js'
 import { PacketService } from '../packet/packet.service.js'
@@ -36,6 +37,19 @@ describe('BitService', () => {
     const { service, packet, member } = await setup()
     await service.update(3, 5, { packetId: packet.id, title: 'neu' })
     expect(member(3)).toMatchObject({ packetId: packet.id, order: 2, title: 'neu' })
+  })
+
+  it('lehnt ein fremdes oder unbekanntes Packet ab, ohne Felder des Bits zu speichern', async () => {
+    const { service, packets, member } = await setup()
+    const foreign = await packets.save({ user: 6, name: 'fremd', x: 0, y: 0 })
+    await expect(service.update(1, 5, { title: 'x', packetId: foreign.id })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(member(1)?.title).toBe('t')
+    await expect(service.update(1, 5, { title: 'x', packetId: 999 })).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
+    expect(member(1)?.title).toBe('t')
   })
 
   it('remove löscht Abhängigkeiten des Bits und löst das Packet auf', async () => {

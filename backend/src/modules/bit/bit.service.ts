@@ -35,6 +35,7 @@ export class BitService {
   async update(id: number, userId: number, updateBitDto: UpdateBitDto): Promise<Bit> {
     await this.findOne(id, userId) // throws 404 if not found or not owned
     const { packetId, ...fields } = updateBitDto
+    if (typeof packetId === 'number') await this.packetService.findOne(packetId, userId) // validate before any write
     if (Object.keys(fields).length > 0) {
       await this.bitRepository.update({ id, user: userId }, fields)
     }
