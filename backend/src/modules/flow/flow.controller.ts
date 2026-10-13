@@ -22,7 +22,7 @@ import { UpdateFlowDto } from '../../dto/update-flow.dto.js'
 @ApiTags('Flow')
 @Controller('flow')
 @UseGuards(JwtAuthGuard)
-// same canvas burst budget as the other flow controllers
+// same canvas burst budget as the packet controller
 @Throttle({ default: { limit: 300, ttl: 60000 } })
 export class FlowController {
   constructor(private readonly flowService: FlowService) {}
