@@ -202,7 +202,8 @@ function focusPacket(id: number) {
   const el = containerRef.value
   if (!rect || !el) return
   const { width, height } = el.getBoundingClientRect()
-  const z = zoom.value
+  // zoom in to the stack when the canvas is zoomed out, keep a closer zoom as is
+  const z = Math.min(3, Math.max(zoom.value, 1))
   animateView(z, width / 2 - (rect.x + rect.w / 2) * z, height / 2 - (rect.y + rect.h / 2) * z)
 }
 
