@@ -77,6 +77,19 @@ describe('Request-Validierung', () => {
     expect(await validate(UpdatePacketDto, { flowId: 3 })).toEqual({ flowId: 3 })
   })
 
+  it('lehnt null für Flow-Name und -Farbe ab, fehlende Felder bleiben optional', async () => {
+    await expect(validate(UpdateFlowDto, { name: null })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    await expect(validate(UpdateFlowDto, { color: null })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    await expect(
+      validate(CreateFlowDto, { bitIds: [1], packetIds: [], name: null }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+    expect(await validate(UpdateFlowDto, {})).toEqual({})
+  })
+
   it('lehnt ungültige Werte ab', async () => {
     await expect(validate(CreateBitDto, { title: '' })).rejects.toBeInstanceOf(BadRequestException)
     await expect(validate(CreateBitDto, { title: 'x', color: 'red' })).rejects.toBeInstanceOf(
