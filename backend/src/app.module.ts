@@ -15,6 +15,7 @@ import { BitController } from './modules/bit/bit.controller.js'
 import { Packet } from './modules/packet/packet.entity.js'
 import { PacketService } from './modules/packet/packet.service.js'
 import { PacketController } from './modules/packet/packet.controller.js'
+import { Flow } from './modules/flow/flow.entity.js'
 import { Dependency } from './modules/dependency/dependency.entity.js'
 import { DependencyService } from './modules/dependency/dependency.service.js'
 import { DependencyController } from './modules/dependency/dependency.controller.js'
@@ -30,10 +31,10 @@ import { DependencyController } from './modules/dependency/dependency.controller
       username: process.env.DB_USER || 'listion',
       password: process.env.DB_PASS,
       database: process.env.DB_NAME || 'listion',
-      entities: [User, Bit, Packet, Dependency],
+      entities: [User, Bit, Packet, Flow, Dependency],
       synchronize: process.env.NODE_ENV !== 'production',
     }),
-    TypeOrmModule.forFeature([User, Bit, Packet, Dependency]),
+    TypeOrmModule.forFeature([User, Bit, Packet, Flow, Dependency]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '1d' },

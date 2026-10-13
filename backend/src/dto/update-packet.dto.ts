@@ -18,4 +18,9 @@ export class UpdatePacketDto {
   @IsOptional()
   @IsInt()
   y?: number
+
+  @ApiProperty({ example: 2, required: false, nullable: true })
+  @IsOptional()
+  @IsInt()
+  flowId?: number | null
 }

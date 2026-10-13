@@ -44,4 +44,8 @@ export class Bit {
   // "order" is an SQL keyword, so the column gets an explicit name
   @Column({ name: 'stepOrder', type: 'int', default: 0 })
   order!: number
+
+  // only loose bits carry a flow; bits inside a packet belong to it through their packet
+  @Column({ type: 'int', nullable: true })
+  flowId?: number | null
 }

@@ -22,6 +22,10 @@ export class Packet {
   @Column({ type: 'int', default: 0 })
   y!: number
 
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: 'int', nullable: true })
+  flowId?: number | null
+
   @CreateDateColumn({ type: 'timestamp' })
   createdAt!: Date
 }

@@ -180,6 +180,15 @@ DROP TABLE IF EXISTS "bit_connection";
 
 Note: dropping `bit_connection` discards all old bit-to-bit connections. This is by design, they are replaced by dependencies.
 
+### Taskbar tools (flows)
+
+```sql
+CREATE TABLE "flow" ("id" SERIAL PRIMARY KEY, "user" integer NOT NULL, "name" varchar(60) NOT NULL,
+  "color" varchar(7) NOT NULL DEFAULT '#818cf8', "createdAt" TIMESTAMP NOT NULL DEFAULT now());
+ALTER TABLE "bit" ADD COLUMN "flowId" integer NULL;
+ALTER TABLE "packet" ADD COLUMN "flowId" integer NULL;
+```
+
 ### Stop Production Environment
 
 ```bash
