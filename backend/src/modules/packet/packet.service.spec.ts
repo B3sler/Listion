@@ -5,6 +5,7 @@ import { PacketService } from './packet.service.js'
 import type { Packet } from './packet.entity.js'
 import type { Bit } from '../bit/bit.entity.js'
 import type { Dependency } from '../dependency/dependency.entity.js'
+import type { Flow } from '../flow/flow.entity.js'
 
 function setup() {
   const bits = new FakeRepository<Bit>(
@@ -15,13 +16,14 @@ function setup() {
       { id: 4, user: 5 },
       { id: 9, user: 6 },
     ],
-    { packetId: null, order: 0, status: 0, title: 't' } as Partial<Bit>,
+    { packetId: null, order: 0, status: 0, title: 't', flowId: null } as Partial<Bit>,
   )
   const packets = new FakeRepository<Packet>()
   const deps = new FakeRepository<Dependency>()
-  const service = new PacketService(packets.asRepo(), bits.asRepo(), deps.asRepo())
+  const flows = new FakeRepository<Flow>()
+  const service = new PacketService(packets.asRepo(), bits.asRepo(), deps.asRepo(), flows.asRepo())
   const member = (id: number) => bits.rows.find((b) => b.id === id)!
-  return { service, bits, packets, deps, member }
+  return { service, bits, packets, deps, flows, member }
 }
 
 describe('PacketService', () => {
@@ -112,5 +114,39 @@ describe('PacketService', () => {
     await service.attachBit(3, p.id, 5)
     expect(deps.rows).toHaveLength(1)
     expect(deps.rows[0]).toMatchObject({ toId: 4 })
+  })
+
+  it('ein Bit, das einem Stapel beitritt, verliert seinen Flow; ein leerer Flow verschwindet', async () => {
+    const { service, flows, member } = setup()
+    flows.rows.push({ id: 70, user: 5, name: 'F', color: '#818cf8', createdAt: new Date() })
+    member(1).flowId = 70
+    await service.create({ x: 0, y: 0, bitIds: [1, 2] }, 5)
+    expect(member(1).flowId).toBeNull()
+    expect(flows.rows).toHaveLength(0)
+  })
+
+  it('beim Auflösen eines Stapels erben die Bits seinen Flow', async () => {
+    const { service, packets, flows, member } = setup()
+    flows.rows.push({ id: 70, user: 5, name: 'F', color: '#818cf8', createdAt: new Date() })
+    const p = await service.create({ x: 0, y: 0, bitIds: [1, 2] }, 5)
+    packets.rows.find((r) => r.id === p.id)!.flowId = 70
+    await service.detachBit(1, 5) // leaves only bit 2 → dissolve
+    expect(member(2).flowId).toBe(70)
+    expect(flows.rows.map((f) => f.id)).toEqual([70])
+  })
+
+  it('update setzt flowId nur auf eigene Flows und räumt den alten Flow auf', async () => {
+    const { service, packets, flows } = setup()
+    flows.rows.push(
+      { id: 70, user: 5, name: 'A', color: '#818cf8', createdAt: new Date() },
+      { id: 71, user: 5, name: 'B', color: '#818cf8', createdAt: new Date() },
+      { id: 80, user: 6, name: 'X', color: '#818cf8', createdAt: new Date() },
+    )
+    const p = await service.create({ x: 0, y: 0, bitIds: [1, 2] }, 5)
+    packets.rows.find((r) => r.id === p.id)!.flowId = 70
+    await expect(service.update(p.id, 5, { flowId: 80 })).rejects.toBeInstanceOf(NotFoundException)
+    await service.update(p.id, 5, { flowId: 71 })
+    expect(packets.rows.find((r) => r.id === p.id)!.flowId).toBe(71)
+    expect(flows.rows.map((f) => f.id)).toEqual([71, 80])
   })
 })
