@@ -11,7 +11,7 @@ Thanks for your interest in improving Listion. Please follow these guidelines to
   ```
 
 ## Local setup
-- Requirements: Node.js 20+ and npm 10+
+- Requirements: Node.js 22.22+ (oder 24.15+) und npm 10+
 - Install dependencies at the repo root:
   ```bash
   npm install
