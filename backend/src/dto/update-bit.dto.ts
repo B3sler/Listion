@@ -1,42 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger'
+import { PartialType } from '@nestjs/swagger'
+import { CreateBitDto } from './create-bit.dto.js'
 
-export class UpdateBitDto {
-  @ApiProperty({
-    example: 'Go shopping',
-    description: 'Short text describing the bit (task)',
-    required: false,
-  })
-  title?: string
-
-  @ApiProperty({
-    example: 1,
-    description: 'Status: 0=open, 1=in progress, 2=done',
-    required: false,
-  })
-  status?: number
-
-  @ApiProperty({
-    example: '2025-10-20T12:00:00',
-    description: 'Deadline for completion',
-    required: false,
-  })
-  dueDate?: Date
-
-  @ApiProperty({ example: 2, description: 'Priority: 1=low, 2=medium, 3=high', required: false })
-  priority?: number
-
-  @ApiProperty({ example: 'Milk, bread, eggs', description: 'Notes for the task', required: false })
-  notes?: string
-
-  @ApiProperty({ example: 5, description: 'X Coordinate of Bit', required: false })
-  x?: number
-
-  @ApiProperty({ example: 2, description: 'X Coordinate of Bit', required: false })
-  y?: number
-
-  @ApiProperty({ example: 1, description: 'Bit workspace', required: false })
-  workspace?: number
-
-  @ApiProperty({ example: '#6366f1', description: 'Hex color of the bit (#rrggbb)', required: false })
-  color?: string
-}
+export class UpdateBitDto extends PartialType(CreateBitDto) {}

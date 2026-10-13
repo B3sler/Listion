@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Delete, UseGuards, Req, ParseIntPipe } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
@@ -31,7 +31,7 @@ export class ConnectionController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a connection' })
   @ApiResponse({ status: 200 })
-  async remove(@Param('id') id: number, @Req() req: Request) {
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const userId = (req as any).user.sub as number
     await this.connectionService.remove(id, userId)
     return { message: 'Deleted' }

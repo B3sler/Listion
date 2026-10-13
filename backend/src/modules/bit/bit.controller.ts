@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req, ParseIntPipe } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
@@ -24,7 +24,7 @@ export class BitController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a single bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
-  findOne(@Param('id') id: number, @Req() req: Request) {
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const userId = (req as any).user.sub as number
     return this.bitService.findOne(id, userId)
   }
@@ -40,7 +40,7 @@ export class BitController {
   @Put(':id')
   @ApiOperation({ summary: 'Update a bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
-  update(@Param('id') id: number, @Body() updateBitDto: UpdateBitDto, @Req() req: Request) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateBitDto: UpdateBitDto, @Req() req: Request) {
     const userId = (req as any).user.sub as number
     return this.bitService.update(id, userId, updateBitDto)
   }
@@ -48,7 +48,7 @@ export class BitController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a bit (task)' })
   @ApiResponse({ status: 204 })
-  async remove(@Param('id') id: number, @Req() req: Request) {
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const userId = (req as any).user.sub as number
     await this.bitService.remove(id, userId)
     return { message: 'Deleted' }

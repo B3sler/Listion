@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
-import { Logger } from '@nestjs/common'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { AppModule } from './app.module.js'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import express from 'express'
@@ -8,6 +8,10 @@ import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 
 async function bootstrap() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not set (see backend/.env.example)')
+  }
+
   const app = await NestFactory.create(AppModule)
 
   app.use(helmet())
@@ -18,6 +22,8 @@ async function bootstrap() {
     credentials: true,
   })
   app.setGlobalPrefix('api')
+  // whitelist entfernt unbekannte Felder (z.B. id/user) aus Request-Bodies
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
 
   // Swagger Setup
   const config = new DocumentBuilder()

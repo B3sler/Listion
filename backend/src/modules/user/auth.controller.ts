@@ -5,6 +5,14 @@ import { Throttle } from '@nestjs/throttler'
 
 import { JwtAuthGuard } from './jwt-auth.guard.js'
 import { UserService } from './user.service.js'
+import { LoginDto, RegisterDto } from '../../dto/auth.dto.js'
+
+const COOKIE_NAME = 'access_token'
+const cookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+})
 
 @Controller('auth')
 @Throttle({ default: { ttl: 60000, limit: 10 } })
@@ -16,37 +24,27 @@ export class AuthController {
 
   @Post('register')
   async register(
-    @Body() body: { email: string; password: string; name: string },
+    @Body() body: RegisterDto,
     @Res() res: Response,
   ) {
     const existing = await this.userService.findByEmail(body.email)
     if (existing) {
-      return res.status(400).json({ message: 'E-Mail already registered.' })
+      return res.status(400).json({ message: 'Email already registered.' })
     }
     const user = await this.userService.create(body.email, body.password, body.name)
     const token = this.jwtService.sign({ sub: user.id, email: user.email })
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24, // 1 Tag
-    })
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: 1000 * 60 * 60 * 24 }) // 1 Tag
     return res.json({ user: { id: user.id, email: user.email, name: user.name } })
   }
 
   @Post('login')
-  async login(@Body() body: { email: string; password: string }, @Res() res: Response) {
+  async login(@Body() body: LoginDto, @Res() res: Response) {
     const user = await this.userService.validateUser(body.email, body.password)
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials.' })
     }
     const token = this.jwtService.sign({ sub: user.id, email: user.email })
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24, // 1 Tag
-    })
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: 1000 * 60 * 60 * 24 }) // 1 Tag
     return res.json({ user: { id: user.id, email: user.email, name: user.name } })
   }
 
@@ -66,12 +64,7 @@ export class AuthController {
 
   @Post('logout')
   async logout(@Res() res: Response) {
-    res.cookie('access_token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 0,
-    })
+    res.clearCookie(COOKIE_NAME, cookieOptions())
     return res.json({ message: 'Logged out successfully' })
   }
 }
