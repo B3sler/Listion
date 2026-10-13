@@ -53,7 +53,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="menuRef" class="fixed top-3 right-4 z-[9999]">
     <button
-      class="menu-btn"
+      class="menu-btn material--thin pressable"
       type="button"
       :aria-expanded="isOpen"
       aria-label="Menü öffnen"
@@ -67,7 +67,7 @@ onBeforeUnmount(() => {
     </button>
 
     <Transition name="dropdown">
-      <div v-if="isOpen" class="dropdown" role="menu">
+      <div v-if="isOpen" class="dropdown material" role="menu">
         <div class="dropdown__header">
           <div class="avatar">{{ initials }}</div>
           <span class="dropdown__name">{{ displayName }}</span>
@@ -97,6 +97,8 @@ onBeforeUnmount(() => {
             {{ isDark ? 'Dark mode' : 'Light mode' }}
           </button>
 
+          <div class="dropdown__sep" />
+
           <button class="menu-item" type="button" role="menuitem" @click="handleLogout">
             <LogOut :size="15" class="shrink-0" />
             Logout
@@ -115,23 +117,19 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  background-color: var(--surface2);
-  border: 1px solid var(--surface3);
+  border-radius: 18px;
+  border: 1px solid var(--material-stroke);
   cursor: pointer;
-  transition:
-    background-color 0.2s,
-    border-color 0.2s;
 }
 
 .menu-btn:hover {
-  background-color: var(--surface3);
+  background-color: var(--material-regular);
 }
 
 /* ── Hamburger icon ─────────────────────────────────────── */
 .menu__icon {
-  width: 18px;
-  height: 12px;
+  width: 16px;
+  height: 11px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -140,26 +138,26 @@ onBeforeUnmount(() => {
 .menu__bar {
   display: block;
   width: 100%;
-  height: 2px;
+  height: 1.75px;
   border-radius: 2px;
   background-color: var(--text1);
   transform-origin: center;
   transition:
-    transform 0.3s ease,
-    opacity 0.3s ease;
+    transform var(--spring-duration) var(--ease-spring),
+    opacity 0.2s ease;
 }
 
 .menu__bar--top-open {
-  transform: translateY(5px) rotate(45deg);
+  transform: translateY(4.6px) rotate(45deg);
 }
 
 .menu__bar--mid-open {
   opacity: 0;
-  transform: scaleX(0);
+  transform: scaleX(0.2);
 }
 
 .menu__bar--bot-open {
-  transform: translateY(-5px) rotate(-45deg);
+  transform: translateY(-4.6px) rotate(-45deg);
 }
 
 /* ── Dropdown panel ─────────────────────────────────────── */
@@ -167,35 +165,38 @@ onBeforeUnmount(() => {
   position: absolute;
   right: 0;
   margin-top: 8px;
-  width: 220px;
-  border-radius: 12px;
-  background-color: var(--surface2);
-  border: 1px solid var(--surface3);
-  box-shadow:
-    0 4px 6px -1px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.05)),
-    0 10px 15px -3px hsl(var(--surface-shadow) / var(--shadow-strength));
+  width: 232px;
+  border-radius: 16px;
   overflow: hidden;
+  /* anchored to the trigger: grows out of the button, not from its own centre */
+  transform-origin: top right;
 }
 
 .dropdown__header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--surface3);
+  padding: 14px 14px 10px;
 }
 
 .dropdown__name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text1);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text0);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .dropdown__body {
-  padding: 6px;
+  padding: 4px 6px 6px;
+}
+
+.dropdown__sep {
+  height: 1px;
+  margin: 4px 10px;
+  background: var(--separator);
 }
 
 /* ── Avatar ─────────────────────────────────────────────── */
@@ -204,11 +205,11 @@ onBeforeUnmount(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: var(--brand);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 75%, white), var(--brand));
   color: hsl(0 0% 100%);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -218,20 +219,27 @@ onBeforeUnmount(() => {
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 0.875rem;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
   color: var(--text1);
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color 0.12s ease;
   text-align: left;
 }
 
 .menu-item:hover {
-  background-color: var(--surface3);
+  background-color: var(--fill-hover);
   color: var(--text0);
+}
+
+/* highlight lands on press, instantly */
+.menu-item:active {
+  background-color: var(--fill-press);
+  transition: none;
 }
 
 /* ── Theme toggle ───────────────────────────────────────── */
@@ -244,23 +252,24 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   width: 48px;
-  height: 24px;
+  height: 26px;
   border-radius: 999px;
-  background-color: var(--surface3);
-  border: 1px solid var(--surface3);
+  background-color: var(--fill-press);
   flex-shrink: 0;
   order: -1;
+  transition: background-color 0.3s ease;
 }
 
 .theme-toggle__icon {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
+  z-index: 1;
   transition:
     color 0.2s ease,
     opacity 0.2s ease;
   color: var(--text2);
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .theme-toggle__icon--sun {
@@ -280,28 +289,47 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 2px;
   top: 2px;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background-color: var(--text1);
-  transition: transform 0.25s ease;
+  background-color: var(--surface1);
+  box-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.15),
+    0 2px 6px hsl(0 0% 0% / 0.12);
+  /* a toggle the user flicks may overshoot a touch */
+  transition: transform var(--spring-duration) var(--ease-spring-bounce);
 }
 
 .theme-toggle__pill--dark {
-  transform: translateX(24px);
+  transform: translateX(22px);
 }
 
-/* ── Dropdown transition ────────────────────────────────── */
-.dropdown-enter-active,
+/* ── Dropdown transition: materialize (scale + blur + opacity together) ── */
+.dropdown-enter-active {
+  transition:
+    opacity 0.18s ease,
+    transform var(--spring-duration) var(--ease-spring),
+    filter 0.25s ease;
+}
 .dropdown-leave-active {
   transition:
     opacity 0.15s ease,
-    transform 0.15s ease;
+    transform 0.2s ease,
+    filter 0.15s ease;
 }
 
 .dropdown-enter-from,
 .dropdown-leave-to {
   opacity: 0;
-  transform: translateY(-6px) scale(0.97);
+  transform: scale(0.9);
+  filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-enter-from,
+  .dropdown-leave-to {
+    transform: none;
+    filter: none;
+  }
 }
 </style>

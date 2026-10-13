@@ -35,6 +35,7 @@ const {
   handleTouchStart,
   handleTouchMove,
   handleTouchEnd,
+  animateView,
 } = useCanvas(containerRef)
 
 const bitStore = useBitStore()
@@ -57,9 +58,7 @@ function resetViewToBits() {
   const bitsWithPos = bitStore.bits.filter((b) => b.x != null && b.y != null)
 
   if (bitsWithPos.length === 0) {
-    zoom.value = 1
-    panX.value = 0
-    panY.value = 0
+    animateView(1, 0, 0)
     return
   }
 
@@ -84,9 +83,7 @@ function resetViewToBits() {
     ),
   )
 
-  zoom.value = newZoom
-  panX.value = width / 2 - cx * newZoom
-  panY.value = height / 2 - cy * newZoom
+  animateView(newZoom, width / 2 - cx * newZoom, height / 2 - cy * newZoom)
 }
 
 const handleContextMenu = (event: MouseEvent) => {
@@ -422,6 +419,7 @@ async function deleteSelectedConnection() {
 
 function onWorkspaceMouseDown(e: MouseEvent) {
   selectedConnectionId.value = null
+  showControls.value = false
   handleMouseDown(e)
 }
 
@@ -713,6 +711,15 @@ function handleLeaveDelay() {
   }, 300)
 }
 
+// Touch has no hover — tapping the trigger expands the controls, tapping the canvas closes them
+function openControls() {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
+  showControls.value = true
+}
+
 onMounted(() => {
   initTheme()
   applyTheme()
@@ -730,14 +737,16 @@ onUnmounted(() => {
 
 <template>
   <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden">
-    <LBitPanel
-      v-if="showPanel"
-      :mode="panelMode"
-      :bit="panelBit"
-      @confirm="onPanelConfirm"
-      @cancel="showPanel = false"
-      @delete="onPanelDelete"
-    />
+    <Transition name="sheet">
+      <LBitPanel
+        v-if="showPanel"
+        :mode="panelMode"
+        :bit="panelBit"
+        @confirm="onPanelConfirm"
+        @cancel="showPanel = false"
+        @delete="onPanelDelete"
+      />
+    </Transition>
 
     <div
       ref="containerRef"
@@ -752,14 +761,14 @@ onUnmounted(() => {
       :style="{
         cursor: isDragging ? 'grabbing' : 'default',
         transform: showPanel ? 'translateX(300px)' : 'translateX(0)',
-        transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+        transition: 'transform var(--spring-duration) var(--ease-spring)',
       }"
     >
       <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
         <div v-if="bitStore.bits.length === 0" class="p-5">
           <div class="max-w-7xl">
-            <h1 class="text-3xl font-bold text-text0 mb-4">Workspace</h1>
-            <p class="text-text1 text-base">
+            <h1 class="text-[2rem] text-text0 mb-2">Workspace</h1>
+            <p class="text-text2 text-[0.9375rem] leading-relaxed">
               Right-click or long-press for options. Shift+Drag or Ctrl+Scroll to navigate.
             </p>
           </div>
@@ -892,45 +901,52 @@ onUnmounted(() => {
         />
       </div>
 
-      <div class="absolute bottom-4 left-4 z-50">
-        <div
-          class="flex flex-col items-start"
-          @mouseenter="handleEnter"
-          @mouseleave="handleLeaveDelay"
-        >
-          <transition name="fade" mode="out-in">
-            <div v-if="showControls" class="flex flex-col items-start gap-2">
-              <button
-                @click="zoomIn"
-                class="w-12 h-12 text-text0 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-surface2 active:scale-95"
-                title="Zoom In"
-              >
-                <ZoomIn :size="24" />
-              </button>
-              <button
-                @click="zoomOut"
-                class="w-12 h-12 text-text0 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-surface2 active:scale-95"
-                title="Zoom Out"
-              >
-                <ZoomOut :size="24" />
-              </button>
-              <button
-                @click="resetViewToBits"
-                class="w-12 h-12 text-text0 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-surface2 active:scale-95"
-                title="Reset View"
-              >
-                <Fullscreen :size="24" />
-              </button>
-            </div>
-            <button
-              v-else
-              class="w-12 h-12 text-text0 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-surface2 active:scale-95"
-              title="View Controls"
-            >
-              <ScanSearch :size="24" />
-            </button>
-          </transition>
+      <div
+        class="view-controls material"
+        :class="{ 'view-controls--open': showControls }"
+        @mouseenter="handleEnter"
+        @mouseleave="handleLeaveDelay"
+        @mousedown.stop
+      >
+        <div class="view-controls__extra" :aria-hidden="!showControls">
+          <button
+            class="view-controls__btn pressable"
+            title="Zoom In"
+            aria-label="Zoom in"
+            :tabindex="showControls ? 0 : -1"
+            @click="zoomIn"
+          >
+            <ZoomIn :size="20" />
+          </button>
+          <button
+            class="view-controls__btn pressable"
+            title="Zoom Out"
+            aria-label="Zoom out"
+            :tabindex="showControls ? 0 : -1"
+            @click="zoomOut"
+          >
+            <ZoomOut :size="20" />
+          </button>
+          <button
+            class="view-controls__btn pressable"
+            title="Fit all Bits"
+            aria-label="Fit all bits into view"
+            :tabindex="showControls ? 0 : -1"
+            @click="resetViewToBits"
+          >
+            <Fullscreen :size="20" />
+          </button>
+          <div class="view-controls__sep" />
         </div>
+        <button
+          class="view-controls__btn pressable"
+          title="View Controls"
+          aria-label="View controls"
+          :aria-expanded="showControls"
+          @click="openControls"
+        >
+          <ScanSearch :size="20" />
+        </button>
       </div>
     </div>
 
@@ -953,13 +969,86 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+/* ── View controls: one material pill that grows up out of its trigger ── */
+.view-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  border-radius: 22px;
+  color: var(--text1);
 }
-.fade-enter-from,
-.fade-leave-to {
+
+.view-controls__extra {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-height: 0;
   opacity: 0;
+  transform: translateY(8px) scale(0.92);
+  transform-origin: bottom center;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    max-height var(--spring-duration) var(--ease-spring),
+    opacity 0.2s ease,
+    transform var(--spring-duration) var(--ease-spring);
+}
+.view-controls--open .view-controls__extra {
+  max-height: 160px;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.view-controls__btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+.view-controls__btn:hover {
+  background-color: var(--fill-hover);
+  color: var(--text0);
+}
+.view-controls__btn:active {
+  background-color: var(--fill-press);
+}
+
+.view-controls__sep {
+  width: 20px;
+  height: 1px;
+  margin: 3px 0;
+  background: var(--separator);
+}
+
+/* ── Bit panel sheet: enters and leaves along the same path ── */
+.sheet-enter-active,
+.sheet-leave-active {
+  transition:
+    transform var(--spring-duration) var(--ease-spring),
+    opacity 0.25s ease;
+}
+.sheet-enter-from,
+.sheet-leave-to {
+  transform: translateX(-100%);
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-from,
+  .sheet-leave-to {
+    transform: none;
+    opacity: 0;
+  }
 }
 
 @keyframes conn-draw {
@@ -975,7 +1064,7 @@ onUnmounted(() => {
   }
 }
 .conn-draw {
-  animation: conn-draw 0.55s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+  animation: conn-draw 0.55s var(--ease-spring) forwards;
 }
 
 @keyframes conn-flow {
@@ -1015,7 +1104,7 @@ onUnmounted(() => {
   }
 }
 .conn-cycle {
-  animation: conn-cycle 0.75s ease-in-out infinite;
+  animation: conn-cycle 1.6s ease-in-out infinite;
 }
 
 @keyframes conn-flash {
