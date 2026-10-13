@@ -1,8 +1,8 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger'
+import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger'
 import { IsInt, IsOptional } from 'class-validator'
 import { CreateBitDto } from './create-bit.dto.js'
 
-export class UpdateBitDto extends PartialType(CreateBitDto) {
+export class UpdateBitDto extends PartialType(OmitType(CreateBitDto, ['flowId'] as const)) {
   @ApiProperty({
     required: false,
     nullable: true,

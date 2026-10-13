@@ -5,6 +5,7 @@ import { Bit } from './bit.entity.js'
 import { Dependency } from '../dependency/dependency.entity.js'
 import { PacketService } from '../packet/packet.service.js'
 import { CreateBitDto } from '../../dto/create-bit.dto.js'
+import { definedOnly } from '../../common/defined-only.js'
 import { UpdateBitDto } from '../../dto/update-bit.dto.js'
 
 @Injectable()
@@ -18,6 +19,8 @@ export class BitService {
   ) {}
 
   async create(createBitDto: CreateBitDto, userId: number): Promise<Bit> {
+    if (createBitDto.flowId != null)
+      await this.packetService.assertFlow(createBitDto.flowId, userId)
     const bit = this.bitRepository.create({ ...createBitDto, user: userId })
     return this.bitRepository.save(bit)
   }
@@ -46,7 +49,7 @@ export class BitService {
       }
     }
     if (packetId === null) await this.packetService.detachBit(id, userId)
-    const write = flowId === undefined ? fields : { ...fields, flowId }
+    const write = definedOnly(flowId === undefined ? fields : { ...fields, flowId })
     if (Object.keys(write).length > 0) {
       await this.bitRepository.update({ id, user: userId }, write)
     }

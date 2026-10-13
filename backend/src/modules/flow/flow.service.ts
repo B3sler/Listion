@@ -6,6 +6,7 @@ import { pruneEmptyFlows, type FlowRepos } from './flow-membership.js'
 import { Bit } from '../bit/bit.entity.js'
 import { Packet } from '../packet/packet.entity.js'
 import { CreateFlowDto } from '../../dto/create-flow.dto.js'
+import { definedOnly } from '../../common/defined-only.js'
 import { UpdateFlowDto } from '../../dto/update-flow.dto.js'
 
 @Injectable()
@@ -24,7 +25,7 @@ export class FlowService {
   }
 
   findAll(userId: number): Promise<Flow[]> {
-    return this.flows.find({ where: { user: userId } })
+    return this.flows.find({ where: { user: userId }, order: { id: 'ASC' } })
   }
 
   async findOne(id: number, userId: number): Promise<Flow> {
@@ -51,11 +52,15 @@ export class FlowService {
         : []
     if (packets.length !== dto.packetIds.length) throw new BadRequestException('Unknown packet')
 
-    const count = await this.flows.count({ where: { user: userId } })
+    const existing = await this.flows.find({ where: { user: userId } })
+    const highest = Math.max(
+      0,
+      ...existing.map((f) => Number(/^Flow (\d+)$/.exec(f.name)?.[1] ?? 0)),
+    )
     const flow = await this.flows.save(
       this.flows.create({
         user: userId,
-        name: dto.name ?? `Flow ${count + 1}`,
+        name: dto.name ?? `Flow ${highest + 1}`,
         color: dto.color ?? DEFAULT_FLOW_COLOR,
       }),
     )
@@ -75,8 +80,10 @@ export class FlowService {
 
   async update(id: number, userId: number, dto: UpdateFlowDto): Promise<Flow> {
     await this.findOne(id, userId)
-    // TypeORM rejects an UPDATE without values, so an empty PUT body is a no-op here.
-    if (Object.keys(dto).length > 0) await this.flows.update({ id, user: userId }, dto)
+    // A validated DTO carries own keys with value undefined for absent fields, and TypeORM throws
+    // on an UPDATE without values: an empty PUT body is a no-op.
+    const patch = definedOnly(dto)
+    if (Object.keys(patch).length > 0) await this.flows.update({ id, user: userId }, patch)
     return this.findOne(id, userId)
   }
 

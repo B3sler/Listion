@@ -8,6 +8,7 @@ import { SetPacketBitsDto } from './set-packet-bits.dto.js'
 import { CreateDependencyDto } from './create-dependency.dto.js'
 import { CreateFlowDto } from './create-flow.dto.js'
 import { UpdateFlowDto } from './update-flow.dto.js'
+import { definedOnly } from '../common/defined-only.js'
 import { RegisterDto } from './auth.dto.js'
 
 // Gleiche Konfiguration wie in main.ts
@@ -87,7 +88,26 @@ describe('Request-Validierung', () => {
     await expect(
       validate(CreateFlowDto, { bitIds: [1], packetIds: [], name: null }),
     ).rejects.toBeInstanceOf(BadRequestException)
-    expect(await validate(UpdateFlowDto, {})).toEqual({})
+    // the parsed DTO carries own keys with value undefined, so only definedOnly() is empty
+    expect(Object.keys(definedOnly(await validate(UpdateFlowDto, {})))).toEqual([])
+  })
+
+  it('akzeptiert eine optionale flowId beim Anlegen von Packets und Bits', async () => {
+    expect(
+      await validate(CreatePacketDto, { x: 1, y: 2, bitIds: [1, 2], flowId: 3 }),
+    ).toMatchObject({
+      flowId: 3,
+    })
+    expect(await validate(CreateBitDto, { title: 'x', flowId: 3 })).toEqual({
+      title: 'x',
+      flowId: 3,
+    })
+    await expect(
+      validate(CreatePacketDto, { x: 1, y: 2, bitIds: [1, 2], flowId: 'a' }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+    await expect(validate(CreateBitDto, { title: 'x', flowId: 1.5 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
   })
 
   it('lehnt ungültige Werte ab', async () => {

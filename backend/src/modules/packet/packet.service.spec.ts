@@ -135,6 +135,44 @@ describe('PacketService', () => {
     expect(flows.rows.map((f) => f.id)).toEqual([70])
   })
 
+  it('create mit flowId stellt den Stapel in den Flow und behält den Flow trotz leerer Mitglieder', async () => {
+    const { service, packets, flows, member } = setup()
+    flows.rows.push({ id: 70, user: 5, name: 'F', color: '#818cf8', createdAt: new Date() })
+    member(1).flowId = 70
+    member(2).flowId = 70
+    const p = await service.create({ x: 0, y: 0, bitIds: [1, 2], flowId: 70 }, 5)
+    expect(packets.rows.find((r) => r.id === p.id)!.flowId).toBe(70)
+    expect(flows.rows.map((f) => f.id)).toEqual([70])
+    expect(member(1).flowId).toBeNull()
+    expect(member(2).flowId).toBeNull()
+  })
+
+  it('create mit fremdem oder unbekanntem Flow wirft NotFound und legt nichts an', async () => {
+    const { service, packets, flows, member } = setup()
+    flows.rows.push({ id: 80, user: 6, name: 'X', color: '#818cf8', createdAt: new Date() })
+    await expect(
+      service.create({ x: 0, y: 0, bitIds: [1, 2], flowId: 80 }, 5),
+    ).rejects.toBeInstanceOf(NotFoundException)
+    await expect(
+      service.create({ x: 0, y: 0, bitIds: [1, 2], flowId: 999 }, 5),
+    ).rejects.toBeInstanceOf(NotFoundException)
+    expect(packets.rows).toHaveLength(0)
+    expect(member(1).packetId).toBeNull()
+  })
+
+  it('update mit leerem Body (nur undefined-Felder) lässt das Packet unverändert', async () => {
+    const { service, packets } = setup()
+    const p = await service.create({ x: 3, y: 4, name: 'P', bitIds: [1, 2] }, 5)
+    const result = await service.update(p.id, 5, {
+      name: undefined,
+      x: undefined,
+      y: undefined,
+      flowId: undefined,
+    })
+    expect(result).toMatchObject({ id: p.id, name: 'P', x: 3, y: 4 })
+    expect(packets.rows.find((r) => r.id === p.id)).toMatchObject({ name: 'P', x: 3, y: 4 })
+  })
+
   it('update setzt flowId nur auf eigene Flows und räumt den alten Flow auf', async () => {
     const { service, packets, flows } = setup()
     flows.rows.push(

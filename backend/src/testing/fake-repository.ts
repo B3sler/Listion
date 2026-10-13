@@ -48,10 +48,20 @@ export class FakeRepository<T extends { id: number }> {
     return { ...this.insert(value) }
   }
 
-  async find(options: { where?: Where } = {}): Promise<T[]> {
-    return this.rows
+  async find(
+    options: { where?: Where; order?: Record<string, 'ASC' | 'DESC'> } = {},
+  ): Promise<T[]> {
+    const found = this.rows
       .filter((r) => matches(r as Record<string, unknown>, options.where ?? {}))
       .map((r) => ({ ...r }))
+    for (const [key, direction] of Object.entries(options.order ?? {}).reverse()) {
+      const sign = direction === 'DESC' ? -1 : 1
+      found.sort((a, b) => {
+        const [x, y] = [(a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]]
+        return (x! > y! ? 1 : x! < y! ? -1 : 0) * sign
+      })
+    }
+    return found
   }
 
   async findOne(options: { where: Where }): Promise<T | null> {
@@ -62,12 +72,17 @@ export class FakeRepository<T extends { id: number }> {
     return (await this.find(options)).length
   }
 
+  /** Like TypeORM: undefined values are skipped, and an UPDATE without any value throws. */
   async update(criteria: number | Where, patch: Partial<T>): Promise<{ affected: number }> {
+    const values = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
+    if (Object.keys(values).length === 0) {
+      throw new Error('UpdateValuesMissingError: no values to update were given')
+    }
     const where = this.toWhere(criteria)
     let affected = 0
     for (const row of this.rows) {
       if (matches(row as Record<string, unknown>, where)) {
-        Object.assign(row, patch)
+        Object.assign(row, values)
         affected++
       }
     }

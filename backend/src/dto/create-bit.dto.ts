@@ -68,8 +68,17 @@ export class CreateBitDto {
   @IsInt()
   workspace?: number
 
-  @ApiProperty({ example: '#6366f1', description: 'Hex color of the bit (#rrggbb)', required: false })
+  @ApiProperty({
+    example: '#6366f1',
+    description: 'Hex color of the bit (#rrggbb)',
+    required: false,
+  })
   @IsOptional()
   @Matches(/^#[0-9a-fA-F]{6}$/)
   color?: string
+
+  @ApiProperty({ example: 2, description: 'Flow the new bit belongs to', required: false })
+  @IsOptional()
+  @IsInt()
+  flowId?: number
 }
