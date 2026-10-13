@@ -145,6 +145,41 @@ The application will be available at:
 - **Backend API**: http://localhost:3000/api (via nginx proxy)
 - **Swagger UI**: http://localhost:3000/api/docs
 
+### Upgrading an existing production database (bit/packet flow)
+
+`synchronize` is off in production and the project has no migrations, so the schema changes of the bit/packet flow must be applied by hand before starting the new backend. Run this once against the production database (adjust the compose file/user/db to your setup):
+
+```bash
+docker compose -f docker-compose.prod.yml exec postgres psql -U listion_user -d listion
+```
+
+```sql
+ALTER TABLE "bit" ADD COLUMN "packetId" integer NULL, ADD COLUMN "stepOrder" integer NOT NULL DEFAULT 0;
+
+CREATE TABLE "packet" (
+  "id" SERIAL PRIMARY KEY,
+  "user" integer NOT NULL,
+  "name" varchar(60) NOT NULL,
+  "x" integer NOT NULL DEFAULT 0,
+  "y" integer NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE "dependency" (
+  "id" SERIAL PRIMARY KEY,
+  "userId" integer NOT NULL,
+  "fromType" varchar(6) NOT NULL,
+  "fromId" integer NOT NULL,
+  "toType" varchar(6) NOT NULL,
+  "toId" integer NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT now()
+);
+
+DROP TABLE IF EXISTS "bit_connection";
+```
+
+Note: dropping `bit_connection` discards all old bit-to-bit connections. This is by design, they are replaced by dependencies.
+
 ### Stop Production Environment
 
 ```bash

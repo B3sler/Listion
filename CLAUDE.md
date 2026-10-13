@@ -39,8 +39,9 @@ listion/
 │   ├── router/       # Vue Router
 │   └── helpers/      # API client (api.ts)
 ├── backend/src/
-│   ├── modules/      # Feature modules: bit/, user/
-│   ├── dto/          # DTOs (create-bit.dto.ts, update-bit.dto.ts)
+│   ├── modules/      # Feature modules: bit/, packet/, dependency/, user/
+│   ├── dto/          # DTOs (create-bit, update-bit, create-packet, update-packet,
+│   │                 #   set-packet-bits, create-dependency, auth)
 │   ├── app.module.ts
 │   └── main.ts
 ├── docker-compose.yml       # Development
@@ -56,7 +57,7 @@ npm install          # updates package-lock.json on the host
 docker compose up -d --build --renew-anon-volumes
 ```
 
-Hot-reload works via bind-mount + polling (Vite: `usePolling: true`, backend: `nest start --watch`).
+Frontend hot-reload works via bind-mount + Vite polling (`usePolling: true`). The backend (`nest start --watch`) does **not** pick up changes on a Windows bind mount — restart it with `docker compose restart backend` after backend edits.
 
 `/app/node_modules` is an anonymous volume that shadows the host folder. After any dependency change, always rebuild **and** renew it (`--build --renew-anon-volumes`, or `./docker-start.sh`) — `docker compose restart` / `up -d` keeps stale packages.
 
@@ -106,11 +107,11 @@ PORT=3000
 
 ## Security Patterns (enforced)
 
-- **All `/api/bit/*` endpoints require `@UseGuards(JwtAuthGuard)`** — applied at controller level
+- **All `/api/bit/*`, `/api/packet/*` and `/api/dependency/*` endpoints require `@UseGuards(JwtAuthGuard)`** — applied at controller level
 - **userId always from JWT** (`req.user.sub`), never accepted from request body
-- **Ownership check on every bit operation** — service filters by `{ id, user: userId }`
+- **Ownership check on every bit, packet and dependency operation** — services filter by `{ id, user: userId }` (dependencies: `userId`); bits referenced by a packet or dependency must belong to the same user
 - **Auth endpoints** rate-limited to 10 req/min via `@Throttle`
-- **Global rate limit**: 60 req/min (ThrottlerGuard as APP_GUARD)
+- **Global rate limit**: 60 req/min (ThrottlerGuard as APP_GUARD); bit/packet/dependency controllers raise it to 300 req/min via `@Throttle` (drag & drop bursts)
 - **Helmet** active in `main.ts` for security headers
 - `synchronize: true` only in non-production
 - bcrypt rounds: 12
