@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import LFlowFrame from './LFlowFrame.vue'
@@ -39,6 +39,18 @@ describe('LFlowFrame', () => {
     expect(w.emitted('recolor')).toEqual([['#34d399']])
     await w.find('.flow__dissolve').trigger('click')
     expect(w.emitted('dissolve')).toHaveLength(1)
+  })
+
+  it('Druck auf der Beschriftung erreicht den Canvas nicht', async () => {
+    const canvas = document.createElement('div')
+    document.body.appendChild(canvas)
+    const onCanvasPointerdown = vi.fn()
+    canvas.addEventListener('pointerdown', onCanvasPointerdown)
+    const w = mount(LFlowFrame, { props: { flow, rect }, attachTo: canvas })
+    await w.find('.flow__label').trigger('pointerdown')
+    expect(onCanvasPointerdown).not.toHaveBeenCalled()
+    expect(w.emitted('dragstart')).toBeUndefined()
+    w.unmount()
   })
 
   it('Ziehen auf der freien Fläche meldet dragstart, auf dem Namen nicht', async () => {
@@ -135,5 +147,48 @@ describe('LTaskbar', () => {
     expect(store.filterOpen).toBe(true)
     expect(w.find('.filter').exists()).toBe(true)
     w.unmount()
+  })
+
+  describe('Filter-Popover schliessen', () => {
+    const press = (el: Element) =>
+      el.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+
+    function outsideElement(): HTMLElement {
+      const el = document.createElement('div')
+      document.body.appendChild(el)
+      return el
+    }
+
+    it('schliesst bei einem Druck ausserhalb', async () => {
+      const w = mount(LTaskbar, { attachTo: document.body })
+      const store = useToolStore()
+      store.filterOpen = true
+      await w.vm.$nextTick()
+      press(outsideElement())
+      expect(store.filterOpen).toBe(false)
+      w.unmount()
+    })
+
+    it('schliesst auch, wenn das Ziel die Ereignisweitergabe stoppt', async () => {
+      const w = mount(LTaskbar, { attachTo: document.body })
+      const store = useToolStore()
+      store.filterOpen = true
+      await w.vm.$nextTick()
+      const outside = outsideElement()
+      outside.addEventListener('pointerdown', (e) => e.stopPropagation())
+      press(outside)
+      expect(store.filterOpen).toBe(false)
+      w.unmount()
+    })
+
+    it('bleibt offen bei einem Druck im Popover', async () => {
+      const w = mount(LTaskbar, { attachTo: document.body })
+      const store = useToolStore()
+      store.filterOpen = true
+      await w.vm.$nextTick()
+      press(w.find('.filter').element)
+      expect(store.filterOpen).toBe(true)
+      w.unmount()
+    })
   })
 })
