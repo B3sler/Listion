@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
 import { PacketService } from './packet.service.js'
@@ -22,6 +23,8 @@ import { SetPacketBitsDto } from '../../dto/set-packet-bits.dto.js'
 @ApiTags('Packet')
 @Controller('packet')
 @UseGuards(JwtAuthGuard)
+// a drag/drop burst makes several requests; the global default (60/min) is too tight for the flow canvas
+@Throttle({ default: { limit: 300, ttl: 60000 } })
 export class PacketController {
   constructor(private readonly packetService: PacketService) {}
 

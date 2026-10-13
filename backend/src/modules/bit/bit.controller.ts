@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req, ParseIntPipe } from '@nestjs/common'
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+  UseGuards,
+  Req,
+  ParseIntPipe,
+} from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
@@ -10,6 +22,8 @@ import { Bit } from './bit.entity.js'
 @ApiTags('Bit')
 @Controller('bit')
 @UseGuards(JwtAuthGuard)
+// a drag/drop burst makes several requests; the global default (60/min) is too tight for the flow canvas
+@Throttle({ default: { limit: 300, ttl: 60000 } })
 export class BitController {
   constructor(private readonly bitService: BitService) {}
 
@@ -40,7 +54,11 @@ export class BitController {
   @Put(':id')
   @ApiOperation({ summary: 'Update a bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateBitDto: UpdateBitDto, @Req() req: Request) {
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateBitDto: UpdateBitDto,
+    @Req() req: Request,
+  ) {
     const userId = (req as any).user.sub as number
     return this.bitService.update(id, userId, updateBitDto)
   }
