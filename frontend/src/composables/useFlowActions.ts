@@ -2,7 +2,8 @@ import api from '@/helpers/api'
 import { useBitStore, type Bit } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
-import type { Dependency, NodeRef, Packet } from '@/types/flow'
+import { useFlowStore } from '@/stores/flowStore'
+import type { Dependency, Flow, NodeRef, Packet } from '@/types/flow'
 import {
   CAPSULE_H,
   STACK_HEADER_H,
@@ -18,26 +19,40 @@ export function useFlowActions() {
   const bitStore = useBitStore()
   const packetStore = usePacketStore()
   const dependencyStore = useDependencyStore()
+  const flowStore = useFlowStore()
 
-  /** Fetch all three collections without committing, so the stores can be assigned together. */
+  /** Fetch all four collections without committing, so the stores can be assigned together. */
   async function fetchSnapshot(): Promise<{
     bits: Bit[]
     packets: Packet[]
     dependencies: Dependency[]
+    flows: Flow[]
   }> {
-    const [bits, packets, dependencies] = await Promise.all([
+    const [bits, packets, dependencies, flows] = await Promise.all([
       api.get<Bit[]>('/api/bit'),
       api.get<Packet[]>('/api/packet'),
       api.get<Dependency[]>('/api/dependency'),
+      api.get<Flow[]>('/api/flow'),
     ])
-    return { bits: bits.data, packets: packets.data, dependencies: dependencies.data }
+    return {
+      bits: bits.data,
+      packets: packets.data,
+      dependencies: dependencies.data,
+      flows: flows.data,
+    }
   }
 
   /** Commit in one synchronous block so no frame renders a half-updated flow. */
-  function commit(snapshot: { bits: Bit[]; packets: Packet[]; dependencies: Dependency[] }): void {
+  function commit(snapshot: {
+    bits: Bit[]
+    packets: Packet[]
+    dependencies: Dependency[]
+    flows: Flow[]
+  }): void {
     bitStore.bits = snapshot.bits
     packetStore.packets = snapshot.packets
     dependencyStore.dependencies = snapshot.dependencies
+    flowStore.flows = snapshot.flows
   }
 
   async function reloadAll(): Promise<void> {

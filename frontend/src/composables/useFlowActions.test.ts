@@ -8,6 +8,7 @@ vi.mock('@/helpers/api', () => ({ default: api }))
 import type { Bit } from '@/stores/bitStore'
 import { useBitStore } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
+import { useFlowStore } from '@/stores/flowStore'
 import { computeLayout } from './useFlowLayout'
 import { useFlowActions } from './useFlowActions'
 
@@ -95,12 +96,15 @@ describe('useFlowActions.dropBit', () => {
     const bitsGet = gate()
     const packetsGet = gate()
     const depsGet = gate()
+    const flowsGet = gate()
     api.get.mockImplementation((url: string) =>
       url === '/api/bit'
         ? bitsGet.promise
         : url === '/api/packet'
           ? packetsGet.promise
-          : depsGet.promise,
+          : url === '/api/flow'
+            ? flowsGet.promise
+            : depsGet.promise,
     )
     const seen: { x: number; y: number }[] = []
     watch(
@@ -113,13 +117,14 @@ describe('useFlowActions.dropBit', () => {
     )
 
     const done = useFlowActions().dropBit(1, null, { x: 700, y: 700 }, layout)
-    await vi.waitFor(() => expect(api.get).toHaveBeenCalledTimes(3))
+    await vi.waitFor(() => expect(api.get).toHaveBeenCalledTimes(4))
     // bits arrive first with a stale DB position for the freed bit 2, packets much later
     bitsGet.resolve({ data: [bit(1, null, 0, 700, 700), bit(2, null, 0, 999, 999)] })
     await Promise.resolve()
     await Promise.resolve()
     packetsGet.resolve({ data: [] })
     depsGet.resolve({ data: [] })
+    flowsGet.resolve({ data: [] })
     await done
 
     expect(seen.length).toBeGreaterThan(0)
@@ -154,5 +159,17 @@ describe('useFlowActions.dropBit', () => {
     seed([bit(1, null, 0)], [])
     await useFlowActions().createDependency({ type: 'bit', id: 1 }, { type: 'bit', id: 1 })
     expect(api.post).not.toHaveBeenCalled()
+  })
+})
+
+describe('useFlowActions.reloadAll', () => {
+  it('lädt Flows zusammen mit Bits, Packets und Pfeilen', async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url === '/api/flow' ? [{ id: 1, name: 'F', color: '#818cf8' }] : [],
+      }),
+    )
+    await useFlowActions().reloadAll()
+    expect(useFlowStore().flows).toEqual([{ id: 1, name: 'F', color: '#818cf8' }])
   })
 })
