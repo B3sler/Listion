@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { watch } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }))
@@ -79,6 +80,67 @@ describe('useFlowActions.dropBit', () => {
     expect(api.put).toHaveBeenCalledWith('/api/bit/1', { packetId: null, x: 700, y: 700 })
     // bit 2 was the second step: rect y = 100 + 76
     expect(api.put).toHaveBeenCalledWith('/api/bit/2', { x: 128, y: 176 })
+  })
+
+  it('befreites Bit wird nie mit veralteten Server-Koordinaten gerendert, auch wenn die GETs gestaffelt eintreffen', async () => {
+    const layout = seed(
+      [bit(1, 7, 0, 5, 5), bit(2, 7, 1, 5, 5)],
+      [{ id: 7, name: 'P', x: 100, y: 100 }],
+    )
+    const gate = () => {
+      let resolve!: (v: { data: unknown }) => void
+      const promise = new Promise<{ data: unknown }>((r) => (resolve = r))
+      return { promise, resolve }
+    }
+    const bitsGet = gate()
+    const packetsGet = gate()
+    const depsGet = gate()
+    api.get.mockImplementation((url: string) =>
+      url === '/api/bit'
+        ? bitsGet.promise
+        : url === '/api/packet'
+          ? packetsGet.promise
+          : depsGet.promise,
+    )
+    const seen: { x: number; y: number }[] = []
+    watch(
+      () => useBitStore().bits,
+      (bits) => {
+        const b = bits.find((x) => x.id === 2)
+        if (b) seen.push({ x: b.x, y: b.y })
+      },
+      { deep: true, flush: 'sync' },
+    )
+
+    const done = useFlowActions().dropBit(1, null, { x: 700, y: 700 }, layout)
+    await vi.waitFor(() => expect(api.get).toHaveBeenCalledTimes(3))
+    // bits arrive first with a stale DB position for the freed bit 2, packets much later
+    bitsGet.resolve({ data: [bit(1, null, 0, 700, 700), bit(2, null, 0, 999, 999)] })
+    await Promise.resolve()
+    await Promise.resolve()
+    packetsGet.resolve({ data: [] })
+    depsGet.resolve({ data: [] })
+    await done
+
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen).not.toContainEqual({ x: 999, y: 999 })
+    expect(useBitStore().bits.find((b) => b.id === 2)).toMatchObject({ x: 128, y: 176 })
+    expect(api.put).toHaveBeenCalledWith('/api/bit/2', { x: 128, y: 176 })
+  })
+
+  it('Drop auf den eigenen Platz im Stapel sendet nichts', async () => {
+    const layout = seed(
+      [bit(1, 7, 0), bit(2, 7, 1), bit(3, 7, 2)],
+      [{ id: 7, name: 'P', x: 100, y: 100 }],
+    )
+    await useFlowActions().dropBit(
+      2,
+      { kind: 'stack', packetId: 7, index: 1 },
+      { x: 0, y: 0 },
+      layout,
+    )
+    expect(api.put).not.toHaveBeenCalled()
+    expect(api.get).not.toHaveBeenCalled()
   })
 
   it('freies Verschieben einer losen Kapsel speichert nur x/y', async () => {

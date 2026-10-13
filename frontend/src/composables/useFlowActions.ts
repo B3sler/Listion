@@ -1,7 +1,8 @@
-import { useBitStore } from '@/stores/bitStore'
+import api from '@/helpers/api'
+import { useBitStore, type Bit } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
-import type { NodeRef } from '@/types/flow'
+import type { Dependency, NodeRef, Packet } from '@/types/flow'
 import {
   CAPSULE_H,
   STACK_HEADER_H,
@@ -18,12 +19,29 @@ export function useFlowActions() {
   const packetStore = usePacketStore()
   const dependencyStore = useDependencyStore()
 
-  async function reloadAll(): Promise<void> {
-    await Promise.all([
-      bitStore.fetchBits(),
-      packetStore.fetchPackets(),
-      dependencyStore.fetchDependencies(),
+  /** Fetch all three collections without committing, so the stores can be assigned together. */
+  async function fetchSnapshot(): Promise<{
+    bits: Bit[]
+    packets: Packet[]
+    dependencies: Dependency[]
+  }> {
+    const [bits, packets, dependencies] = await Promise.all([
+      api.get<Bit[]>('/api/bit'),
+      api.get<Packet[]>('/api/packet'),
+      api.get<Dependency[]>('/api/dependency'),
     ])
+    return { bits: bits.data, packets: packets.data, dependencies: dependencies.data }
+  }
+
+  /** Commit in one synchronous block so no frame renders a half-updated flow. */
+  function commit(snapshot: { bits: Bit[]; packets: Packet[]; dependencies: Dependency[] }): void {
+    bitStore.bits = snapshot.bits
+    packetStore.packets = snapshot.packets
+    dependencyStore.dependencies = snapshot.dependencies
+  }
+
+  async function reloadAll(): Promise<void> {
+    commit(await fetchSnapshot())
   }
 
   /** On any failure the server state wins and the canvas springs back to it. */
@@ -36,23 +54,28 @@ export function useFlowActions() {
     }
   }
 
-  /** Bits that just left a packet keep their last on-screen position. */
-  async function restoreFreedPositions(
+  /**
+   * Reload the flow after an operation that may have freed bits from a packet. Freed bits keep
+   * their last on-screen position: it is patched into the fetched data before committing (so they
+   * never paint at the stale server coordinates) and persisted afterwards.
+   */
+  async function reloadKeepingFreedPositions(
     before: FlowLayout,
     packetBefore: Map<number, number | null>,
     skipId: number,
   ): Promise<void> {
-    const freed = bitStore.bits.filter(
-      (b) => b.packetId == null && packetBefore.get(b.id) != null && b.id !== skipId,
-    )
-    await Promise.all(
-      freed.map((b) => {
-        const r = before.bitRects.get(b.id)
-        return r
-          ? bitStore.updateBit(b.id, { x: Math.round(r.x), y: Math.round(r.y) })
-          : Promise.resolve()
-      }),
-    )
+    const snapshot = await fetchSnapshot()
+    const patched: { id: number; x: number; y: number }[] = []
+    snapshot.bits = snapshot.bits.map((b) => {
+      const r = before.bitRects.get(b.id)
+      if (b.packetId != null || packetBefore.get(b.id) == null || b.id === skipId || !r) return b
+      const x = Math.round(r.x)
+      const y = Math.round(r.y)
+      patched.push({ id: b.id, x, y })
+      return { ...b, x, y }
+    })
+    commit(snapshot)
+    await Promise.all(patched.map((p) => api.put(`/api/bit/${p.id}`, { x: p.x, y: p.y })))
   }
 
   function dropBit(
@@ -67,10 +90,11 @@ export function useFlowActions() {
       const packetBefore = new Map(bitStore.bits.map((b) => [b.id, b.packetId] as const))
 
       if (target?.kind === 'stack') {
-        const ids = (layout.membersOf.get(target.packetId) ?? [])
-          .map((b) => b.id)
-          .filter((id) => id !== bitId)
+        const current = (layout.membersOf.get(target.packetId) ?? []).map((b) => b.id)
+        const ids = current.filter((id) => id !== bitId)
         ids.splice(target.index, 0, bitId)
+        // dropped back into its own slot: nothing to save
+        if (ids.length === current.length && ids.every((id, i) => id === current[i])) return
         await packetStore.setBits(target.packetId, ids)
       } else if (target?.kind === 'pair') {
         const t = layout.bitRects.get(target.bitId)
@@ -93,8 +117,7 @@ export function useFlowActions() {
         return
       }
 
-      await reloadAll()
-      await restoreFreedPositions(layout, packetBefore, bitId)
+      await reloadKeepingFreedPositions(layout, packetBefore, bitId)
     })
   }
 
@@ -122,8 +145,7 @@ export function useFlowActions() {
     return guarded(async () => {
       const packetBefore = new Map(bitStore.bits.map((b) => [b.id, b.packetId] as const))
       await bitStore.deleteBit(id)
-      await reloadAll()
-      await restoreFreedPositions(layout, packetBefore, id)
+      await reloadKeepingFreedPositions(layout, packetBefore, id)
     })
   }
 
