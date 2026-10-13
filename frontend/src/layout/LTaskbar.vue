@@ -23,8 +23,9 @@ function onDocumentPointerDown(e: PointerEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('pointerdown', onDocumentPointerDown))
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerDown))
+// capture phase: canvas gestures stop propagation, so a bubble listener would miss their presses
+onMounted(() => document.addEventListener('pointerdown', onDocumentPointerDown, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerDown, true))
 </script>
 
 <template>
@@ -40,7 +41,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
       </svg>
     </div>
     <div
-      class="flex-[0.7] grid grid-cols-[1fr_auto_1fr] items-center rounded-b-2xl bg-taskbar shadow-lg px-3"
+      class="flex-[0.7] grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center rounded-b-2xl bg-taskbar shadow-lg px-3"
     >
       <div class="flex items-center gap-1">
         <button

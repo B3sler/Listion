@@ -52,6 +52,7 @@ function openTools() {
 
 // a short grace period so the pointer can travel from the name to the bar
 function closeToolsSoon() {
+  if (closeTimer) clearTimeout(closeTimer)
   closeTimer = setTimeout(() => (toolsOpen.value = false), 200)
 }
 
@@ -82,6 +83,7 @@ onBeforeUnmount(() => {
   >
     <div
       class="flow__label"
+      @pointerdown.stop
       @mouseenter="openTools"
       @mouseleave="closeToolsSoon"
       @focusin="openTools"
