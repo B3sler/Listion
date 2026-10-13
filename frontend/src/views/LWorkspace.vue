@@ -82,11 +82,13 @@ const { bitDrag, packetDrag, linkDrag, startBitPointer, startPacketPointer, star
       selectedDependencyId.value = null
       openBitDetail(id)
     },
-    onDropBit: (id, target, pos) => actions.dropBit(id, target, pos, baseLayout.value),
-    onMovePacketEnd: (id, x, y) => actions.movePacket(id, x, y),
+    onDropBit: (id, target, pos) => actions.dropBit(id, target, pos, baseLayout.value, new Map()),
+    onMovePacketEnd: (id, x, y) => actions.movePacket(id, x, y, baseLayout.value, new Map()),
     onCreateDependency: (from, to) => {
       void actions.createDependency(from, to)
     },
+    onLassoEnd: () => {},
+    onMoveFlowEnd: async () => {},
   })
 
 // Layout including in-flight gestures — what is rendered and where arrows attach

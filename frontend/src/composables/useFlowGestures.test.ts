@@ -46,6 +46,8 @@ function setup(options: { zoom?: number; bits?: Bit[]; packets?: Packet[] } = {}
     onDropBit: vi.fn().mockResolvedValue(undefined),
     onMovePacketEnd: vi.fn().mockResolvedValue(undefined),
     onCreateDependency: vi.fn(),
+    onLassoEnd: vi.fn(),
+    onMoveFlowEnd: vi.fn().mockResolvedValue(undefined),
   }
   return { opts, g: useFlowGestures(opts) }
 }
@@ -202,5 +204,46 @@ describe('useFlowGestures', () => {
     expect(g.bitDrag.value).toBeNull()
     expect(opts.onTapBit).not.toHaveBeenCalled()
     expect(opts.onDropBit).not.toHaveBeenCalled()
+  })
+
+  it('Lasso sammelt die Spur in Canvas-Koordinaten und meldet sie beim Loslassen', () => {
+    const { opts, g } = setup()
+    g.startLasso(pointer('pointerdown', 0, 0))
+    window.dispatchEvent(pointer('pointermove', 20, 0))
+    window.dispatchEvent(pointer('pointermove', 20, 20))
+    expect(g.lasso.value).toEqual([
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 20 },
+    ])
+    window.dispatchEvent(pointer('pointerup', 20, 20))
+    expect(g.lasso.value).toBeNull()
+    expect(opts.onLassoEnd).toHaveBeenCalledWith([
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 20, y: 20 },
+    ])
+  })
+
+  it('cancelLasso bricht ab, ohne etwas zu melden', () => {
+    const { opts, g } = setup()
+    g.startLasso(pointer('pointerdown', 0, 0))
+    window.dispatchEvent(pointer('pointermove', 30, 30))
+    g.cancelLasso()
+    window.dispatchEvent(pointer('pointerup', 30, 30))
+    expect(g.lasso.value).toBeNull()
+    expect(opts.onLassoEnd).not.toHaveBeenCalled()
+  })
+
+  it('Rahmen ziehen liefert den Versatz und meldet ihn beim Loslassen', async () => {
+    const { opts, g } = setup()
+    g.startFlowPointer(pointer('pointerdown', 100, 100), 5)
+    window.dispatchEvent(pointer('pointermove', 140, 130))
+    expect(g.flowDrag.value).toEqual({ flowId: 5, dx: 40, dy: 30 })
+    vi.spyOn(performance, 'now').mockReturnValue(10_000) // released after resting: no glide
+    window.dispatchEvent(pointer('pointerup', 140, 130))
+    await Promise.resolve()
+    expect(g.flowDrag.value).toBeNull()
+    expect(opts.onMoveFlowEnd).toHaveBeenCalledWith(5, 40, 30)
   })
 })

@@ -6,12 +6,15 @@ import { useFlowStore } from '@/stores/flowStore'
 import type { Dependency, Flow, NodeRef, Packet } from '@/types/flow'
 import {
   CAPSULE_H,
+  CAPSULE_W,
   STACK_HEADER_H,
   STACK_PAD,
   STEP_GAP,
   STEP_NUM_W,
   type FlowLayout,
+  type Rect,
 } from './useFlowLayout'
+import { flowAt, lassoHits, type Point } from './useFlowGroups'
 import { isValidLink } from './useFlowState'
 import type { SnapTarget } from './useStackDrag'
 
@@ -98,6 +101,7 @@ export function useFlowActions() {
     target: SnapTarget | null,
     pos: { x: number; y: number },
     layout: FlowLayout,
+    frames: Map<number, Rect>,
   ): Promise<void> {
     return guarded(async () => {
       const bit = bitStore.bits.find((b) => b.id === bitId)
@@ -121,23 +125,52 @@ export function useFlowActions() {
           y: (above ? t.y - (CAPSULE_H + STEP_GAP) : t.y) - STACK_HEADER_H,
           bitIds: above ? [bitId, target.bitId] : [target.bitId, bitId],
         })
-      } else if (bit.packetId != null) {
-        await bitStore.updateBit(bitId, {
-          packetId: null,
-          x: Math.round(pos.x),
-          y: Math.round(pos.y),
-        })
       } else {
-        await bitStore.updateBit(bitId, { x: Math.round(pos.x), y: Math.round(pos.y) })
-        return
+        const centre = { x: pos.x + CAPSULE_W / 2, y: pos.y + CAPSULE_H / 2 }
+        const targetFlow = flowAt(centre, frames, flowStore.flows)
+        // a bit inside a packet has no flow of its own; after leaving the packet it is loose
+        const currentFlow = bit.packetId != null ? null : (bit.flowId ?? null)
+        const flowPatch = targetFlow !== currentFlow ? { flowId: targetFlow } : {}
+        if (bit.packetId != null) {
+          await bitStore.updateBit(bitId, {
+            packetId: null,
+            x: Math.round(pos.x),
+            y: Math.round(pos.y),
+            ...flowPatch,
+          })
+        } else {
+          await bitStore.updateBit(bitId, {
+            x: Math.round(pos.x),
+            y: Math.round(pos.y),
+            ...flowPatch,
+          })
+          // the server may have pruned an emptied flow
+          if ('flowId' in flowPatch) await reloadAll()
+          return
+        }
       }
 
       await reloadKeepingFreedPositions(layout, packetBefore, bitId)
     })
   }
 
-  function movePacket(id: number, x: number, y: number): Promise<void> {
-    return guarded(() => packetStore.updatePacket(id, { x, y }))
+  function movePacket(
+    id: number,
+    x: number,
+    y: number,
+    layout: FlowLayout,
+    frames: Map<number, Rect>,
+  ): Promise<void> {
+    return guarded(async () => {
+      const packet = packetStore.packets.find((p) => p.id === id)
+      const rect = layout.packetRects.get(id)
+      if (!packet || !rect) return
+      const centre = { x: x + rect.w / 2, y: y + rect.h / 2 }
+      const targetFlow = flowAt(centre, frames, flowStore.flows)
+      const changed = targetFlow !== (packet.flowId ?? null)
+      await packetStore.updatePacket(id, { x, y, ...(changed ? { flowId: targetFlow } : {}) })
+      if (changed) await reloadAll()
+    })
   }
 
   function renamePacket(id: number, name: string): Promise<void> {
@@ -164,6 +197,45 @@ export function useFlowActions() {
     })
   }
 
+  /** Resolves true when the lasso caught something and a flow was created. */
+  function createFlowFromLasso(points: Point[], layout: FlowLayout): Promise<boolean> {
+    const hits = lassoHits(points, layout)
+    if (hits.bitIds.length + hits.packetIds.length === 0) return Promise.resolve(false)
+    return guarded(async () => {
+      await flowStore.createFlow({ bitIds: hits.bitIds, packetIds: hits.packetIds })
+      await reloadAll()
+    }).then(() => true)
+  }
+
+  function renameFlow(id: number, name: string): Promise<void> {
+    return guarded(() => flowStore.updateFlow(id, { name }))
+  }
+
+  function recolorFlow(id: number, color: string): Promise<void> {
+    return guarded(() => flowStore.updateFlow(id, { color }))
+  }
+
+  function dissolveFlow(id: number): Promise<void> {
+    return guarded(async () => {
+      await flowStore.deleteFlow(id)
+      await reloadAll()
+    })
+  }
+
+  /** Move every loose bit and stack of the flow by the same offset (optimistic per item). */
+  function moveFlow(flowId: number, dx: number, dy: number): Promise<void> {
+    return guarded(async () => {
+      const bits = bitStore.bits.filter((b) => b.flowId === flowId && b.packetId == null)
+      const packets = packetStore.packets.filter((p) => p.flowId === flowId)
+      await Promise.all([
+        ...bits.map((b) =>
+          bitStore.updateBit(b.id, { x: Math.round(b.x + dx), y: Math.round(b.y + dy) }),
+        ),
+        ...packets.map((p) => packetStore.updatePacket(p.id, { x: p.x + dx, y: p.y + dy })),
+      ])
+    })
+  }
+
   return {
     reloadAll,
     dropBit,
@@ -172,5 +244,10 @@ export function useFlowActions() {
     createDependency,
     deleteDependency,
     deleteBit,
+    createFlowFromLasso,
+    renameFlow,
+    recolorFlow,
+    dissolveFlow,
+    moveFlow,
   }
 }

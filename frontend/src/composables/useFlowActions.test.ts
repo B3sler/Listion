@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delet
 vi.mock('@/helpers/api', () => ({ default: api }))
 
 import type { Bit } from '@/stores/bitStore'
+import type { Packet } from '@/types/flow'
 import { useBitStore } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
 import { useFlowStore } from '@/stores/flowStore'
@@ -23,7 +24,7 @@ const bit = (id: number, packetId: number | null, order: number, x = 0, y = 0): 
   createdAt: '',
 })
 
-let server: { bits: Bit[]; packets: { id: number; name: string; x: number; y: number }[] }
+let server: { bits: Bit[]; packets: Packet[] }
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -38,7 +39,7 @@ beforeEach(() => {
   api.post.mockResolvedValue({ data: { id: 50, name: 'Packet 1', x: 0, y: 0 } })
 })
 
-function seed(bits: Bit[], packets: { id: number; name: string; x: number; y: number }[]) {
+function seed(bits: Bit[], packets: Packet[]) {
   useBitStore().bits = bits.map((b) => ({ ...b }))
   usePacketStore().packets = packets.map((p) => ({ ...p }))
   return computeLayout({ bits, packets, expandedBitId: null })
@@ -55,6 +56,7 @@ describe('useFlowActions.dropBit', () => {
       { kind: 'stack', packetId: 7, index: 1 },
       { x: 0, y: 0 },
       layout,
+      new Map(),
     )
     expect(api.put).toHaveBeenCalledWith('/api/packet/7/bits', { bitIds: [1, 3, 2] })
   })
@@ -66,6 +68,7 @@ describe('useFlowActions.dropBit', () => {
       { kind: 'pair', bitId: 1, position: 'below' },
       { x: 0, y: 0 },
       layout,
+      new Map(),
     )
     expect(api.post).toHaveBeenCalledWith('/api/packet', { x: 472, y: 260, bitIds: [1, 2] })
   })
@@ -77,7 +80,7 @@ describe('useFlowActions.dropBit', () => {
     )
     server.bits = [bit(1, null, 0, 700, 700), bit(2, null, 0, 5, 5)]
     server.packets = []
-    await useFlowActions().dropBit(1, null, { x: 700, y: 700 }, layout)
+    await useFlowActions().dropBit(1, null, { x: 700, y: 700 }, layout, new Map())
     expect(api.put).toHaveBeenCalledWith('/api/bit/1', { packetId: null, x: 700, y: 700 })
     // bit 2 was the second step: rect y = 100 + 76
     expect(api.put).toHaveBeenCalledWith('/api/bit/2', { x: 128, y: 176 })
@@ -116,7 +119,7 @@ describe('useFlowActions.dropBit', () => {
       { deep: true, flush: 'sync' },
     )
 
-    const done = useFlowActions().dropBit(1, null, { x: 700, y: 700 }, layout)
+    const done = useFlowActions().dropBit(1, null, { x: 700, y: 700 }, layout, new Map())
     await vi.waitFor(() => expect(api.get).toHaveBeenCalledTimes(4))
     // bits arrive first with a stale DB position for the freed bit 2, packets much later
     bitsGet.resolve({ data: [bit(1, null, 0, 700, 700), bit(2, null, 0, 999, 999)] })
@@ -143,6 +146,7 @@ describe('useFlowActions.dropBit', () => {
       { kind: 'stack', packetId: 7, index: 1 },
       { x: 0, y: 0 },
       layout,
+      new Map(),
     )
     expect(api.put).not.toHaveBeenCalled()
     expect(api.get).not.toHaveBeenCalled()
@@ -150,7 +154,7 @@ describe('useFlowActions.dropBit', () => {
 
   it('freies Verschieben einer losen Kapsel speichert nur x/y', async () => {
     const layout = seed([bit(1, null, 0)], [])
-    await useFlowActions().dropBit(1, null, { x: 40.4, y: 80.6 }, layout)
+    await useFlowActions().dropBit(1, null, { x: 40.4, y: 80.6 }, layout, new Map())
     expect(api.put).toHaveBeenCalledWith('/api/bit/1', { x: 40, y: 81 })
     expect(api.get).not.toHaveBeenCalled()
   })
@@ -171,5 +175,68 @@ describe('useFlowActions.reloadAll', () => {
     )
     await useFlowActions().reloadAll()
     expect(useFlowStore().flows).toEqual([{ id: 1, name: 'F', color: '#818cf8' }])
+  })
+})
+
+describe('useFlowActions flows', () => {
+  it('Lasso ohne Treffer legt nichts an, mit Treffern einen Flow', async () => {
+    const layout = seed([bit(1, null, 0, 0, 0)], [])
+    const a = useFlowActions()
+    const miss = [
+      { x: 500, y: 500 },
+      { x: 600, y: 500 },
+      { x: 600, y: 600 },
+    ]
+    expect(await a.createFlowFromLasso(miss, layout)).toBe(false)
+    expect(api.post).not.toHaveBeenCalled()
+    api.post.mockResolvedValue({ data: { id: 3, name: 'Flow 1', color: '#818cf8' } })
+    const hit = [
+      { x: -10, y: -10 },
+      { x: 300, y: -10 },
+      { x: 300, y: 100 },
+      { x: -10, y: 100 },
+    ]
+    expect(await a.createFlowFromLasso(hit, layout)).toBe(true)
+    expect(api.post).toHaveBeenCalledWith('/api/flow', { bitIds: [1], packetIds: [] })
+  })
+
+  it('ein loses Bit verlässt seinen Flow, wenn es außerhalb des alten Rahmens landet', async () => {
+    const layout = seed([{ ...bit(1, null, 0, 0, 0), flowId: 5 }], [])
+    useFlowStore().flows = [{ id: 5, name: 'F', color: '#818cf8' }]
+    const frames = new Map([[5, { x: -24, y: -32, w: 248, h: 88 }]])
+    await useFlowActions().dropBit(1, null, { x: 900, y: 900 }, layout, frames)
+    expect(api.put).toHaveBeenCalledWith('/api/bit/1', { x: 900, y: 900, flowId: null })
+  })
+
+  it('ein loses Bit tritt einem Flow bei, wenn es in dessen Rahmen landet', async () => {
+    const layout = seed([bit(1, null, 0, 900, 900)], [])
+    useFlowStore().flows = [{ id: 5, name: 'F', color: '#818cf8' }]
+    const frames = new Map([[5, { x: 0, y: 0, w: 400, h: 300 }]])
+    await useFlowActions().dropBit(1, null, { x: 50, y: 50 }, layout, frames)
+    expect(api.put).toHaveBeenCalledWith('/api/bit/1', { x: 50, y: 50, flowId: 5 })
+  })
+
+  it('innerhalb des eigenen Flows verschieben ändert die Mitgliedschaft nicht', async () => {
+    const layout = seed([{ ...bit(1, null, 0, 0, 0), flowId: 5 }], [])
+    useFlowStore().flows = [{ id: 5, name: 'F', color: '#818cf8' }]
+    const frames = new Map([[5, { x: -24, y: -32, w: 600, h: 400 }]])
+    await useFlowActions().dropBit(1, null, { x: 100, y: 100 }, layout, frames)
+    expect(api.put).toHaveBeenCalledWith('/api/bit/1', { x: 100, y: 100 })
+  })
+
+  it('einen Flow verschieben bewegt lose Bits und Stapel um denselben Versatz', async () => {
+    seed(
+      [
+        { ...bit(1, null, 0, 10, 20), flowId: 5 },
+        bit(2, 7, 0),
+        bit(3, 7, 1),
+        bit(4, null, 0, 0, 0),
+      ],
+      [{ id: 7, name: 'P', x: 100, y: 100, flowId: 5 }],
+    )
+    await useFlowActions().moveFlow(5, 30, -10)
+    expect(api.put).toHaveBeenCalledWith('/api/bit/1', { x: 40, y: 10 })
+    expect(api.put).toHaveBeenCalledWith('/api/packet/7', { x: 130, y: 90 })
+    expect(api.put).not.toHaveBeenCalledWith('/api/bit/4', expect.anything())
   })
 })
