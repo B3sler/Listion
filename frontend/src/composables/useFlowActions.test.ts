@@ -73,6 +73,37 @@ describe('useFlowActions.dropBit', () => {
     expect(api.post).toHaveBeenCalledWith('/api/packet', { x: 472, y: 260, bitIds: [1, 2] })
   })
 
+  it('Pair-Ziel mit Flow: das neue Packet erbt den Flow der Ziel-Kapsel', async () => {
+    const layout = seed([{ ...bit(1, null, 0, 500, 300), flowId: 5 }, bit(2, null, 0)], [])
+    await useFlowActions().dropBit(
+      2,
+      { kind: 'pair', bitId: 1, position: 'below' },
+      { x: 0, y: 0 },
+      layout,
+      new Map(),
+    )
+    expect(api.post).toHaveBeenCalledWith('/api/packet', {
+      x: 472,
+      y: 260,
+      bitIds: [1, 2],
+      flowId: 5,
+    })
+  })
+
+  it('Pair-Ziel ohne eigenen Flow, aber im Rahmen eines Flows: das Packet tritt dem Flow bei', async () => {
+    const layout = seed([bit(1, null, 0, 500, 300), bit(2, null, 0)], [])
+    useFlowStore().flows = [{ id: 8, name: 'F', color: '#818cf8' }]
+    const frames = new Map([[8, { x: 400, y: 200, w: 400, h: 300 }]])
+    await useFlowActions().dropBit(
+      2,
+      { kind: 'pair', bitId: 1, position: 'below' },
+      { x: 0, y: 0 },
+      layout,
+      frames,
+    )
+    expect(api.post).toHaveBeenCalledWith('/api/packet', expect.objectContaining({ flowId: 8 }))
+  })
+
   it('Herausziehen bis zur Auflösung: das übrige Bit behält seine Bildschirmposition', async () => {
     const layout = seed(
       [bit(1, 7, 0, 5, 5), bit(2, 7, 1, 5, 5)],

@@ -119,11 +119,18 @@ export function useFlowActions() {
         const t = layout.bitRects.get(target.bitId)
         if (!t) return
         const above = target.position === 'above'
+        // the target capsule is the anchor, so the new stack stays in its flow (or the frame
+        // it visually sits in)
+        const targetBit = bitStore.bits.find((b) => b.id === target.bitId)
+        const stackFlow =
+          targetBit?.flowId ??
+          flowAt({ x: t.x + t.w / 2, y: t.y + t.h / 2 }, frames, flowStore.flows)
         await packetStore.createPacket({
           x: t.x - STACK_PAD - STEP_NUM_W,
           // the target capsule stays where it is; the stack grows around it
           y: (above ? t.y - (CAPSULE_H + STEP_GAP) : t.y) - STACK_HEADER_H,
           bitIds: above ? [bitId, target.bitId] : [target.bitId, bitId],
+          ...(stackFlow != null ? { flowId: stackFlow } : {}),
         })
       } else {
         const centre = { x: pos.x + CAPSULE_W / 2, y: pos.y + CAPSULE_H / 2 }
