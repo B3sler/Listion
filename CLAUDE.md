@@ -52,14 +52,13 @@ listion/
 
 ### Development (with hot-reload)
 ```bash
-docker compose down
-npm install          # host install required after new dependencies
-docker compose up -d --build
+npm install          # updates package-lock.json on the host
+docker compose up -d --build --renew-anon-volumes
 ```
 
-Hot-reload works via bind-mount + polling (Vite: `usePolling: true`, ts-node-dev: `--poll`).
+Hot-reload works via bind-mount + polling (Vite: `usePolling: true`, backend: `nest start --watch`).
 
-After adding new npm packages always run `npm install` on the host before restarting containers.
+`/app/node_modules` is an anonymous volume that shadows the host folder. After any dependency change, always rebuild **and** renew it (`--build --renew-anon-volumes`, or `./docker-start.sh`) — `docker compose restart` / `up -d` keeps stale packages.
 
 ### Production
 ```bash
