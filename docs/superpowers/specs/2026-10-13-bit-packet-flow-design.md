@@ -142,7 +142,7 @@ Alle Endpunkte: `@UseGuards(JwtAuthGuard)` auf Controller-Ebene, userId aus `req
 ### Packets
 
 - `GET /api/packet` → alle Packets des Users.
-- `POST /api/packet` `{ name?, x, y, bitIds: number[] (≥ 2) }` → legt das Packet an und setzt für die Bits `packetId` + `order` in genau dieser Reihenfolge (Transaktion). Bits, die vorher in einem anderen Packet waren, werden dort entfernt (mit Auflösungsregel).
+- `POST /api/packet` `{ name?, x, y, bitIds: number[] (≥ 2) }` → legt das Packet an und setzt für die Bits `packetId` + `order` in genau dieser Reihenfolge. (v1 ohne DB-Transaktion; bricht eine Teiloperation ab, lädt der Client den Serverstand neu.) Bits, die vorher in einem anderen Packet waren, werden dort entfernt (mit Auflösungsregel).
 - `PUT /api/packet/:id` `{ name?, x?, y? }`.
 - `PUT /api/packet/:id/bits` `{ bitIds: number[] (≥ 2) }` → setzt die Mitgliedschaft **genau** auf diese Bits in dieser Reihenfolge. Bisherige Mitglieder, die fehlen, werden lose (behalten x/y). Neu hinzukommende Bits verlassen ihr altes Packet (mit Auflösungsregel).
 - `DELETE /api/packet/:id` → Bits werden lose, Dependencies von/zu diesem Packet werden gelöscht.
