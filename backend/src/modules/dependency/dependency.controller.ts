@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
 import { DependencyService } from './dependency.service.js'
@@ -19,6 +20,8 @@ import { CreateDependencyDto } from '../../dto/create-dependency.dto.js'
 @ApiTags('Dependency')
 @Controller('dependency')
 @UseGuards(JwtAuthGuard)
+// a drag/drop burst makes several requests; the global default (60/min) is too tight for the flow canvas
+@Throttle({ default: { limit: 300, ttl: 60000 } })
 export class DependencyController {
   constructor(private readonly dependencyService: DependencyService) {}
 
