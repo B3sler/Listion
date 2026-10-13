@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import router from '@/router'
 import { useUserStore } from '@/stores/userStore'
 import { storeToRefs } from 'pinia'
+import { CircleAlert, LoaderCircle } from 'lucide-vue-next'
 
 const { initTheme, applyTheme, isDark } = useTheme()
 
@@ -19,17 +20,21 @@ const logoSrc = computed(() =>
 const email = ref('')
 const password = ref('')
 const loginErrorMessage = ref('')
+const isSubmitting = ref(false)
 
 const userStore = useUserStore()
 const { error } = storeToRefs(userStore)
 
 async function handleLogin() {
   loginErrorMessage.value = ''
+  isSubmitting.value = true
   try {
     await userStore.login(email.value, password.value)
     await router.push('/workspace')
   } catch {
     loginErrorMessage.value = error.value || 'Login failed.'
+  } finally {
+    isSubmitting.value = false
   }
 }
 
@@ -39,72 +44,172 @@ function navigateToRegister() {
 </script>
 
 <template>
-  <div class="min-h-screen flex bg-gradient-to-br from-surface3 via-surface1 to-surface4">
-    <div class="w-2/3 flex items-center justify-center">
-      <div class="text-center">
-        <img :src="logoSrc" alt="Listion Logo" class="h-60 mx-auto mb-6 opacity-80" />
-        <h2 class="text-4xl font-bold text-text0 mb-4">Welcome to Listion!</h2>
-        <p class="text-lg text-text1">Your tasks. Your flow.</p>
+  <div class="auth">
+    <div class="auth__hero">
+      <div class="text-center l-rise">
+        <img :src="logoSrc" alt="Listion Logo" class="auth__logo" />
+        <h2 class="auth__headline">Welcome to Listion</h2>
+        <p class="auth__tagline">Your tasks. Your flow.</p>
       </div>
     </div>
-    <div
-      class="w-1/3 flex items-center justify-center bg-surface1 rounded-l-3xl shadow-2xl"
-      :class="isDark ? 'bg-dotted-grid-dark' : 'bg-dotted-grid-light'"
-    >
-      <div
-        class="animate-fade-in w-full max-w-sm bg-surface2 border-2 border-gray-300 rounded-xl shadow-lg p-8 flex flex-col items-center"
-      >
-        <h1 class="text-3xl font-bold mb-2 text-text0">Login</h1>
-        <p class="mb-6 text-text1">Welcome back! Please login.</p>
-        <form class="w-full flex flex-col gap-4" @submit.prevent="handleLogin">
+
+    <div class="auth__side" :class="isDark ? 'bg-dotted-grid-dark' : 'bg-dotted-grid-light'">
+      <div class="auth__card material--thick l-rise" style="animation-delay: 60ms">
+        <h1 class="auth__title">Sign in</h1>
+        <p class="auth__subtitle">Welcome back. Pick up where you left off.</p>
+        <form class="auth__form" @submit.prevent="handleLogin">
+          <label class="sr-only" for="login-email">E-Mail</label>
           <input
+            id="login-email"
             v-model="email"
             type="email"
+            autocomplete="email"
             required
             placeholder="E-Mail"
-            class="text-text0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+            class="l-input"
+            :aria-invalid="!!loginErrorMessage"
           />
+          <label class="sr-only" for="login-password">Password</label>
           <input
+            id="login-password"
             v-model="password"
             type="password"
+            autocomplete="current-password"
             required
             placeholder="Password"
-            class="text-text0 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+            class="l-input"
+            :aria-invalid="!!loginErrorMessage"
           />
-          <p v-if="loginErrorMessage" class="text-red-500 text-sm mt-2">
-            {{ loginErrorMessage }}
-          </p>
-          <button
-            type="submit"
-            class="mt-2 bg-brand text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
-          >
-            Login
+          <Transition name="error">
+            <p v-if="loginErrorMessage" class="l-error" role="alert">
+              <CircleAlert :size="14" />
+              {{ loginErrorMessage }}
+            </p>
+          </Transition>
+          <button type="submit" class="l-btn-primary mt-2" :disabled="isSubmitting">
+            <LoaderCircle v-if="isSubmitting" :size="16" class="animate-spin" />
+            {{ isSubmitting ? 'Signing in…' : 'Sign in' }}
           </button>
         </form>
-        <div class="w-full flex justify-between mt-4 text-sm">
-          <!--          <a href="#" class="text-blue-500 hover:underline">Forgot your password?</a>-->
-          <a href="#" class="text-blue-500 hover:underline" @click.prevent="navigateToRegister"
-            >Don't have an account yet?</a
+        <p class="auth__switch">
+          New to Listion?
+          <a href="/register" class="l-link" @click.prevent="navigateToRegister"
+            >Create an account</a
           >
-        </div>
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translatex(+40px);
-  }
-  to {
-    opacity: 1;
-    transform: translatex(0);
-  }
+.auth {
+  min-height: 100vh;
+  display: flex;
+  background: linear-gradient(135deg, var(--surface3), var(--surface1) 55%, var(--surface4));
 }
 
-.animate-fade-in {
-  animation: fade-in 1s ease-out;
+.auth__hero {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.auth__logo {
+  height: 12rem;
+  margin: 0 auto 1.5rem;
+  opacity: 0.85;
+}
+
+.auth__headline {
+  font-size: clamp(2rem, 3.5vw, 2.75rem);
+  color: var(--text0);
+  margin-bottom: 0.5rem;
+}
+
+.auth__tagline {
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+  color: var(--text1);
+}
+
+.auth__side {
+  flex: 1;
+  min-width: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background-color: var(--surface1);
+  border-radius: 28px 0 0 28px;
+  box-shadow: -12px 0 48px -16px hsl(var(--surface-shadow) / 0.35);
+}
+
+.auth__card {
+  width: 100%;
+  max-width: 22rem;
+  padding: 2rem;
+  border-radius: 22px;
+  border: 1px solid var(--material-stroke);
+}
+
+.auth__title {
+  font-size: 1.75rem;
+  color: var(--text0);
+  margin-bottom: 0.25rem;
+}
+
+.auth__subtitle {
+  font-size: 0.9375rem;
+  color: var(--text2);
+  margin-bottom: 1.5rem;
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth__switch {
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text2);
+  text-align: center;
+}
+
+.error-enter-active,
+.error-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform var(--spring-duration) var(--ease-spring);
+}
+.error-enter-from,
+.error-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Small screens: stack instead of squeezing two columns */
+@media (max-width: 767px) {
+  .auth {
+    flex-direction: column;
+  }
+  .auth__hero {
+    flex: none;
+    padding: 3rem 1.5rem 1.5rem;
+  }
+  .auth__logo {
+    height: 6rem;
+    margin-bottom: 1rem;
+  }
+  .auth__side {
+    min-width: 0;
+    flex: 1;
+    border-radius: 28px 28px 0 0;
+    align-items: flex-start;
+  }
 }
 </style>

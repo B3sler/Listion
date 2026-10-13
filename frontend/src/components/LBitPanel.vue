@@ -75,7 +75,7 @@ watch(
 )
 
 onMounted(() => {
-  setTimeout(() => titleInput.value?.focus(), 80)
+  titleInput.value?.focus({ preventScroll: true })
   document.addEventListener('keydown', onKeydown)
 })
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
@@ -83,6 +83,23 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') emit('cancel')
 }
+
+// Deleting is irreversible: ask once, inline, instead of a modal dialog
+const confirmingDelete = ref(false)
+let confirmTimer: ReturnType<typeof setTimeout> | null = null
+
+function onDeleteClick() {
+  if (confirmingDelete.value) {
+    emit('delete')
+    return
+  }
+  confirmingDelete.value = true
+  if (confirmTimer) clearTimeout(confirmTimer)
+  confirmTimer = setTimeout(() => (confirmingDelete.value = false), 3000)
+}
+onUnmounted(() => {
+  if (confirmTimer) clearTimeout(confirmTimer)
+})
 
 function submit() {
   const t = title.value.trim()
@@ -117,7 +134,11 @@ const STATUS_COLOURS: Record<number, string> = {
 </script>
 
 <template>
-  <div class="panel">
+  <div
+    class="panel material--thick"
+    role="dialog"
+    :aria-label="mode === 'create' ? 'New Bit' : 'Bit Details'"
+  >
     <!-- header -->
     <div class="panel__header">
       <div class="panel__header-left">
@@ -126,7 +147,7 @@ const STATUS_COLOURS: Record<number, string> = {
         </div>
         <span class="panel__heading">{{ mode === 'create' ? 'New Bit' : 'Bit Details' }}</span>
       </div>
-      <button class="panel__close" @click="emit('cancel')">
+      <button class="panel__close pressable" aria-label="Close" @click="emit('cancel')">
         <X :size="14" />
       </button>
     </div>
@@ -160,8 +181,10 @@ const STATUS_COLOURS: Record<number, string> = {
               type="button"
               class="color-swatch"
               :class="{ 'color-swatch--active': color === c }"
-              :style="{ background: c }"
+              :style="{ background: c, color: c }"
               :title="c"
+              :aria-label="`Color ${c}`"
+              :aria-pressed="color === c"
               @click="color = c"
             />
           </div>
@@ -221,17 +244,23 @@ const STATUS_COLOURS: Record<number, string> = {
 
     <!-- footer -->
     <div class="panel__footer">
-      <button v-if="mode === 'edit'" type="button" class="btn btn--danger" @click="emit('delete')">
+      <button
+        v-if="mode === 'edit'"
+        type="button"
+        class="btn btn--danger pressable"
+        :class="{ 'btn--danger-confirm': confirmingDelete }"
+        @click="onDeleteClick"
+      >
         <Trash2 :size="13" />
-        Delete
+        {{ confirmingDelete ? 'Delete Bit?' : 'Delete' }}
       </button>
       <div v-else />
       <div class="panel__actions">
-        <button type="button" class="btn" @click="emit('cancel')">Cancel</button>
+        <button type="button" class="btn pressable" @click="emit('cancel')">Cancel</button>
         <button
           type="submit"
           form="bit-panel-form"
-          class="btn btn--primary"
+          class="btn btn--primary pressable"
           :disabled="!title.trim()"
         >
           {{ mode === 'create' ? 'Create' : 'Save' }}
@@ -243,7 +272,8 @@ const STATUS_COLOURS: Record<number, string> = {
 
 <style scoped>
 /* ─────────────────────────────────────────
-   Panel shell
+   Panel shell — a thick material sheet; enter/leave is driven by
+   the <Transition name="sheet"> in LWorkspace (same path both ways)
 ───────────────────────────────────────── */
 .panel {
   position: fixed;
@@ -252,27 +282,13 @@ const STATUS_COLOURS: Record<number, string> = {
   bottom: 0;
   width: 300px;
   z-index: 100;
-  background-color: var(--surface2);
-  border-right: 1px solid var(--surface3);
-  border-radius: 0 20px 20px 0;
-  box-shadow:
-    4px 0 6px -1px hsl(var(--surface-shadow) / calc(var(--shadow-strength) + 0.05)),
-    10px 0 24px -4px hsl(var(--surface-shadow) / var(--shadow-strength));
+  border: 1px solid var(--material-stroke);
+  border-left: none;
+  border-radius: 0 22px 22px 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: panel-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes panel-enter {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  will-change: transform;
 }
 
 /* ─────────────────────────────────────────
@@ -282,23 +298,21 @@ const STATUS_COLOURS: Record<number, string> = {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px 13px;
-  border-bottom: 1px solid var(--surface3);
+  padding: 16px 16px 12px;
   flex-shrink: 0;
-  animation: fade-in 0.22s ease 0.05s both;
 }
 
 .panel__header-left {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
 }
 
 .panel__icon-wrap {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background-color: var(--surface3);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--brand) 14%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -307,29 +321,26 @@ const STATUS_COLOURS: Record<number, string> = {
 }
 
 .panel__heading {
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 1.0625rem;
+  font-weight: 650;
   color: var(--text0);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .panel__close {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text2);
-  background: transparent;
+  background-color: var(--fill-hover);
   border: none;
   cursor: pointer;
-  transition:
-    background-color 0.15s,
-    color 0.15s;
 }
 .panel__close:hover {
-  background-color: var(--surface3);
+  background-color: var(--fill-press);
   color: var(--text0);
 }
 
@@ -339,12 +350,27 @@ const STATUS_COLOURS: Record<number, string> = {
 .panel__body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 12px;
+  overscroll-behavior: contain;
+  padding: 4px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   scrollbar-width: thin;
   scrollbar-color: var(--surface3) transparent;
+  /* scroll edge effect instead of hard dividers */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 10px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+}
+
+#bit-panel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* ─────────────────────────────────────────
@@ -353,57 +379,41 @@ const STATUS_COLOURS: Record<number, string> = {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  opacity: 0;
-  animation: field-rise 0.22s ease forwards;
-}
-.field--1 {
-  animation-delay: 0.08s;
-}
-.field--2 {
-  animation-delay: 0.12s;
-}
-.field--3 {
-  animation-delay: 0.16s;
-}
-.field--4 {
-  animation-delay: 0.16s;
-}
-.field--5 {
-  animation-delay: 0.2s;
-}
-.field--6 {
-  animation-delay: 0.24s;
+  gap: 6px;
 }
 
 /* two-column grid for status + priority */
 .field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 
 .field__label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.005em;
   color: var(--text2);
-  padding-left: 2px;
+  padding-left: 4px;
 }
 
 .field__box {
-  background-color: var(--surface3);
-  border-radius: 9px;
-  border: 1.5px solid transparent;
+  background-color: var(--fill-hover);
+  border-radius: 10px;
+  border: 1px solid var(--material-stroke);
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
   overflow: hidden;
+}
+.field__box:hover {
+  background-color: var(--fill-press);
 }
 .field__box:has(:focus) {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+  background-color: var(--surface1);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent);
 }
 
 .field__box--select {
@@ -415,14 +425,16 @@ const STATUS_COLOURS: Record<number, string> = {
   background: transparent;
   border: none;
   outline: none;
-  padding: 8px 10px;
-  font-size: 0.875rem;
+  padding: 9px 11px;
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
   color: var(--text0);
   appearance: none;
   -webkit-appearance: none;
 }
 .field__input::placeholder {
   color: var(--text2);
+  opacity: 0.7;
 }
 
 .field__input--select {
@@ -430,34 +442,38 @@ const STATUS_COLOURS: Record<number, string> = {
   padding-right: 26px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236c7086' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 8px center;
+  background-position: right 9px center;
 }
 
 .field__input--dotted {
-  padding-left: 24px;
+  padding-left: 25px;
 }
 
 .field__dot {
   position: absolute;
-  left: 10px;
+  left: 11px;
   top: 50%;
   transform: translateY(-50%);
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   pointer-events: none;
+  transition: background-color 0.2s ease;
 }
 
 .field__input--textarea {
   resize: none;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .field__input--date {
+  color-scheme: light;
+}
+:global(.theme-dark) .field__input--date {
   color-scheme: dark;
 }
 .field__input--date::-webkit-calendar-picker-indicator {
-  filter: invert(0.5);
+  opacity: 0.55;
   cursor: pointer;
   padding: 0;
   margin: 0;
@@ -469,31 +485,42 @@ const STATUS_COLOURS: Record<number, string> = {
 .color-picker {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-  padding: 10px;
-  background-color: var(--surface3);
-  border-radius: 9px;
+  gap: 8px;
+  padding: 12px;
+  background-color: var(--fill-hover);
+  border: 1px solid var(--material-stroke);
+  border-radius: 12px;
 }
 
 .color-swatch {
   aspect-ratio: 1;
   border-radius: 50%;
-  border: 2px solid transparent;
+  border: none;
   cursor: pointer;
-  transition:
-    transform 0.12s ease,
-    box-shadow 0.12s ease,
-    border-color 0.12s ease;
   padding: 0;
   outline: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  transition:
+    transform var(--spring-duration) var(--ease-spring),
+    box-shadow 0.2s ease;
 }
 .color-swatch:hover {
-  transform: scale(1.2);
+  transform: scale(1.12);
 }
+.color-swatch:active {
+  transform: scale(0.9);
+  transition-duration: var(--press-duration);
+}
+/* selection ring sits outside the swatch, like the system colour well */
 .color-swatch--active {
-  border-color: rgba(255, 255, 255, 0.9);
-  transform: scale(1.15);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 0 0 2px var(--surface1),
+    0 0 0 4px currentColor;
+}
+.color-swatch:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--surface1),
+    0 0 0 4px var(--brand);
 }
 
 /* ─────────────────────────────────────────
@@ -503,15 +530,13 @@ const STATUS_COLOURS: Record<number, string> = {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  border-top: 1px solid var(--surface3);
+  padding: 10px 12px 14px;
   flex-shrink: 0;
-  animation: fade-in 0.22s ease 0.14s both;
 }
 
 .panel__actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
 /* ─────────────────────────────────────────
@@ -521,60 +546,48 @@ const STATUS_COLOURS: Record<number, string> = {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 11px;
-  border-radius: 8px;
-  font-size: 0.8125rem;
-  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 550;
+  letter-spacing: -0.005em;
   color: var(--text1);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition:
-    background-color 0.15s,
-    color 0.15s;
 }
 .btn:hover {
-  background-color: var(--surface3);
+  background-color: var(--fill-hover);
   color: var(--text0);
 }
 
 .btn--primary {
   background-color: var(--brand);
   color: hsl(0 0% 100%);
+  font-weight: 600;
+  padding: 8px 18px;
 }
 .btn--primary:hover:not(:disabled) {
   background-color: var(--brand);
-  filter: brightness(1.12);
+  filter: brightness(1.1);
+  color: hsl(0 0% 100%);
 }
 .btn--primary:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
+.btn--danger {
+  color: hsl(0 72% 52%);
+  padding-left: 10px;
+}
 .btn--danger:hover {
-  color: hsl(0 72% 65%);
+  color: hsl(0 72% 50%);
+  background-color: hsl(0 72% 50% / 0.1);
 }
-
-/* ─────────────────────────────────────────
-   Animations
-───────────────────────────────────────── */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes field-rise {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.btn--danger-confirm,
+.btn--danger-confirm:hover {
+  color: hsl(0 0% 100%);
+  background-color: hsl(0 72% 52%);
 }
 </style>

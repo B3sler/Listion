@@ -2,6 +2,7 @@ import { ref, onMounted } from 'vue'
 
 const isDark = ref<boolean | null>(null)
 let initialized = false
+let themeTransitionTimer: ReturnType<typeof setTimeout> | null = null
 
 function applyTheme() {
   const root = document.documentElement
@@ -32,7 +33,12 @@ export function useTheme() {
     }
     isDark.value = !isDark.value
     localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+    // Ease the brightness change instead of flashing between themes
+    const root = document.documentElement
+    root.classList.add('theme-transition')
     applyTheme()
+    if (themeTransitionTimer) clearTimeout(themeTransitionTimer)
+    themeTransitionTimer = setTimeout(() => root.classList.remove('theme-transition'), 320)
   }
 
   return {
