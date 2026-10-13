@@ -43,3 +43,6 @@ node_modules/
 **/.env.*
 !**/.env.example
 
+
+# Brainstorming companion mockups
+.superpowers/
