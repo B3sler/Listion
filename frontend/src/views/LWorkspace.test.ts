@@ -105,4 +105,93 @@ describe('LWorkspace', () => {
     await wrapper.find('.bg-surface1').trigger('dblclick')
     expect(wrapper.text()).toContain('New Bit')
   })
+
+  it('zeigt Flow-Rahmen mit Namen und schaltet per F/Esc in den Lasso-Modus', async () => {
+    const { default: api } = await import('../helpers/api')
+    vi.mocked(api.get).mockImplementation((url: string) =>
+      Promise.resolve({
+        data:
+          url === '/api/bit'
+            ? [
+                {
+                  id: 3,
+                  title: 'Loose',
+                  status: 0,
+                  x: 400,
+                  y: 0,
+                  packetId: null,
+                  order: 0,
+                  flowId: 9,
+                  createdAt: '',
+                },
+              ]
+            : url === '/api/flow'
+              ? [{ id: 9, name: 'Release Q4', color: '#818cf8' }]
+              : [],
+      }),
+    )
+    const wrapper = mount(LWorkspace, {
+      global: { plugins: [router, createPinia()] },
+      attachTo: document.body,
+    })
+    await router.isReady()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(wrapper.find('[data-flow-id="9"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Release Q4')
+
+    expect(wrapper.find('.lasso-capture').exists()).toBe(false)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+    await wrapper.vm.$nextTick()
+    // the capture layer sits above bits so a lasso can start on top of them
+    expect(wrapper.find('.lasso-capture').exists()).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.lasso-capture').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('Filter dimmt nicht passende Kapseln', async () => {
+    const { default: api } = await import('../helpers/api')
+    vi.mocked(api.get).mockImplementation((url: string) =>
+      Promise.resolve({
+        data:
+          url === '/api/bit'
+            ? [
+                {
+                  id: 1,
+                  title: 'High',
+                  status: 0,
+                  x: 0,
+                  y: 0,
+                  packetId: null,
+                  order: 0,
+                  priority: 3,
+                  createdAt: '',
+                },
+                {
+                  id: 2,
+                  title: 'Low',
+                  status: 0,
+                  x: 300,
+                  y: 0,
+                  packetId: null,
+                  order: 0,
+                  priority: 1,
+                  createdAt: '',
+                },
+              ]
+            : [],
+      }),
+    )
+    localStorage.setItem('listion-filter', JSON.stringify({ workflow: [], priority: [3], due: [] }))
+    const wrapper = mount(LWorkspace, { global: { plugins: [router, createPinia()] } })
+    await router.isReady()
+    await new Promise((r) => setTimeout(r, 0))
+    const caps = wrapper.findAll('[data-node-type="bit"]')
+    const high = caps.find((c) => c.text().includes('High'))!
+    const low = caps.find((c) => c.text().includes('Low'))!
+    expect(high.classes()).not.toContain('capsule--dimmed')
+    expect(low.classes()).toContain('capsule--dimmed')
+    localStorage.clear()
+  })
 })
