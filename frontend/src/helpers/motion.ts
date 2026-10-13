@@ -82,11 +82,21 @@ export class Spring {
   private last = 0
   private onUpdate: (v: number) => void
   private onRest?: () => void
+  // Rest thresholds are in the value's own unit: the defaults suit pixels, a scale
+  // factor (zoom) needs far finer ones or it visibly snaps onto its target.
+  private readonly restDelta: number
+  private readonly restSpeed: number
 
-  constructor(initial: number, onUpdate: (v: number) => void) {
+  constructor(
+    initial: number,
+    onUpdate: (v: number) => void,
+    precision: { restDelta?: number; restSpeed?: number } = {},
+  ) {
     this.value = initial
     this.target = initial
     this.onUpdate = onUpdate
+    this.restDelta = precision.restDelta ?? 0.05
+    this.restSpeed = precision.restSpeed ?? 0.5
   }
 
   get isAnimating() {
@@ -142,7 +152,9 @@ export class Spring {
       dt -= h
     }
 
-    const settled = Math.abs(this.velocity) < 0.5 && Math.abs(this.value - this.target) < 0.05
+    const settled =
+      Math.abs(this.velocity) < this.restSpeed &&
+      Math.abs(this.value - this.target) < this.restDelta
     if (settled) {
       this.value = this.target
       this.velocity = 0

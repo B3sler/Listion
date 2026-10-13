@@ -30,15 +30,22 @@ export function useCanvas(containerRef: Ref<HTMLElement | null>) {
   // Independent X / Y / zoom springs — 2D motion decomposed per axis
   const springX = new Spring(panX.value, (v) => (panX.value = v))
   const springY = new Spring(panY.value, (v) => (panY.value = v))
-  const springZ = new Spring(zoom.value, (v) => (zoom.value = v))
+  const springZ = new Spring(zoom.value, (v) => (zoom.value = v), {
+    restDelta: 0.0001,
+    restSpeed: 0.001,
+  })
 
+  /** Direct input takes over: freeze the view where it is and drop any leftover momentum. */
   function stopAll() {
-    springX.stop()
-    springY.stop()
-    springZ.stop()
-    springX.value = panX.value
-    springY.value = panY.value
-    springZ.value = zoom.value
+    for (const [spring, live] of [
+      [springX, panX.value],
+      [springY, panY.value],
+      [springZ, zoom.value],
+    ] as const) {
+      spring.stop()
+      spring.value = live
+      spring.velocity = 0
+    }
   }
 
   function setView(z: number, x: number, y: number) {
