@@ -21,6 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High' }
+const STATUS_LABEL: Record<number, string> = { 0: 'Open', 1: 'In progress', 2: 'Done' }
 
 const color = computed(() => props.bit.color ?? '#6366f1')
 
@@ -42,6 +43,15 @@ const meta = computed(() => {
     parts.push(props.bit.status === 2 ? 'Done' : props.bit.status === 1 ? 'In progress' : 'Open')
   return parts.join(' · ')
 })
+
+const ariaLabel = computed(() => {
+  const parts = [props.bit.title, STATUS_LABEL[props.bit.status] ?? 'Open']
+  if (props.state === 'blocked') parts.push('blocked')
+  if (props.state === 'ready') parts.push('ready')
+  if (props.inCycle) parts.push('in a cycle')
+  if (props.expanded) parts.push(meta.value)
+  return parts.join(', ')
+})
 </script>
 
 <template>
@@ -61,7 +71,7 @@ const meta = computed(() => {
     :data-node-id="bit.id"
     tabindex="0"
     role="button"
-    :aria-label="bit.title"
+    :aria-label="ariaLabel"
     :aria-expanded="expanded"
     @pointerdown="emit('pointerdown', $event)"
     @mousedown.stop
@@ -73,7 +83,7 @@ const meta = computed(() => {
         <Check v-if="bit.status === 2" :size="10" :stroke-width="3" />
       </span>
       <span class="capsule__title">{{ bit.title }}</span>
-      <Lock v-if="state === 'blocked'" :size="11" class="capsule__lock" aria-label="Blocked" />
+      <Lock v-if="state === 'blocked'" :size="11" class="capsule__lock" aria-hidden="true" />
     </div>
     <div class="capsule__meta-wrap" :class="{ 'capsule__meta-wrap--open': expanded }">
       <div class="capsule__meta">{{ meta }}</div>
