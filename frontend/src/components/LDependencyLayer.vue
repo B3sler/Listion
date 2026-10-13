@@ -17,10 +17,30 @@ const COLORS: Record<DependencyItem['state'], string> = {
   done: 'rgba(52,211,153,0.85)',
   cycle: 'rgba(249,115,22,0.9)',
 }
+
+function onArrowKey(e: KeyboardEvent, id: number) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    e.stopPropagation()
+    emit('select', id)
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault()
+    e.stopPropagation()
+    emit('remove', id)
+  }
+}
+
+function onDeleteKey(e: KeyboardEvent, id: number) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    e.stopPropagation()
+    emit('remove', id)
+  }
+}
 </script>
 
 <template>
-  <svg class="deps" aria-hidden="false">
+  <svg class="deps">
     <g
       v-for="item in items"
       :key="item.id"
@@ -38,14 +58,25 @@ const COLORS: Record<DependencyItem['state'], string> = {
         :transform="`translate(${item.tx},${item.ty}) rotate(${item.angle})`"
         :fill="COLORS[item.state]"
       />
-      <path :d="item.d" class="dep__hit" @click.stop="emit('select', item.id)" @mousedown.stop />
+      <path
+        :d="item.d"
+        class="dep__hit"
+        tabindex="0"
+        role="button"
+        aria-label="Dependency, select"
+        @click.stop="emit('select', item.id)"
+        @keydown="onArrowKey($event, item.id)"
+        @mousedown.stop
+      />
       <g
         v-if="selectedId === item.id"
         class="dep__delete"
         role="button"
+        tabindex="0"
         aria-label="Delete dependency"
         :transform="`translate(${item.mx},${item.my})`"
         @click.stop="emit('remove', item.id)"
+        @keydown="onDeleteKey($event, item.id)"
         @mousedown.stop
       >
         <circle r="12" class="dep__delete-bg" />
@@ -90,10 +121,18 @@ const COLORS: Record<DependencyItem['state'], string> = {
   stroke-width: 20;
   pointer-events: stroke;
   cursor: pointer;
+  outline: none;
+}
+.dep__hit:focus-visible {
+  stroke: color-mix(in srgb, var(--brand) 22%, transparent);
 }
 .dep__delete {
   pointer-events: all;
   cursor: pointer;
+  outline: none;
+}
+.dep__delete:focus-visible .dep__delete-bg {
+  stroke-width: 3;
 }
 .dep__delete-bg {
   fill: var(--surface1);

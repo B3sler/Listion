@@ -35,6 +35,18 @@ describe('LBitCapsule', () => {
     expect(open.find('.capsule__meta-wrap').classes()).toContain('capsule__meta-wrap--open')
     expect(open.text()).toContain('High')
   })
+
+  it('liefert Titel und Zustand als aria-label', () => {
+    const blocked = mount(LBitCapsule, {
+      props: { bit: bit(1), state: 'blocked', expanded: false },
+    })
+    const label = blocked.attributes('aria-label') ?? ''
+    expect(label).toContain('Task 1')
+    expect(label).toContain('blocked')
+
+    const done = mount(LBitCapsule, { props: { bit: bit(2, 2), state: null, expanded: false } })
+    expect(done.attributes('aria-label')).toContain('Done')
+  })
 })
 
 describe('LPacketStack', () => {
@@ -69,23 +81,38 @@ describe('LPacketStack', () => {
 })
 
 describe('LDependencyLayer', () => {
+  const item = {
+    id: 4,
+    d: 'M 0 0 C 50 0 50 0 100 0',
+    mx: 50,
+    my: 0,
+    tx: 100,
+    ty: 0,
+    angle: 0,
+    state: 'pending' as const,
+    dimmed: false,
+  }
+
   it('wählt aus und löscht über den ✕-Knopf', async () => {
-    const item = {
-      id: 4,
-      d: 'M 0 0 C 50 0 50 0 100 0',
-      mx: 50,
-      my: 0,
-      tx: 100,
-      ty: 0,
-      angle: 0,
-      state: 'pending' as const,
-      dimmed: false,
-    }
     const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: null } })
     await w.find('.dep__hit').trigger('click')
     expect(w.emitted('select')).toEqual([[4]])
     await w.setProps({ selectedId: 4 })
     await w.find('.dep__delete').trigger('click')
+    expect(w.emitted('remove')).toEqual([[4]])
+  })
+
+  it('bedient Pfeile per Tastatur: Enter wählt, Delete entfernt', async () => {
+    const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: null } })
+    await w.find('.dep__hit').trigger('keydown', { key: 'Enter' })
+    expect(w.emitted('select')).toEqual([[4]])
+    await w.find('.dep__hit').trigger('keydown', { key: 'Delete' })
+    expect(w.emitted('remove')).toEqual([[4]])
+  })
+
+  it('löscht den ✕-Knopf per Enter', async () => {
+    const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: 4 } })
+    await w.find('.dep__delete').trigger('keydown', { key: 'Enter' })
     expect(w.emitted('remove')).toEqual([[4]])
   })
 })
