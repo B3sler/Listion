@@ -7,6 +7,7 @@ import LBitCapsule from '@/components/LBitCapsule.vue'
 import LPacketStack from '@/components/LPacketStack.vue'
 import LDependencyLayer from '@/components/LDependencyLayer.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
+import LSplash from '@/components/LSplash.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
 import { useTheme } from '@/composables/useTheme.ts'
@@ -385,6 +386,9 @@ function onWorkspaceMouseDown(e: MouseEvent) {
 
 const { initTheme, applyTheme, isDark } = useTheme()
 
+// Brand splash plays on every entry into the workspace (login, navigation, reload)
+const showSplash = ref(true)
+
 onMounted(() => {
   initTheme()
   applyTheme()
@@ -580,6 +584,8 @@ onUnmounted(() => {
       :items="menuItems"
       @close="closeContextMenu"
     />
+
+    <LSplash v-if="showSplash" @done="showSplash = false" />
   </div>
 </template>
 
