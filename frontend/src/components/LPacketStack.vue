@@ -10,21 +10,21 @@ const props = defineProps<{
   members: Bit[]
   x: number
   y: number
-  states: Map<number, WorkflowState>
-  cycleBitIds: Set<number>
+  states: Map<string, WorkflowState>
+  cycleBitIds: Set<string>
   summary: PacketSummary
   gapIndex: number | null
   highlighted?: boolean
   dimmed?: boolean
   dragging?: boolean
-  dimmedBitIds?: Set<number>
+  dimmedBitIds?: Set<string>
 }>()
 
 const emit = defineEmits<{
   headerPointerdown: [e: PointerEvent]
-  bitPointerdown: [e: PointerEvent, bitId: number]
-  bitOpen: [bitId: number]
-  bitToggleDone: [bitId: number]
+  bitPointerdown: [e: PointerEvent, bitId: string]
+  bitOpen: [bitId: string]
+  bitToggleDone: [bitId: string]
   linkstart: [e: PointerEvent, from: NodeRef]
   rename: [name: string]
 }>()

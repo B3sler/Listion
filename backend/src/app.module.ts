@@ -21,20 +21,17 @@ import { FlowController } from './modules/flow/flow.controller.js'
 import { Dependency } from './modules/dependency/dependency.entity.js'
 import { DependencyService } from './modules/dependency/dependency.service.js'
 import { DependencyController } from './modules/dependency/dependency.controller.js'
+import { dataSourceOptions } from './data-source.js'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }) as unknown as import('@nestjs/common').DynamicModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
+    // Dev derives the schema from the entities; production only ever applies migrations
     TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: +(process.env.DB_PORT || 5432),
-      username: process.env.DB_USER || 'listion',
-      password: process.env.DB_PASS,
-      database: process.env.DB_NAME || 'listion',
-      entities: [User, Bit, Packet, Flow, Dependency],
+      ...dataSourceOptions(),
       synchronize: process.env.NODE_ENV !== 'production',
+      migrationsRun: process.env.NODE_ENV === 'production',
     }),
     TypeOrmModule.forFeature([User, Bit, Packet, Flow, Dependency]),
     JwtModule.register({

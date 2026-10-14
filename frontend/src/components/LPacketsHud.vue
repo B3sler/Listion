@@ -16,7 +16,7 @@ const CARDS_PER_PAGE = 3
 const props = defineProps<{ cards: PacketCard[] }>()
 
 const emit = defineEmits<{
-  highlight: [packetId: number]
+  highlight: [packetId: string]
   unhighlight: []
 }>()
 
@@ -172,7 +172,7 @@ onMounted(() => {
   measurePageHeight()
 })
 
-const highlightedKey = ref<number | null>(null)
+const highlightedKey = ref<string | null>(null)
 
 // A highlight cannot outlive its packet: once the card is gone, nothing could clear it
 watch(

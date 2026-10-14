@@ -6,7 +6,7 @@ import { dueMatches, matchesFilter } from './useFilter'
 const TODAY = new Date(2026, 9, 14, 15, 0)
 const day = (d: number) => new Date(2026, 9, d, 9, 30).toISOString()
 const bit = (extra: Partial<Bit> = {}): Bit => ({
-  id: 1,
+  id: '1',
   title: 'B',
   status: 0,
   x: 0,

@@ -10,7 +10,7 @@ import {
   STACK_W,
 } from './useFlowLayout'
 
-const bit = (id: number, packetId: number | null = null, order = 0, x = 0, y = 0): Bit => ({
+const bit = (id: string, packetId: string | null = null, order = 0, x = 0, y = 0): Bit => ({
   id,
   title: `B${id}`,
   status: 0,
@@ -42,30 +42,35 @@ describe('stackGeometry', () => {
 })
 
 describe('computeLayout', () => {
-  const bits = [bit(1, 7, 1), bit(2, 7, 0), bit(3, null, 0, 10, 20), bit(4, 99, 0, 5, 6)]
+  const bits = [
+    bit('1', '7', 1),
+    bit('2', '7', 0),
+    bit('3', null, 0, 10, 20),
+    bit('4', '99', 0, 5, 6),
+  ]
   const layout = computeLayout({
     bits,
-    packets: [{ id: 7, name: 'P', x: 100, y: 100 }],
+    packets: [{ id: '7', name: 'P', x: 100, y: 100 }],
     expandedBitId: null,
   })
 
   it('ordnet Stapel-Mitglieder nach order und positioniert sie im Stapel', () => {
-    expect(layout.membersOf.get(7)!.map((b) => b.id)).toEqual([2, 1])
-    expect(layout.bitRects.get(2)).toEqual({ x: 128, y: 140, w: 200, h: 32 })
-    expect(layout.packetRects.get(7)).toEqual({ x: 100, y: 100, w: STACK_W, h: 116 })
+    expect(layout.membersOf.get('7')!.map((b) => b.id)).toEqual(['2', '1'])
+    expect(layout.bitRects.get('2')).toEqual({ x: 128, y: 140, w: 200, h: 32 })
+    expect(layout.packetRects.get('7')).toEqual({ x: 100, y: 100, w: STACK_W, h: 116 })
   })
 
   it('behandelt Bits ohne existierendes Packet als lose', () => {
-    expect(layout.looseBitIds).toEqual([3, 4])
-    expect(layout.bitRects.get(4)).toEqual({ x: 5, y: 6, w: 200, h: 32 })
+    expect(layout.looseBitIds).toEqual(['3', '4'])
+    expect(layout.bitRects.get('4')).toEqual({ x: 5, y: 6, w: 200, h: 32 })
   })
 
   it('liefert Anker an rechter/linker Kante', () => {
-    expect(anchor(layout, { type: 'bit', id: 3 }, 'out')).toEqual({ x: 210, y: 36 })
-    expect(anchor(layout, { type: 'bit', id: 3 }, 'in')).toEqual({ x: 10, y: 36 })
-    expect(anchor(layout, { type: 'packet', id: 7 }, 'out')).toEqual({ x: 336, y: 120 })
-    expect(anchor(layout, { type: 'packet', id: 7 }, 'in')).toEqual({ x: 100, y: 120 })
-    expect(anchor(layout, { type: 'bit', id: 404 }, 'in')).toBeNull()
+    expect(anchor(layout, { type: 'bit', id: '3' }, 'out')).toEqual({ x: 210, y: 36 })
+    expect(anchor(layout, { type: 'bit', id: '3' }, 'in')).toEqual({ x: 10, y: 36 })
+    expect(anchor(layout, { type: 'packet', id: '7' }, 'out')).toEqual({ x: 336, y: 120 })
+    expect(anchor(layout, { type: 'packet', id: '7' }, 'in')).toEqual({ x: 100, y: 120 })
+    expect(anchor(layout, { type: 'bit', id: '404' }, 'in')).toBeNull()
   })
 
   it('vereinigt Rechtecke', () => {

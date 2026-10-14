@@ -69,8 +69,8 @@ function toCanvas(clientX: number, clientY: number) {
   }
 }
 
-const selectedDependencyId = ref<number | null>(null)
-const highlightedPacketId = ref<number | null>(null)
+const selectedDependencyId = ref<string | null>(null)
+const highlightedPacketId = ref<string | null>(null)
 
 // Layout of the stored state — what snap detection and drops reason about
 const baseLayout = computed(() =>
@@ -127,7 +127,7 @@ const {
 const liveLayout = computed(() => {
   const pd = packetDrag.value
   const fd = flowDrag.value
-  const inDraggedFlow = (flowId: number | null | undefined) => fd !== null && flowId === fd.flowId
+  const inDraggedFlow = (flowId: string | null | undefined) => fd !== null && flowId === fd.flowId
   const packets = packetStore.packets.map((p) => {
     if (pd && p.id === pd.packetId) return { ...p, x: pd.x, y: pd.y }
     if (fd && inDraggedFlow(p.flowId)) return { ...p, x: p.x + fd.dx, y: p.y + fd.dy }
@@ -159,7 +159,7 @@ const filterActive = computed(() => toolStore.activeFilterCount > 0)
 
 /** Bits that do not match the filter (empty when no filter is active). */
 const filterDimmed = computed(() => {
-  const dimmed = new Set<number>()
+  const dimmed = new Set<string>()
   if (!filterActive.value) return dimmed
   const today = new Date()
   for (const b of bitStore.bits) {
@@ -198,11 +198,11 @@ const stacks = computed(() =>
     }),
 )
 
-function packetOfBit(id: number): number | null {
+function packetOfBit(id: string): string | null {
   return bitStore.bits.find((b) => b.id === id)?.packetId ?? null
 }
 
-function isBitDimmed(id: number): boolean {
+function isBitDimmed(id: string): boolean {
   const byHighlight =
     highlightedPacketId.value !== null && packetOfBit(id) !== highlightedPacketId.value
   return byHighlight || filterDimmed.value.has(id)
@@ -211,13 +211,13 @@ function isBitDimmed(id: number): boolean {
 function isDependencyDimmed(dep: Dependency): boolean {
   const hp = highlightedPacketId.value
   if (hp !== null) {
-    const touches = (type: 'bit' | 'packet', id: number) =>
+    const touches = (type: 'bit' | 'packet', id: string) =>
       type === 'packet' ? id === hp : packetOfBit(id) === hp
     if (!touches(dep.fromType, dep.fromId) && !touches(dep.toType, dep.toId)) return true
   }
   if (!filterActive.value) return false
   // a packet end matches when at least one of its steps matches
-  const matches = (type: 'bit' | 'packet', id: number) =>
+  const matches = (type: 'bit' | 'packet', id: string) =>
     type === 'bit'
       ? !filterDimmed.value.has(id)
       : (liveLayout.value.membersOf.get(id) ?? []).some((b) => !filterDimmed.value.has(b.id))
@@ -266,7 +266,7 @@ watch(packetCards, (cards) => {
   }
 })
 
-function focusPacket(id: number) {
+function focusPacket(id: string) {
   highlightedPacketId.value = id
   const rect = liveLayout.value.packetRects.get(id)
   const el = containerRef.value
@@ -369,7 +369,7 @@ function handleTouchEndWithLongPress() {
 // --- Detail panel ---
 const showPanel = ref(false)
 const panelMode = ref<'create' | 'edit'>('create')
-const panelBitId = ref<number | null>(null)
+const panelBitId = ref<string | null>(null)
 const panelBit = computed(() =>
   panelBitId.value !== null ? bitStore.bits.find((b) => b.id === panelBitId.value) : undefined,
 )
@@ -381,14 +381,14 @@ function createBit() {
   showPanel.value = true
 }
 
-function openBitDetail(id: number) {
+function openBitDetail(id: string) {
   panelMode.value = 'edit'
   panelBitId.value = id
   showPanel.value = true
 }
 
 /** The status circle ticks a bit off; ticking a done bit re-opens it. */
-async function toggleDone(id: number) {
+async function toggleDone(id: string) {
   const bit = bitStore.bits.find((b) => b.id === id)
   if (!bit) return
   try {

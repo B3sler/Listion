@@ -14,13 +14,13 @@ beforeEach(() => {
   setActivePinia(createPinia())
 })
 
-const flow = { id: 5, name: 'Release', color: '#818cf8' }
+const flow = { id: 'f5', name: 'Release', color: '#818cf8' }
 const rect = { x: 10, y: 20, w: 300, h: 200 }
 
 describe('LFlowFrame', () => {
   it('zeigt den Namen auf der Linie und benennt per Klick um', async () => {
     const w = mount(LFlowFrame, { props: { flow, rect } })
-    expect(w.attributes('data-flow-id')).toBe('5')
+    expect(w.attributes('data-flow-id')).toBe('f5')
     expect(w.attributes('style')).toContain('translate3d(10px, 20px, 0')
     await w.find('.flow__name').trigger('click')
     const input = w.find('input')
@@ -94,14 +94,14 @@ describe('LLassoPath', () => {
   })
 })
 
-const bit = (id: number): Bit => ({
-  id,
-  title: `Task ${id}`,
+const bit = (n: number): Bit => ({
+  id: String(n),
+  title: `Task ${n}`,
   status: 0,
   x: 0,
   y: 0,
-  packetId: 7,
-  order: id,
+  packetId: '7',
+  order: n,
   createdAt: '',
   priority: 3,
 })
@@ -111,15 +111,15 @@ describe('LPacketStack', () => {
     const members = [bit(1), bit(2)]
     const w = mount(LPacketStack, {
       props: {
-        packet: { id: 7, name: 'Stack', x: 0, y: 0 },
+        packet: { id: '7', name: 'Stack', x: 0, y: 0 },
         members,
         x: 0,
         y: 0,
         states: new Map(),
-        cycleBitIds: new Set<number>(),
+        cycleBitIds: new Set<string>(),
         summary: { total: 2, done: 0, inProgress: 0, blocked: 0, ready: 0, cycles: 0, percent: 0 },
         gapIndex: null,
-        dimmedBitIds: new Set([2]),
+        dimmedBitIds: new Set(['2']),
       },
     })
     const capsules = w.findAll('.capsule')

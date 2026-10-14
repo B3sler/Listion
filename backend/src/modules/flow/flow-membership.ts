@@ -14,13 +14,13 @@ export interface FlowRepos {
  * (bits inside a packet never carry a flowId), so both are counted.
  */
 export async function pruneEmptyFlows(
-  flowIds: (number | null | undefined)[],
-  userId: number,
+  flowIds: (string | null | undefined)[],
+  userId: string,
   repos: FlowRepos,
 ): Promise<void> {
-  for (const id of new Set(flowIds.filter((f): f is number => f != null))) {
-    const bits = await repos.bits.count({ where: { flowId: id, user: userId } })
-    const packets = await repos.packets.count({ where: { flowId: id, user: userId } })
-    if (bits + packets === 0) await repos.flows.delete({ id, user: userId })
+  for (const id of new Set(flowIds.filter((f): f is string => f != null))) {
+    const bits = await repos.bits.count({ where: { flowId: id, userId } })
+    const packets = await repos.packets.count({ where: { flowId: id, userId } })
+    if (bits + packets === 0) await repos.flows.delete({ id, userId })
   }
 }

@@ -9,12 +9,12 @@ export interface FlowGestureOptions {
   toCanvas(clientX: number, clientY: number): Point
   zoom: Ref<number>
   layout: ComputedRef<FlowLayout>
-  onTapBit(bitId: number): void
-  onDropBit(bitId: number, target: SnapTarget | null, pos: Point): Promise<void>
-  onMovePacketEnd(packetId: number, x: number, y: number): Promise<void>
+  onTapBit(bitId: string): void
+  onDropBit(bitId: string, target: SnapTarget | null, pos: Point): Promise<void>
+  onMovePacketEnd(packetId: string, x: number, y: number): Promise<void>
   onCreateDependency(from: NodeRef, to: NodeRef): void
   onLassoEnd(points: Point[]): void
-  onMoveFlowEnd(flowId: number, dx: number, dy: number): Promise<void>
+  onMoveFlowEnd(flowId: string, dx: number, dy: number): Promise<void>
 }
 
 // Free drops glide a little: objects on a table, not a scroll view
@@ -23,18 +23,18 @@ const DECELERATION = 0.985
 export function nodeAt(clientX: number, clientY: number): NodeRef | null {
   const el = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-node-type]')
   const type = el?.dataset.nodeType
-  const id = Number(el?.dataset.nodeId)
-  return (type === 'bit' || type === 'packet') && Number.isFinite(id) ? { type, id } : null
+  const id = el?.dataset.nodeId
+  return (type === 'bit' || type === 'packet') && id ? { type, id } : null
 }
 
 export function useFlowGestures(opts: FlowGestureOptions) {
-  const bitDrag = ref<{ bitId: number; x: number; y: number; target: SnapTarget | null } | null>(
+  const bitDrag = ref<{ bitId: string; x: number; y: number; target: SnapTarget | null } | null>(
     null,
   )
-  const packetDrag = ref<{ packetId: number; x: number; y: number } | null>(null)
+  const packetDrag = ref<{ packetId: string; x: number; y: number } | null>(null)
   const linkDrag = ref<{ from: NodeRef; x: number; y: number } | null>(null)
   const lasso = ref<Point[] | null>(null)
-  const flowDrag = ref<{ flowId: number; dx: number; dy: number } | null>(null)
+  const flowDrag = ref<{ flowId: string; dx: number; dy: number } | null>(null)
   let cancelActive: (() => void) | null = null
 
   /**
@@ -83,7 +83,7 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     return cancel
   }
 
-  function startBitPointer(e: PointerEvent, bitId: number) {
+  function startBitPointer(e: PointerEvent, bitId: string) {
     if (e.button !== 0 || e.shiftKey) return
     e.stopPropagation()
     const rect = opts.layout.value.bitRects.get(bitId)
@@ -131,7 +131,7 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     })
   }
 
-  function startPacketPointer(e: PointerEvent, packetId: number) {
+  function startPacketPointer(e: PointerEvent, packetId: string) {
     if (e.button !== 0 || e.shiftKey) return
     e.stopPropagation()
     const rect = opts.layout.value.packetRects.get(packetId)
@@ -203,7 +203,7 @@ export function useFlowGestures(opts: FlowGestureOptions) {
     lasso.value = null
   }
 
-  function startFlowPointer(e: PointerEvent, flowId: number) {
+  function startFlowPointer(e: PointerEvent, flowId: string) {
     if (e.button !== 0 || e.shiftKey) return
     e.stopPropagation()
     const start = opts.toCanvas(e.clientX, e.clientY)

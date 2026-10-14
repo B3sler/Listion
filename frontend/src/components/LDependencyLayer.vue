@@ -5,12 +5,12 @@ import { ARROW_LEN } from '@/composables/useFlowLayout'
 defineProps<{
   items: DependencyItem[]
   preview: string | null
-  selectedId: number | null
+  selectedId: string | null
 }>()
 
 const emit = defineEmits<{
-  select: [id: number]
-  remove: [id: number]
+  select: [id: string]
+  remove: [id: string]
 }>()
 
 // Solid colours: a translucent arrowhead lets the line underneath show through
@@ -22,7 +22,7 @@ const COLORS: Record<DependencyItem['state'], string> = {
 
 const ARROW_POINTS = `0,0 ${-ARROW_LEN},-4.5 ${-ARROW_LEN},4.5`
 
-function onArrowKey(e: KeyboardEvent, id: number) {
+function onArrowKey(e: KeyboardEvent, id: string) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     e.stopPropagation()
@@ -34,7 +34,7 @@ function onArrowKey(e: KeyboardEvent, id: number) {
   }
 }
 
-function onDeleteKey(e: KeyboardEvent, id: number) {
+function onDeleteKey(e: KeyboardEvent, id: string) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     e.stopPropagation()

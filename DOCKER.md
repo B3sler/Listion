@@ -145,40 +145,23 @@ The application will be available at:
 - **Backend API**: http://localhost:3000/api (via nginx proxy)
 - **Swagger UI**: http://localhost:3000/api/docs
 
-### Upgrading an existing production database (bit/packet flow)
+### Database schema and migrations
 
-`synchronize` is off in production and the project has no migrations, so the schema changes of the bit/packet flow must be applied by hand before starting the new backend. Run this once against the production database (adjust the compose file/user/db to your setup):
+Production never synchronizes the schema: the backend applies pending TypeORM migrations on startup (`migrationsRun`), so a fresh production database is created by the first start. Development keeps `synchronize: true`.
+
+After changing an entity, generate a migration from an empty throwaway database and register it in `backend/src/data-source.ts` (the list is explicit, no glob):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec postgres psql -U listion_user -d listion
+docker compose exec postgres psql -U listion_user -d listion -c "CREATE DATABASE listion_migrations;"
+# apply the existing migrations first, then diff the entities against them
+docker compose exec -e DB_NAME=listion_migrations backend npm run migration:run --workspace backend
+docker compose exec -e DB_NAME=listion_migrations backend npm run migration:generate --workspace backend -- src/migrations/<Name>
+# after registering the new file: must report "No changes in database schema were found"
+docker compose exec -e DB_NAME=listion_migrations backend npm run migration:check --workspace backend
+docker compose exec postgres psql -U listion_user -d listion -c "DROP DATABASE listion_migrations;"
 ```
 
-```sql
-ALTER TABLE "bit" ADD COLUMN "packetId" integer NULL, ADD COLUMN "stepOrder" integer NOT NULL DEFAULT 0;
-
-CREATE TABLE "packet" (
-  "id" SERIAL PRIMARY KEY,
-  "user" integer NOT NULL,
-  "name" varchar(60) NOT NULL,
-  "x" integer NOT NULL DEFAULT 0,
-  "y" integer NOT NULL DEFAULT 0,
-  "createdAt" TIMESTAMP NOT NULL DEFAULT now()
-);
-
-CREATE TABLE "dependency" (
-  "id" SERIAL PRIMARY KEY,
-  "userId" integer NOT NULL,
-  "fromType" varchar(6) NOT NULL,
-  "fromId" integer NOT NULL,
-  "toType" varchar(6) NOT NULL,
-  "toId" integer NOT NULL,
-  "createdAt" TIMESTAMP NOT NULL DEFAULT now()
-);
-
-DROP TABLE IF EXISTS "bit_connection";
-```
-
-Note: dropping `bit_connection` discards all old bit-to-bit connections. This is by design, they are replaced by dependencies.
+All IDs are UUIDv7 (`1791981763517-Init` is the baseline). Databases from before that switch use integer IDs and cannot be migrated: reset them (see [Reset Database](#reset-database)).
 
 ### Taskbar tools (flows)
 
@@ -322,9 +305,11 @@ docker-compose exec frontend npm test
 ### Run Database Migrations
 
 ```bash
-docker-compose exec backend npm run migration:run
-# (if you add migration scripts later)
+# apply pending migrations to the configured database (production does this on startup)
+docker compose exec backend npm run migration:run --workspace backend
 ```
+
+See [Database schema and migrations](#database-schema-and-migrations) for creating new ones.
 
 ## Network Architecture
 

@@ -1,5 +1,6 @@
 import type { Bit } from '@/stores/bitStore'
 import type { NodeRef, Packet } from '@/types/flow'
+import { compareIds } from '@/helpers/uuid'
 
 export const CAPSULE_W = 200
 export const CAPSULE_H = 32
@@ -23,11 +24,11 @@ export interface Rect {
 }
 
 export interface FlowLayout {
-  bitRects: Map<number, Rect>
-  packetRects: Map<number, Rect>
+  bitRects: Map<string, Rect>
+  packetRects: Map<string, Rect>
   /** Members of each existing packet, in step order. */
-  membersOf: Map<number, Bit[]>
-  looseBitIds: number[]
+  membersOf: Map<string, Bit[]>
+  looseBitIds: string[]
 }
 
 export function capsuleHeight(expanded: boolean): number {
@@ -63,11 +64,11 @@ export function stackGeometry(
 export function computeLayout(input: {
   bits: Bit[]
   packets: Packet[]
-  expandedBitId: number | null
+  expandedBitId: string | null
 }): FlowLayout {
   const packetIds = new Set(input.packets.map((p) => p.id))
-  const membersOf = new Map<number, Bit[]>()
-  const looseBitIds: number[] = []
+  const membersOf = new Map<string, Bit[]>()
+  const looseBitIds: string[] = []
   for (const bit of input.bits) {
     if (bit.packetId != null && packetIds.has(bit.packetId)) {
       const list = membersOf.get(bit.packetId) ?? []
@@ -77,10 +78,11 @@ export function computeLayout(input: {
       looseBitIds.push(bit.id)
     }
   }
-  for (const list of membersOf.values()) list.sort((a, b) => a.order - b.order || a.id - b.id)
+  for (const list of membersOf.values())
+    list.sort((a, b) => a.order - b.order || compareIds(a.id, b.id))
 
-  const bitRects = new Map<number, Rect>()
-  const packetRects = new Map<number, Rect>()
+  const bitRects = new Map<string, Rect>()
+  const packetRects = new Map<string, Rect>()
 
   for (const packet of input.packets) {
     const members = membersOf.get(packet.id)

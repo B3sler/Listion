@@ -4,16 +4,15 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Put,
-  Req,
   UseGuards,
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
+import { CurrentUserId } from '../user/current-user.decorator.js'
 import { PacketService } from './packet.service.js'
 import { Packet } from './packet.entity.js'
 import { CreatePacketDto } from '../../dto/create-packet.dto.js'
@@ -31,24 +30,26 @@ export class PacketController {
   @Get()
   @ApiOperation({ summary: 'Get all packets (stacks) of the current user' })
   @ApiResponse({ status: 200, type: [Packet] })
-  findAll(@Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  findAll(@CurrentUserId() userId: string) {
     return this.packetService.findAll(userId)
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a packet from at least two bits (in step order)' })
   @ApiResponse({ status: 201, type: Packet })
-  create(@Body() dto: CreatePacketDto, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  @ApiResponse({ status: 409, description: 'The client-chosen id is already taken' })
+  create(@Body() dto: CreatePacketDto, @CurrentUserId() userId: string) {
     return this.packetService.create(dto, userId)
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Rename or move a packet' })
   @ApiResponse({ status: 200, type: Packet })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePacketDto, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePacketDto,
+    @CurrentUserId() userId: string,
+  ) {
     return this.packetService.update(id, userId, dto)
   }
 
@@ -56,19 +57,17 @@ export class PacketController {
   @ApiOperation({ summary: 'Set the exact member bits of a packet in step order' })
   @ApiResponse({ status: 200, type: Packet })
   setBits(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetPacketBitsDto,
-    @Req() req: Request,
+    @CurrentUserId() userId: string,
   ) {
-    const userId = (req as any).user.sub as number
     return this.packetService.setBits(id, userId, dto.bitIds)
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Dissolve a packet (its bits become loose)' })
   @ApiResponse({ status: 200 })
-  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     await this.packetService.remove(id, userId)
     return { message: 'Deleted' }
   }

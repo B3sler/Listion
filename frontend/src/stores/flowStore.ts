@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/helpers/api'
+import { uuidv7 } from '@/helpers/uuid'
 import type { Flow } from '@/types/flow'
+import { whenCreated } from './pendingCreates'
 
 export const useFlowStore = defineStore('flow', () => {
   const flows = ref<Flow[]>([])
@@ -14,17 +16,19 @@ export const useFlowStore = defineStore('flow', () => {
   async function createFlow(payload: {
     name?: string
     color?: string
-    bitIds: number[]
-    packetIds: number[]
+    bitIds: string[]
+    packetIds: string[]
   }): Promise<Flow> {
-    const res = await api.post<Flow>('/api/flow', payload)
+    // Not optimistic (the flow reloads afterwards), but a lassoed bit may be brand new
+    await whenCreated(...payload.bitIds)
+    const res = await api.post<Flow>('/api/flow', { id: uuidv7(), ...payload })
     flows.value.push(res.data)
     return res.data
   }
 
   // Optimistic: the frame must not flicker back while the request is in flight
   async function updateFlow(
-    id: number,
+    id: string,
     updates: Partial<Pick<Flow, 'name' | 'color'>>,
   ): Promise<void> {
     const idx = flows.value.findIndex((f) => f.id === id)
@@ -39,7 +43,7 @@ export const useFlowStore = defineStore('flow', () => {
     }
   }
 
-  async function deleteFlow(id: number): Promise<void> {
+  async function deleteFlow(id: string): Promise<void> {
     await api.delete(`/api/flow/${id}`)
     flows.value = flows.value.filter((f) => f.id !== id)
   }

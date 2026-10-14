@@ -4,15 +4,14 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common'
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
+import { CurrentUserId } from '../user/current-user.decorator.js'
 import { DependencyService } from './dependency.service.js'
 import { Dependency } from './dependency.entity.js'
 import { CreateDependencyDto } from '../../dto/create-dependency.dto.js'
@@ -28,24 +27,22 @@ export class DependencyController {
   @Get()
   @ApiOperation({ summary: 'Get all dependencies (arrows) of the current user' })
   @ApiResponse({ status: 200, type: [Dependency] })
-  findAll(@Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  findAll(@CurrentUserId() userId: string) {
     return this.dependencyService.findAll(userId)
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a dependency: "to" waits for "from" (bit or packet each)' })
   @ApiResponse({ status: 201, type: Dependency })
-  create(@Body() dto: CreateDependencyDto, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  @ApiResponse({ status: 409, description: 'The client-chosen id is already taken' })
+  create(@Body() dto: CreateDependencyDto, @CurrentUserId() userId: string) {
     return this.dependencyService.create(dto, userId)
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a dependency' })
   @ApiResponse({ status: 200 })
-  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     await this.dependencyService.remove(id, userId)
     return { message: 'Deleted' }
   }

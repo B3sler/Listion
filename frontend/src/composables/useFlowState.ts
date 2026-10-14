@@ -1,18 +1,19 @@
 import type { Bit } from '@/stores/bitStore'
 import type { Dependency, NodeRef, Packet, PacketSummary, WorkflowState } from '@/types/flow'
+import { compareIds } from '@/helpers/uuid'
 
 export interface FlowState {
-  bitState: Map<number, WorkflowState>
-  cycleDependencyIds: Set<number>
-  cycleBitIds: Set<number>
-  packetSummary: Map<number, PacketSummary>
+  bitState: Map<string, WorkflowState>
+  cycleDependencyIds: Set<string>
+  cycleBitIds: Set<string>
+  packetSummary: Map<string, PacketSummary>
   sourceDone(dep: Dependency): boolean
 }
 
 // Graph nodes: "b:<id>" bit, "pi:<id>" packet gate (opens the first step), "po:<id>" packet done
-const bitKey = (id: number) => `b:${id}`
-const gateKey = (id: number) => `pi:${id}`
-const doneKey = (id: number) => `po:${id}`
+const bitKey = (id: string) => `b:${id}`
+const gateKey = (id: string) => `pi:${id}`
+const doneKey = (id: string) => `po:${id}`
 const sourceKey = (dep: Dependency) =>
   dep.fromType === 'bit' ? bitKey(dep.fromId) : doneKey(dep.fromId)
 const targetKey = (dep: Dependency) => (dep.toType === 'bit' ? bitKey(dep.toId) : gateKey(dep.toId))
@@ -20,19 +21,20 @@ const targetKey = (dep: Dependency) => (dep.toType === 'bit' ? bitKey(dep.toId) 
 interface Edge {
   from: string
   to: string
-  depId?: number
+  depId?: string
 }
 
 export function computeFlowState(bits: Bit[], packets: Packet[], deps: Dependency[]): FlowState {
   const packetIds = new Set(packets.map((p) => p.id))
-  const members = new Map<number, Bit[]>()
+  const members = new Map<string, Bit[]>()
   for (const bit of bits) {
     if (bit.packetId == null || !packetIds.has(bit.packetId)) continue
     const list = members.get(bit.packetId) ?? []
     list.push(bit)
     members.set(bit.packetId, list)
   }
-  for (const list of members.values()) list.sort((a, b) => a.order - b.order || a.id - b.id)
+  for (const list of members.values())
+    list.sort((a, b) => a.order - b.order || compareIds(a.id, b.id))
 
   const bitIds = new Set(bits.map((b) => b.id))
   const liveDeps = deps.filter(
@@ -59,14 +61,13 @@ export function computeFlowState(bits: Bit[], packets: Packet[], deps: Dependenc
   // done() never recurses through a gate twice: gate predecessors are bits or packet-done nodes,
   // and those only look at bit statuses — so cycles in the graph cannot loop here.
   function done(key: string): boolean {
-    const [kind, raw] = key.split(':') as [string, string]
-    const id = Number(raw)
+    const [kind, id] = key.split(':') as [string, string]
     if (kind === 'b') return statusOf.get(id) === 2
     if (kind === 'po') return (members.get(id) ?? []).every((b) => b.status === 2)
     return (incoming.get(key) ?? []).every((k) => done(k))
   }
 
-  const bitState = new Map<number, WorkflowState>()
+  const bitState = new Map<string, WorkflowState>()
   for (const bit of bits) {
     const prereqs = (incoming.get(bitKey(bit.id)) ?? []).filter(
       // an ungated packet gate is not a real prerequisite
@@ -90,12 +91,12 @@ export function computeFlowState(bits: Bit[], packets: Packet[], deps: Dependenc
   )
   const cycleBitIds = new Set(bits.filter((b) => cyclic.has(bitKey(b.id))).map((b) => b.id))
 
-  const packetSummary = new Map<number, PacketSummary>()
+  const packetSummary = new Map<string, PacketSummary>()
   for (const [packetId, list] of members) {
     const total = list.length
     const doneCount = list.filter((b) => b.status === 2).length
     const ids = new Set(list.map((b) => b.id))
-    const touches = (type: 'bit' | 'packet', id: number) =>
+    const touches = (type: 'bit' | 'packet', id: string) =>
       type === 'packet' ? id === packetId : ids.has(id)
     packetSummary.set(packetId, {
       total,
@@ -176,7 +177,7 @@ function sameComponent(cyclic: Map<string, number>, e: Edge): boolean {
 /** Client-side mirror of the server rules, so invalid arrows never hit the API. */
 export function isValidLink(from: NodeRef, to: NodeRef, bits: Bit[], deps: Dependency[]): boolean {
   if (from.type === to.type && from.id === to.id) return false
-  const packetOf = (id: number) => bits.find((b) => b.id === id)?.packetId ?? null
+  const packetOf = (id: string) => bits.find((b) => b.id === id)?.packetId ?? null
   if (from.type === 'bit' && to.type === 'packet' && packetOf(from.id) === to.id) return false
   if (from.type === 'packet' && to.type === 'bit' && packetOf(to.id) === from.id) return false
   return !deps.some(

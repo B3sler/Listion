@@ -79,11 +79,11 @@ export function useFlowActions() {
    */
   async function reloadKeepingFreedPositions(
     before: FlowLayout,
-    packetBefore: Map<number, number | null>,
-    skipId: number,
+    packetBefore: Map<string, string | null>,
+    skipId: string,
   ): Promise<void> {
     const snapshot = await fetchSnapshot()
-    const patched: { id: number; x: number; y: number }[] = []
+    const patched: { id: string; x: number; y: number }[] = []
     snapshot.bits = snapshot.bits.map((b) => {
       const r = before.bitRects.get(b.id)
       if (b.packetId != null || packetBefore.get(b.id) == null || b.id === skipId || !r) return b
@@ -97,11 +97,11 @@ export function useFlowActions() {
   }
 
   function dropBit(
-    bitId: number,
+    bitId: string,
     target: SnapTarget | null,
     pos: { x: number; y: number },
     layout: FlowLayout,
-    frames: Map<number, Rect>,
+    frames: Map<string, Rect>,
   ): Promise<void> {
     return guarded(async () => {
       const bit = bitStore.bits.find((b) => b.id === bitId)
@@ -162,11 +162,11 @@ export function useFlowActions() {
   }
 
   function movePacket(
-    id: number,
+    id: string,
     x: number,
     y: number,
     layout: FlowLayout,
-    frames: Map<number, Rect>,
+    frames: Map<string, Rect>,
   ): Promise<void> {
     return guarded(async () => {
       const packet = packetStore.packets.find((p) => p.id === id)
@@ -180,7 +180,7 @@ export function useFlowActions() {
     })
   }
 
-  function renamePacket(id: number, name: string): Promise<void> {
+  function renamePacket(id: string, name: string): Promise<void> {
     return guarded(() => packetStore.updatePacket(id, { name }))
   }
 
@@ -192,11 +192,11 @@ export function useFlowActions() {
     })
   }
 
-  function deleteDependency(id: number): Promise<void> {
+  function deleteDependency(id: string): Promise<void> {
     return guarded(() => dependencyStore.deleteDependency(id))
   }
 
-  function deleteBit(id: number, layout: FlowLayout): Promise<void> {
+  function deleteBit(id: string, layout: FlowLayout): Promise<void> {
     return guarded(async () => {
       const packetBefore = new Map(bitStore.bits.map((b) => [b.id, b.packetId] as const))
       await bitStore.deleteBit(id)
@@ -216,15 +216,15 @@ export function useFlowActions() {
     }).then(() => created)
   }
 
-  function renameFlow(id: number, name: string): Promise<void> {
+  function renameFlow(id: string, name: string): Promise<void> {
     return guarded(() => flowStore.updateFlow(id, { name }))
   }
 
-  function recolorFlow(id: number, color: string): Promise<void> {
+  function recolorFlow(id: string, color: string): Promise<void> {
     return guarded(() => flowStore.updateFlow(id, { color }))
   }
 
-  function dissolveFlow(id: number): Promise<void> {
+  function dissolveFlow(id: string): Promise<void> {
     return guarded(async () => {
       await flowStore.deleteFlow(id)
       await reloadAll()
@@ -232,7 +232,7 @@ export function useFlowActions() {
   }
 
   /** Move every loose bit and stack of the flow by the same offset (optimistic per item). */
-  function moveFlow(flowId: number, dx: number, dy: number): Promise<void> {
+  function moveFlow(flowId: string, dx: number, dy: number): Promise<void> {
     return guarded(async () => {
       const bits = bitStore.bits.filter((b) => b.flowId === flowId && b.packetId == null)
       const packets = packetStore.packets.filter((p) => p.flowId === flowId)

@@ -1,9 +1,10 @@
-import { Controller, Post, Body, Res, UseGuards, Get, Req } from '@nestjs/common'
-import type { Response, Request } from 'express'
+import { Controller, Post, Body, Res, UseGuards, Get } from '@nestjs/common'
+import type { Response } from 'express'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 
 import { JwtAuthGuard } from './jwt-auth.guard.js'
+import { CurrentUserId } from './current-user.decorator.js'
 import { UserService } from './user.service.js'
 import { LoginDto, RegisterDto } from '../../dto/auth.dto.js'
 
@@ -23,10 +24,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
-  async register(
-    @Body() body: RegisterDto,
-    @Res() res: Response,
-  ) {
+  async register(@Body() body: RegisterDto, @Res() res: Response) {
     const existing = await this.userService.findByEmail(body.email)
     if (existing) {
       return res.status(400).json({ message: 'Email already registered.' })
@@ -50,12 +48,8 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async me(@Req() req: Request) {
-    const user = (req as any).user
-    if (!user) {
-      return { user: null }
-    }
-    const dbUser = await this.userService.findByEmail(user.email)
+  async me(@CurrentUserId() userId: string) {
+    const dbUser = await this.userService.findById(userId)
     if (!dbUser) {
       return { user: null }
     }

@@ -7,10 +7,16 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
 } from 'class-validator'
 
 export class CreatePacketDto {
+  @ApiProperty({ format: 'uuid', required: false, description: 'Client-generated UUIDv7' })
+  @IsOptional()
+  @IsUUID('7')
+  id?: string
+
   @ApiProperty({ example: 'Release', required: false })
   @IsOptional()
   @IsString()
@@ -28,17 +34,21 @@ export class CreatePacketDto {
 
   @ApiProperty({
     required: false,
-    example: 2,
+    format: 'uuid',
     description: 'Flow the new stack belongs to (the bits leave their own flows)',
   })
   @IsOptional()
-  @IsInt()
-  flowId?: number
+  @IsUUID()
+  flowId?: string
 
-  @ApiProperty({ type: [Number], example: [1, 2], description: 'Bits in step order (at least 2)' })
+  @ApiProperty({
+    type: [String],
+    format: 'uuid',
+    description: 'Bits in step order (at least 2)',
+  })
   @IsArray()
   @ArrayMinSize(2)
   @ArrayUnique()
-  @IsInt({ each: true })
-  bitIds!: number[]
+  @IsUUID('all', { each: true })
+  bitIds!: string[]
 }

@@ -2,31 +2,31 @@ export type NodeType = 'bit' | 'packet'
 
 export interface NodeRef {
   type: NodeType
-  id: number
+  id: string
 }
 
 export interface Packet {
-  id: number
+  id: string
   name: string
   x: number
   y: number
-  flowId?: number | null
+  flowId?: string | null
 }
 
 /** A named group of loose bits and packets, drawn as a frame on the canvas. */
 export interface Flow {
-  id: number
+  id: string
   name: string
   color: string
 }
 
 /** "to" waits for "from". */
 export interface Dependency {
-  id: number
+  id: string
   fromType: NodeType
-  fromId: number
+  fromId: string
   toType: NodeType
-  toId: number
+  toId: string
 }
 
 export type WorkflowState = 'blocked' | 'ready' | null
@@ -42,13 +42,13 @@ export interface PacketSummary {
 }
 
 export interface PacketCard extends PacketSummary {
-  key: number
+  key: string
   name: string
-  bitIds: number[]
+  bitIds: string[]
 }
 
 export interface DependencyItem {
-  id: number
+  id: string
   d: string
   mx: number
   my: number

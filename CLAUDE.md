@@ -39,7 +39,7 @@ listion/
 │   ├── router/       # Vue Router
 │   └── helpers/      # API client (api.ts)
 ├── backend/src/
-│   ├── modules/      # Feature modules: bit/, packet/, dependency/, user/
+│   ├── modules/      # Feature modules: bit/, packet/, flow/, dependency/, user/
 │   ├── dto/          # DTOs (create-bit, update-bit, create-packet, update-packet,
 │   │                 #   set-packet-bits, create-dependency, auth)
 │   ├── app.module.ts
@@ -66,7 +66,7 @@ Frontend hot-reload works via bind-mount + Vite polling (`usePolling: true`). Th
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Requires `.env` with real secrets (see below). `synchronize` is disabled in production.
+Requires `.env` with real secrets (see below). `synchronize` is disabled in production; the backend applies TypeORM migrations on startup instead (`backend/src/migrations/`, registered explicitly in `backend/src/data-source.ts`). After any entity change, generate a migration — workflow in DOCKER.md → "Database schema and migrations".
 
 ## Environment Variables
 
@@ -107,11 +107,12 @@ PORT=3000
 
 ## Security Patterns (enforced)
 
-- **All `/api/bit/*`, `/api/packet/*` and `/api/dependency/*` endpoints require `@UseGuards(JwtAuthGuard)`** — applied at controller level
-- **userId always from JWT** (`req.user.sub`), never accepted from request body
-- **Ownership check on every bit, packet and dependency operation** — services filter by `{ id, user: userId }` (dependencies: `userId`); bits referenced by a packet or dependency must belong to the same user
+- **All `/api/bit/*`, `/api/packet/*`, `/api/flow/*` and `/api/dependency/*` endpoints require `@UseGuards(JwtAuthGuard)`** — applied at controller level
+- **userId always from JWT** — controllers take it via `@CurrentUserId()` (the verified `sub`), never from the request body
+- **Ownership check on every bit, packet, flow and dependency operation** — services filter by `{ id, userId }`; bits and packets referenced by a packet, flow or dependency must belong to the same user
+- **IDs are UUIDv7** — clients may choose the id on create (`@IsUUID('7')`). New rows are created only via `insertWithId()` (`backend/src/common/insert-with-id.ts`), never `save()`: `save()` with an existing id would UPDATE that row, even another user's. A taken id → 409
 - **Auth endpoints** rate-limited to 10 req/min via `@Throttle`
-- **Global rate limit**: 60 req/min (ThrottlerGuard as APP_GUARD); bit/packet/dependency controllers raise it to 300 req/min via `@Throttle` (drag & drop bursts)
+- **Global rate limit**: 60 req/min (ThrottlerGuard as APP_GUARD); bit/packet/flow/dependency controllers raise it to 300 req/min via `@Throttle` (drag & drop bursts)
 - **Helmet** active in `main.ts` for security headers
 - `synchronize: true` only in non-production
 - bcrypt rounds: 12
@@ -157,6 +158,6 @@ Run before every commit.
 - Do **not** commit automatically — the user commits manually
 - Do not add fallback values for secrets (`JWT_SECRET`, `DB_PASS`) — fail fast is intentional
 - When adding a new API endpoint, always add `@UseGuards(JwtAuthGuard)` unless it's explicitly public (login/register)
-- User ID must always come from the JWT payload (`req.user.sub`), never from the request body
+- User ID must always come from the JWT payload (`@CurrentUserId()`), never from the request body
 - `docker-compose.prod.yml` uses the full multi-stage Dockerfile — no `.prod` Dockerfiles exist
 - Frontend dev port: 5173, Backend dev port: 3000, Postgres: 5432

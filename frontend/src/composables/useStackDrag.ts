@@ -1,8 +1,8 @@
 import { CAPSULE_H, STACK_HEADER_H, STEP_PITCH, type FlowLayout } from './useFlowLayout'
 
 export type SnapTarget =
-  | { kind: 'stack'; packetId: number; index: number }
-  | { kind: 'pair'; bitId: number; position: 'above' | 'below' }
+  | { kind: 'stack'; packetId: string; index: number }
+  | { kind: 'pair'; bitId: string; position: 'above' | 'below' }
 
 export const STACK_SNAP_MARGIN = 16
 export const PAIR_SNAP_DISTANCE = 24
@@ -20,7 +20,7 @@ export function insertIndex(pointerY: number, stackTop: number, count: number): 
  */
 export function findSnapTarget(
   probe: { x: number; y: number },
-  draggedBitId: number,
+  draggedBitId: string,
   layout: FlowLayout,
 ): SnapTarget | null {
   for (const [packetId, rect] of layout.packetRects) {
