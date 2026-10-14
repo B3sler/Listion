@@ -1,4 +1,5 @@
-import { FindOperator, type Repository } from 'typeorm'
+import { FindOperator, QueryFailedError, type Repository } from 'typeorm'
+import { uuidv7 } from '../common/uuid.js'
 
 type Where = Record<string, unknown>
 
@@ -13,30 +14,37 @@ function matches(row: Record<string, unknown>, where: Where): boolean {
 }
 
 /** Minimal in-memory Repository for unit tests: equality and In() filters only. */
-export class FakeRepository<T extends { id: number }> {
+export class FakeRepository<T extends { id: string }> {
   rows: T[] = []
-  private nextId = 1
 
   constructor(
     seed: Partial<T>[] = [],
     private readonly defaults: Partial<T> = {},
   ) {
-    for (const row of seed) this.insert(row)
+    for (const row of seed) this.add(row)
   }
 
-  private insert(value: Partial<T>): T {
-    const row = { ...this.defaults, ...value, id: value.id ?? this.nextId } as T
-    this.nextId = Math.max(this.nextId, row.id) + 1
+  private add(value: Partial<T>): T {
+    const row = { ...this.defaults, ...value, id: value.id ?? uuidv7() } as T
     this.rows.push(row)
     return row
   }
 
-  private toWhere(criteria: number | Where): Where {
-    return typeof criteria === 'number' ? { id: criteria } : criteria
+  private toWhere(criteria: string | Where): Where {
+    return typeof criteria === 'string' ? { id: criteria } : criteria
   }
 
   create(value: Partial<T>): Partial<T> {
     return { ...value }
+  }
+
+  /** Like Postgres: a taken primary key fails with unique_violation (23505). */
+  async insert(value: Partial<T>): Promise<{ identifiers: { id: string }[] }> {
+    if (value.id != null && this.rows.some((r) => r.id === value.id)) {
+      const driverError = Object.assign(new Error('duplicate key value'), { code: '23505' })
+      throw new QueryFailedError('INSERT', [], driverError)
+    }
+    return { identifiers: [{ id: this.add(value).id }] }
   }
 
   async save(value: Partial<T>): Promise<T> {
@@ -45,7 +53,7 @@ export class FakeRepository<T extends { id: number }> {
       Object.assign(existing, value)
       return { ...existing }
     }
-    return { ...this.insert(value) }
+    return { ...this.add(value) }
   }
 
   async find(
@@ -73,7 +81,7 @@ export class FakeRepository<T extends { id: number }> {
   }
 
   /** Like TypeORM: undefined values are skipped, and an UPDATE without any value throws. */
-  async update(criteria: number | Where, patch: Partial<T>): Promise<{ affected: number }> {
+  async update(criteria: string | Where, patch: Partial<T>): Promise<{ affected: number }> {
     const values = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))
     if (Object.keys(values).length === 0) {
       throw new Error('UpdateValuesMissingError: no values to update were given')
@@ -89,7 +97,7 @@ export class FakeRepository<T extends { id: number }> {
     return { affected }
   }
 
-  async delete(criteria: number | Where): Promise<{ affected: number }> {
+  async delete(criteria: string | Where): Promise<{ affected: number }> {
     const where = this.toWhere(criteria)
     const before = this.rows.length
     this.rows = this.rows.filter((r) => !matches(r as Record<string, unknown>, where))

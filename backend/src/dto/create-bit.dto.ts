@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -13,6 +14,15 @@ import {
 } from 'class-validator'
 
 export class CreateBitDto {
+  @ApiProperty({
+    format: 'uuid',
+    required: false,
+    description: 'Client-generated UUIDv7, so the bit can be shown before the server answers',
+  })
+  @IsOptional()
+  @IsUUID('7')
+  id?: string
+
   @ApiProperty({ example: 'Go shopping', description: 'Short text describing the task' })
   @IsString()
   @IsNotEmpty()
@@ -63,11 +73,6 @@ export class CreateBitDto {
   @IsInt()
   y?: number
 
-  @ApiProperty({ example: 1, description: 'Bit workspace', required: false })
-  @IsOptional()
-  @IsInt()
-  workspace?: number
-
   @ApiProperty({
     example: '#6366f1',
     description: 'Hex color of the bit (#rrggbb)',
@@ -77,8 +82,8 @@ export class CreateBitDto {
   @Matches(/^#[0-9a-fA-F]{6}$/)
   color?: string
 
-  @ApiProperty({ example: 2, description: 'Flow the new bit belongs to', required: false })
+  @ApiProperty({ format: 'uuid', description: 'Flow the new bit belongs to', required: false })
   @IsOptional()
-  @IsInt()
-  flowId?: number
+  @IsUUID()
+  flowId?: string
 }

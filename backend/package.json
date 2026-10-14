@@ -12,7 +12,10 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "migration:generate": "npm run build && typeorm migration:generate -d dist/data-source.js",
+    "migration:run": "npm run build && typeorm migration:run -d dist/data-source.js",
+    "migration:check": "npm run build && typeorm migration:generate --check -d dist/data-source.js src/migrations/Check"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.3",

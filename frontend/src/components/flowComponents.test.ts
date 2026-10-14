@@ -6,13 +6,13 @@ import LPacketStack from './LPacketStack.vue'
 import LDependencyLayer from './LDependencyLayer.vue'
 import depLayerSource from './LDependencyLayer.vue?raw'
 
-const bit = (id: number, status = 0, order = 0): Bit => ({
+const bit = (id: string, status = 0, order = 0): Bit => ({
   id,
   title: `Task ${id}`,
   status,
   x: 0,
   y: 0,
-  packetId: 7,
+  packetId: '7',
   order,
   createdAt: '',
   priority: 3,
@@ -20,7 +20,7 @@ const bit = (id: number, status = 0, order = 0): Bit => ({
 
 describe('LBitCapsule', () => {
   it('zeigt Titel, markiert blocked und öffnet per Enter', async () => {
-    const w = mount(LBitCapsule, { props: { bit: bit(1), state: 'blocked' } })
+    const w = mount(LBitCapsule, { props: { bit: bit('1'), state: 'blocked' } })
     expect(w.text()).toContain('Task 1')
     expect(w.attributes('data-node-type')).toBe('bit')
     expect(w.attributes('data-node-id')).toBe('1')
@@ -30,13 +30,13 @@ describe('LBitCapsule', () => {
   })
 
   it('klappt keine Details mehr auf', () => {
-    const w = mount(LBitCapsule, { props: { bit: bit(1), state: null } })
+    const w = mount(LBitCapsule, { props: { bit: bit('1'), state: null } })
     expect(w.find('.capsule__meta-wrap').exists()).toBe(false)
     expect(w.attributes('aria-expanded')).toBeUndefined()
   })
 
   it('der Status-Kreis hakt ab, ohne einen Drag oder das Panel auszulösen', async () => {
-    const w = mount(LBitCapsule, { props: { bit: bit(1), state: null } })
+    const w = mount(LBitCapsule, { props: { bit: bit('1'), state: null } })
     const check = w.find('.capsule__check')
     expect(check.attributes('aria-label')).toBe('Mark as done')
     await check.trigger('pointerdown')
@@ -45,41 +45,41 @@ describe('LBitCapsule', () => {
     expect(w.emitted('open')).toBeUndefined()
     expect(w.emitted('toggleDone')).toHaveLength(1)
 
-    const done = mount(LBitCapsule, { props: { bit: bit(2, 2), state: null } })
+    const done = mount(LBitCapsule, { props: { bit: bit('2', 2), state: null } })
     expect(done.find('.capsule__check').attributes('aria-label')).toBe('Mark as open')
   })
 
   it('zeigt die Priorität als farbige Flagge, ohne Priorität keine', () => {
-    const high = mount(LBitCapsule, { props: { bit: bit(1), state: null } })
+    const high = mount(LBitCapsule, { props: { bit: bit('1'), state: null } })
     expect(high.find('.capsule__prio').classes()).toContain('capsule__prio--3')
-    const low = mount(LBitCapsule, { props: { bit: { ...bit(1), priority: 1 }, state: null } })
+    const low = mount(LBitCapsule, { props: { bit: { ...bit('1'), priority: 1 }, state: null } })
     expect(low.find('.capsule__prio').classes()).toContain('capsule__prio--1')
     const none = mount(LBitCapsule, {
-      props: { bit: { ...bit(1), priority: undefined }, state: null },
+      props: { bit: { ...bit('1'), priority: undefined }, state: null },
     })
     expect(none.find('.capsule__prio').exists()).toBe(false)
   })
 
   it('liefert Titel, Zustand und Priorität als aria-label', () => {
-    const blocked = mount(LBitCapsule, { props: { bit: bit(1), state: 'blocked' } })
+    const blocked = mount(LBitCapsule, { props: { bit: bit('1'), state: 'blocked' } })
     const label = blocked.attributes('aria-label') ?? ''
     expect(label).toContain('Task 1')
     expect(label).toContain('blocked')
     expect(label).toContain('High priority')
 
-    const done = mount(LBitCapsule, { props: { bit: bit(2, 2), state: null } })
+    const done = mount(LBitCapsule, { props: { bit: bit('2', 2), state: null } })
     expect(done.attributes('aria-label')).toContain('Done')
   })
 })
 
 describe('LPacketStack', () => {
   const props = {
-    packet: { id: 7, name: 'Release', x: 0, y: 0 },
-    members: [bit(1, 2, 0), bit(2, 0, 1)],
+    packet: { id: '7', name: 'Release', x: 0, y: 0 },
+    members: [bit('1', 2, 0), bit('2', 0, 1)],
     x: 10,
     y: 20,
     states: new Map(),
-    cycleBitIds: new Set<number>(),
+    cycleBitIds: new Set<string>(),
     summary: { total: 2, done: 1, inProgress: 0, blocked: 0, ready: 1, cycles: 0, percent: 50 },
     gapIndex: null,
   }
@@ -87,7 +87,7 @@ describe('LPacketStack', () => {
   it('reicht das Abhaken eines Schritts weiter', async () => {
     const w = mount(LPacketStack, { props })
     await w.findAll('.capsule__check')[1]!.trigger('click')
-    expect(w.emitted('bitToggleDone')).toEqual([[2]])
+    expect(w.emitted('bitToggleDone')).toEqual([['2']])
   })
 
   it('zeigt Name, Fortschritt und nummerierte Schritte', () => {
@@ -110,7 +110,7 @@ describe('LPacketStack', () => {
 
 describe('LDependencyLayer', () => {
   const item = {
-    id: 4,
+    id: '4',
     d: 'M 0 0 C 50 0 50 0 100 0',
     mx: 50,
     my: 0,
@@ -124,18 +124,18 @@ describe('LDependencyLayer', () => {
   it('wählt aus und löscht über den ✕-Knopf', async () => {
     const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: null } })
     await w.find('.dep__hit').trigger('click')
-    expect(w.emitted('select')).toEqual([[4]])
-    await w.setProps({ selectedId: 4 })
+    expect(w.emitted('select')).toEqual([['4']])
+    await w.setProps({ selectedId: '4' })
     await w.find('.dep__delete').trigger('click')
-    expect(w.emitted('remove')).toEqual([[4]])
+    expect(w.emitted('remove')).toEqual([['4']])
   })
 
   it('bedient Pfeile per Tastatur: Enter wählt, Delete entfernt', async () => {
     const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: null } })
     await w.find('.dep__hit').trigger('keydown', { key: 'Enter' })
-    expect(w.emitted('select')).toEqual([[4]])
+    expect(w.emitted('select')).toEqual([['4']])
     await w.find('.dep__hit').trigger('keydown', { key: 'Delete' })
-    expect(w.emitted('remove')).toEqual([[4]])
+    expect(w.emitted('remove')).toEqual([['4']])
   })
 
   it('zeichnet die Pfeilspitze deckend, damit die Linie nicht durchscheint', () => {
@@ -148,9 +148,9 @@ describe('LDependencyLayer', () => {
   })
 
   it('löscht den ✕-Knopf per Enter', async () => {
-    const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: 4 } })
+    const w = mount(LDependencyLayer, { props: { items: [item], preview: null, selectedId: '4' } })
     await w.find('.dep__delete').trigger('keydown', { key: 'Enter' })
-    expect(w.emitted('remove')).toEqual([[4]])
+    expect(w.emitted('remove')).toEqual([['4']])
   })
 })
 
@@ -168,7 +168,7 @@ describe('LDependencyLayer Größe', () => {
 
 describe('Pan-Gesten über Knoten', () => {
   const depItem = {
-    id: 4,
+    id: '4',
     d: 'M 0 0 C 50 0 50 0 100 0',
     mx: 50,
     my: 0,
@@ -179,12 +179,12 @@ describe('Pan-Gesten über Knoten', () => {
     dimmed: false,
   }
   const stackProps = {
-    packet: { id: 7, name: 'Release', x: 0, y: 0 },
-    members: [bit(1, 2, 0)],
+    packet: { id: '7', name: 'Release', x: 0, y: 0 },
+    members: [bit('1', 2, 0)],
     x: 0,
     y: 0,
     states: new Map(),
-    cycleBitIds: new Set<number>(),
+    cycleBitIds: new Set<string>(),
     summary: { total: 1, done: 1, inProgress: 0, blocked: 0, ready: 0, cycles: 0, percent: 100 },
     gapIndex: null,
   }
@@ -205,7 +205,7 @@ describe('Pan-Gesten über Knoten', () => {
       '.capsule',
       (host) =>
         void mount(LBitCapsule, {
-          props: { bit: bit(1), state: null },
+          props: { bit: bit('1'), state: null },
           attachTo: host,
         }),
     ],
@@ -214,7 +214,7 @@ describe('Pan-Gesten über Knoten', () => {
       '.capsule__handle',
       (host) =>
         void mount(LBitCapsule, {
-          props: { bit: bit(1), state: null },
+          props: { bit: bit('1'), state: null },
           attachTo: host,
         }),
     ],
@@ -238,7 +238,7 @@ describe('Pan-Gesten über Knoten', () => {
       '.dep__delete',
       (host) =>
         void mount(LDependencyLayer, {
-          props: { items: [depItem], preview: null, selectedId: 4 },
+          props: { items: [depItem], preview: null, selectedId: '4' },
           attachTo: host,
         }),
     ],

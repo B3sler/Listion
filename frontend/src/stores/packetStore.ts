@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/helpers/api'
+import { uuidv7 } from '@/helpers/uuid'
 import type { Packet } from '@/types/flow'
+import { whenCreated } from './pendingCreates'
 
 export const usePacketStore = defineStore('packet', () => {
   const packets = ref<Packet[]>([])
@@ -15,11 +17,14 @@ export const usePacketStore = defineStore('packet', () => {
     name?: string
     x: number
     y: number
-    bitIds: number[]
-    flowId?: number
+    bitIds: string[]
+    flowId?: string
   }): Promise<Packet> {
+    // Not optimistic (the flow reloads after a packet forms), but its members may be brand new
+    await whenCreated(...payload.bitIds)
     const res = await api.post<Packet>('/api/packet', {
       ...payload,
+      id: uuidv7(),
       x: Math.round(payload.x),
       y: Math.round(payload.y),
     })
@@ -28,7 +33,7 @@ export const usePacketStore = defineStore('packet', () => {
   }
 
   async function updatePacket(
-    id: number,
+    id: string,
     updates: Partial<Pick<Packet, 'name' | 'x' | 'y' | 'flowId'>>,
   ): Promise<void> {
     const body = { ...updates }
@@ -46,11 +51,12 @@ export const usePacketStore = defineStore('packet', () => {
     }
   }
 
-  async function setBits(id: number, bitIds: number[]): Promise<void> {
+  async function setBits(id: string, bitIds: string[]): Promise<void> {
+    await whenCreated(...bitIds)
     await api.put(`/api/packet/${id}/bits`, { bitIds })
   }
 
-  async function deletePacket(id: number): Promise<void> {
+  async function deletePacket(id: string): Promise<void> {
     await api.delete(`/api/packet/${id}`)
     packets.value = packets.value.filter((p) => p.id !== id)
   }

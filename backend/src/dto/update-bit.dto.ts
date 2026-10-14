@@ -1,25 +1,26 @@
 import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger'
-import { IsInt, IsOptional } from 'class-validator'
+import { IsOptional, IsUUID } from 'class-validator'
 import { CreateBitDto } from './create-bit.dto.js'
 
-export class UpdateBitDto extends PartialType(OmitType(CreateBitDto, ['flowId'] as const)) {
+// the id is fixed at creation; flowId gets its own nullable field below
+export class UpdateBitDto extends PartialType(OmitType(CreateBitDto, ['id', 'flowId'] as const)) {
   @ApiProperty({
     required: false,
     nullable: true,
-    example: 3,
+    format: 'uuid',
     description: 'Append the bit to this packet, or null to make it a loose bit',
   })
   @IsOptional()
-  @IsInt()
-  packetId?: number | null
+  @IsUUID()
+  packetId?: string | null
 
   @ApiProperty({
     required: false,
     nullable: true,
-    example: 2,
+    format: 'uuid',
     description: 'Put the loose bit into this flow, or null to take it out',
   })
   @IsOptional()
-  @IsInt()
-  flowId?: number | null
+  @IsUUID()
+  flowId?: string | null
 }

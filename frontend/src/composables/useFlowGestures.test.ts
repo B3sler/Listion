@@ -5,7 +5,7 @@ import type { Packet } from '@/types/flow'
 import { computeLayout } from './useFlowLayout'
 import { useFlowGestures } from './useFlowGestures'
 
-const bit = (id: number, packetId: number | null, order: number, x = 0, y = 0): Bit => ({
+const bit = (id: string, packetId: string | null, order: number, x = 0, y = 0): Bit => ({
   id,
   title: `B${id}`,
   status: 0,
@@ -33,7 +33,7 @@ let clock = 0
 function setup(options: { zoom?: number; bits?: Bit[]; packets?: Packet[] } = {}) {
   const layout = computed(() =>
     computeLayout({
-      bits: options.bits ?? [bit(1, null, 0, 0, 0), bit(2, null, 0, 0, 300)],
+      bits: options.bits ?? [bit('1', null, 0, 0, 0), bit('2', null, 0, 0, 300)],
       packets: options.packets ?? [],
       expandedBitId: null,
     }),
@@ -57,10 +57,10 @@ function stubNodeUnder(el: HTMLElement) {
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => el })
 }
 
-function nodeElement(type: 'bit' | 'packet', id: number) {
+function nodeElement(type: 'bit' | 'packet', id: string) {
   const el = document.createElement('div')
   el.dataset.nodeType = type
-  el.dataset.nodeId = String(id)
+  el.dataset.nodeId = id
   return el
 }
 
@@ -71,7 +71,7 @@ function nodeElement(type: 'bit' | 'packet', id: number) {
 function freeDropOfBit2(zoom: number) {
   const { opts, g } = setup({ zoom })
   clock = 0
-  g.startBitPointer(pointer('pointerdown', 10, 300), 2)
+  g.startBitPointer(pointer('pointerdown', 10, 300), '2')
   clock = 16
   window.dispatchEvent(pointer('pointermove', 60, 300))
   clock = 32
@@ -94,15 +94,15 @@ afterEach(() => {
 describe('useFlowGestures', () => {
   it('ein Klick ohne Bewegung ist ein Tap', () => {
     const { opts, g } = setup()
-    g.startBitPointer(pointer('pointerdown', 10, 10), 1)
+    g.startBitPointer(pointer('pointerdown', 10, 10), '1')
     window.dispatchEvent(pointer('pointerup', 11, 11))
-    expect(opts.onTapBit).toHaveBeenCalledWith(1)
+    expect(opts.onTapBit).toHaveBeenCalledWith('1')
     expect(opts.onDropBit).not.toHaveBeenCalled()
   })
 
   it('pointercancel ohne Bewegung ist kein Tap', () => {
     const { opts, g } = setup()
-    g.startBitPointer(pointer('pointerdown', 10, 10), 1)
+    g.startBitPointer(pointer('pointerdown', 10, 10), '1')
     window.dispatchEvent(pointer('pointercancel', 10, 10))
     expect(opts.onTapBit).not.toHaveBeenCalled()
     expect(opts.onDropBit).not.toHaveBeenCalled()
@@ -111,18 +111,18 @@ describe('useFlowGestures', () => {
 
   it('ziehen folgt dem Pointer mit Greif-Versatz und erkennt Snap auf lose Kapsel', async () => {
     const { opts, g } = setup()
-    g.startBitPointer(pointer('pointerdown', 10, 300), 2)
+    g.startBitPointer(pointer('pointerdown', 10, 300), '2')
     // grabbed 10px from the left edge, at the top edge → grab offset (10, 0)
     window.dispatchEvent(pointer('pointermove', 60, 100))
     window.dispatchEvent(pointer('pointermove', 60, 40))
-    expect(g.bitDrag.value).toMatchObject({ bitId: 2, x: 50, y: 40 })
+    expect(g.bitDrag.value).toMatchObject({ bitId: '2', x: 50, y: 40 })
     // probe = capsule centre (150, 56) is 40px below bit 1's centre → pair snap
-    expect(g.bitDrag.value!.target).toEqual({ kind: 'pair', bitId: 1, position: 'below' })
+    expect(g.bitDrag.value!.target).toEqual({ kind: 'pair', bitId: '1', position: 'below' })
     window.dispatchEvent(pointer('pointerup', 60, 40))
     await Promise.resolve()
     expect(opts.onDropBit).toHaveBeenCalledWith(
-      2,
-      { kind: 'pair', bitId: 1, position: 'below' },
+      '2',
+      { kind: 'pair', bitId: '1', position: 'below' },
       { x: 50, y: 40 },
     )
   })
@@ -130,7 +130,7 @@ describe('useFlowGestures', () => {
   it('ein freier Drop gleitet in Wurfrichtung weiter', () => {
     // release velocity 100px / 32ms = 3125 px/s → glide 3125 * 0.985 / 15 ≈ 205px
     const [bitId, target, pos] = freeDropOfBit2(1)
-    expect(bitId).toBe(2)
+    expect(bitId).toBe('2')
     expect(target).toBeNull()
     // raw drag position is x = 100, y = 300; the glide moves it further right only
     expect(pos.x).toBeCloseTo(305.21, 1)
@@ -146,40 +146,40 @@ describe('useFlowGestures', () => {
 
   it('ziehen eines Stacks folgt dem Pointer und ruft onMovePacketEnd beim Loslassen', () => {
     const { opts, g } = setup({
-      bits: [bit(1, 7, 0), bit(2, 7, 1)],
-      packets: [{ id: 7, name: 'P', x: 100, y: 100 }],
+      bits: [bit('1', '7', 0), bit('2', '7', 1)],
+      packets: [{ id: '7', name: 'P', x: 100, y: 100 }],
     })
-    g.startPacketPointer(pointer('pointerdown', 110, 110), 7)
+    g.startPacketPointer(pointer('pointerdown', 110, 110), '7')
     clock = 10
     window.dispatchEvent(pointer('pointermove', 160, 150))
     // grab offset (10, 10) from the stack's top-left corner at (100, 100)
-    expect(g.packetDrag.value).toEqual({ packetId: 7, x: 150, y: 140 })
+    expect(g.packetDrag.value).toEqual({ packetId: '7', x: 150, y: 140 })
     // release after the pointer rested: no momentum, so the stack stays where dropped
     clock = 100
     window.dispatchEvent(pointer('pointerup', 160, 150))
-    expect(opts.onMovePacketEnd).toHaveBeenCalledWith(7, 150, 140)
+    expect(opts.onMovePacketEnd).toHaveBeenCalledWith('7', 150, 140)
     expect(g.packetDrag.value).toBeNull()
   })
 
   it('ein Pfeil von einer Kapsel zu einem Stack erzeugt eine Abhängigkeit', () => {
     const { opts, g } = setup()
-    stubNodeUnder(nodeElement('packet', 7))
-    g.startLinkPointer(pointer('pointerdown', 10, 10), { type: 'bit', id: 1 })
+    stubNodeUnder(nodeElement('packet', '7'))
+    g.startLinkPointer(pointer('pointerdown', 10, 10), { type: 'bit', id: '1' })
     clock = 10
     window.dispatchEvent(pointer('pointermove', 60, 60))
-    expect(g.linkDrag.value).toEqual({ from: { type: 'bit', id: 1 }, x: 60, y: 60 })
+    expect(g.linkDrag.value).toEqual({ from: { type: 'bit', id: '1' }, x: 60, y: 60 })
     window.dispatchEvent(pointer('pointerup', 60, 60))
     expect(opts.onCreateDependency).toHaveBeenCalledWith(
-      { type: 'bit', id: 1 },
-      { type: 'packet', id: 7 },
+      { type: 'bit', id: '1' },
+      { type: 'packet', id: '7' },
     )
     expect(g.linkDrag.value).toBeNull()
   })
 
   it('ein Klick auf einen Pfeil ohne Bewegung erzeugt keine Abhängigkeit', () => {
     const { opts, g } = setup()
-    stubNodeUnder(nodeElement('packet', 7))
-    g.startLinkPointer(pointer('pointerdown', 10, 10), { type: 'bit', id: 1 })
+    stubNodeUnder(nodeElement('packet', '7'))
+    g.startLinkPointer(pointer('pointerdown', 10, 10), { type: 'bit', id: '1' })
     window.dispatchEvent(pointer('pointerup', 10, 10))
     expect(opts.onCreateDependency).not.toHaveBeenCalled()
     expect(g.linkDrag.value).toBeNull()
@@ -187,8 +187,8 @@ describe('useFlowGestures', () => {
 
   it('ein Pfeil auf denselben Knoten erzeugt keine Abhängigkeit', () => {
     const { opts, g } = setup()
-    stubNodeUnder(nodeElement('bit', 1))
-    g.startLinkPointer(pointer('pointerdown', 10, 10), { type: 'bit', id: 1 })
+    stubNodeUnder(nodeElement('bit', '1'))
+    g.startLinkPointer(pointer('pointerdown', 10, 10), { type: 'bit', id: '1' })
     window.dispatchEvent(pointer('pointermove', 60, 60))
     window.dispatchEvent(pointer('pointerup', 60, 60))
     expect(opts.onCreateDependency).not.toHaveBeenCalled()
@@ -196,7 +196,7 @@ describe('useFlowGestures', () => {
 
   it('pointercancel beendet einen Drag sauber ohne Callbacks', async () => {
     const { opts, g } = setup()
-    g.startBitPointer(pointer('pointerdown', 10, 10), 1)
+    g.startBitPointer(pointer('pointerdown', 10, 10), '1')
     window.dispatchEvent(pointer('pointermove', 400, 400))
     window.dispatchEvent(pointer('pointercancel', 400, 400))
     await Promise.resolve()
@@ -237,13 +237,13 @@ describe('useFlowGestures', () => {
 
   it('Rahmen ziehen liefert den Versatz und meldet ihn beim Loslassen', async () => {
     const { opts, g } = setup()
-    g.startFlowPointer(pointer('pointerdown', 100, 100), 5)
+    g.startFlowPointer(pointer('pointerdown', 100, 100), 'f5')
     window.dispatchEvent(pointer('pointermove', 140, 130))
-    expect(g.flowDrag.value).toEqual({ flowId: 5, dx: 40, dy: 30 })
+    expect(g.flowDrag.value).toEqual({ flowId: 'f5', dx: 40, dy: 30 })
     clock = 10_000 // released after resting: no glide
     window.dispatchEvent(pointer('pointerup', 140, 130))
     await Promise.resolve()
     expect(g.flowDrag.value).toBeNull()
-    expect(opts.onMoveFlowEnd).toHaveBeenCalledWith(5, 40, 30)
+    expect(opts.onMoveFlowEnd).toHaveBeenCalledWith('f5', 40, 30)
   })
 })

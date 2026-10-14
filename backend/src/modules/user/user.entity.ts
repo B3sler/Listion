@@ -1,9 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm'
+import { Entity, PrimaryColumn, Column } from 'typeorm'
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn()
-  id!: number
+  // UUIDv7, assigned by UserService (see common/uuid.ts)
+  @PrimaryColumn('uuid')
+  id!: string
 
   @Column({ unique: true })
   email!: string

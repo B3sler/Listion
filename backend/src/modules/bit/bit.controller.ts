@@ -7,13 +7,12 @@ import {
   Put,
   Delete,
   UseGuards,
-  Req,
-  ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
-import type { Request } from 'express'
 import { JwtAuthGuard } from '../user/jwt-auth.guard.js'
+import { CurrentUserId } from '../user/current-user.decorator.js'
 import { BitService } from './bit.service.js'
 import { CreateBitDto } from '../../dto/create-bit.dto.js'
 import { UpdateBitDto } from '../../dto/update-bit.dto.js'
@@ -30,24 +29,22 @@ export class BitController {
   @Get()
   @ApiOperation({ summary: 'Get all bits (tasks) for the current user' })
   @ApiResponse({ status: 200, type: [Bit] })
-  findAll(@Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  findAll(@CurrentUserId() userId: string) {
     return this.bitService.findAll(userId)
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
-  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     return this.bitService.findOne(id, userId)
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a new bit (task)' })
   @ApiResponse({ status: 201, type: Bit })
-  create(@Body() createBitDto: CreateBitDto, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  @ApiResponse({ status: 409, description: 'The client-chosen id is already taken' })
+  create(@Body() createBitDto: CreateBitDto, @CurrentUserId() userId: string) {
     return this.bitService.create(createBitDto, userId)
   }
 
@@ -55,19 +52,17 @@ export class BitController {
   @ApiOperation({ summary: 'Update a bit (task)' })
   @ApiResponse({ status: 200, type: Bit })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateBitDto: UpdateBitDto,
-    @Req() req: Request,
+    @CurrentUserId() userId: string,
   ) {
-    const userId = (req as any).user.sub as number
     return this.bitService.update(id, userId, updateBitDto)
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a bit (task)' })
   @ApiResponse({ status: 204 })
-  async remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
-    const userId = (req as any).user.sub as number
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     await this.bitService.remove(id, userId)
     return { message: 'Deleted' }
   }

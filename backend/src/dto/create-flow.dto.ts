@@ -2,15 +2,21 @@ import { ApiProperty } from '@nestjs/swagger'
 import {
   ArrayUnique,
   IsArray,
-  IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator'
 
 export class CreateFlowDto {
+  @ApiProperty({ format: 'uuid', required: false, description: 'Client-generated UUIDv7' })
+  @IsOptional()
+  @IsUUID('7')
+  id?: string
+
   // absent is fine; null is not (it would reach the NOT NULL column)
   @ApiProperty({ example: 'Release Q4', required: false })
   @ValidateIf((_, value) => value !== undefined)
@@ -24,15 +30,15 @@ export class CreateFlowDto {
   @Matches(/^#[0-9a-fA-F]{6}$/)
   color?: string
 
-  @ApiProperty({ type: [Number], example: [1, 4], description: 'Loose bits to put into the flow' })
+  @ApiProperty({ type: [String], format: 'uuid', description: 'Loose bits to put into the flow' })
   @IsArray()
   @ArrayUnique()
-  @IsInt({ each: true })
-  bitIds!: number[]
+  @IsUUID('all', { each: true })
+  bitIds!: string[]
 
-  @ApiProperty({ type: [Number], example: [2], description: 'Packets to put into the flow' })
+  @ApiProperty({ type: [String], format: 'uuid', description: 'Packets to put into the flow' })
   @IsArray()
   @ArrayUnique()
-  @IsInt({ each: true })
-  packetIds!: number[]
+  @IsUUID('all', { each: true })
+  packetIds!: string[]
 }

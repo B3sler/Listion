@@ -51,27 +51,27 @@ describe('LWorkspace', () => {
           url === '/api/bit'
             ? [
                 {
-                  id: 1,
+                  id: '1',
                   title: 'Plan',
                   status: 2,
                   x: 0,
                   y: 0,
-                  packetId: 7,
+                  packetId: '7',
                   order: 0,
                   createdAt: '',
                 },
                 {
-                  id: 2,
+                  id: '2',
                   title: 'Build',
                   status: 0,
                   x: 0,
                   y: 0,
-                  packetId: 7,
+                  packetId: '7',
                   order: 1,
                   createdAt: '',
                 },
                 {
-                  id: 3,
+                  id: '3',
                   title: 'Loose',
                   status: 0,
                   x: 400,
@@ -82,7 +82,7 @@ describe('LWorkspace', () => {
                 },
               ]
             : url === '/api/packet'
-              ? [{ id: 7, name: 'Release', x: 0, y: 0 }]
+              ? [{ id: '7', name: 'Release', x: 0, y: 0 }]
               : [],
       }),
     )
@@ -114,19 +114,19 @@ describe('LWorkspace', () => {
           url === '/api/bit'
             ? [
                 {
-                  id: 3,
+                  id: '3',
                   title: 'Loose',
                   status: 0,
                   x: 400,
                   y: 0,
                   packetId: null,
                   order: 0,
-                  flowId: 9,
+                  flowId: 'f9',
                   createdAt: '',
                 },
               ]
             : url === '/api/flow'
-              ? [{ id: 9, name: 'Release Q4', color: '#818cf8' }]
+              ? [{ id: 'f9', name: 'Release Q4', color: '#818cf8' }]
               : [],
       }),
     )
@@ -136,7 +136,7 @@ describe('LWorkspace', () => {
     })
     await router.isReady()
     await new Promise((r) => setTimeout(r, 0))
-    expect(wrapper.find('[data-flow-id="9"]').exists()).toBe(true)
+    expect(wrapper.find('[data-flow-id="f9"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Release Q4')
 
     expect(wrapper.find('.lasso-capture').exists()).toBe(false)
@@ -152,14 +152,14 @@ describe('LWorkspace', () => {
 
   describe('Flow-Rahmen', () => {
     const looseInFlow = {
-      id: 3,
+      id: '3',
       title: 'Loose',
       status: 0,
       x: 400,
       y: 0,
       packetId: null,
       order: 0,
-      flowId: 9,
+      flowId: 'f9',
       createdAt: '',
     }
 
@@ -173,7 +173,7 @@ describe('LWorkspace', () => {
               : url === '/api/packet'
                 ? (extra.packets ?? [])
                 : url === '/api/flow'
-                  ? [{ id: 9, name: 'Release Q4', color: '#818cf8' }]
+                  ? [{ id: 'f9', name: 'Release Q4', color: '#818cf8' }]
                   : [],
         }),
       )
@@ -189,11 +189,11 @@ describe('LWorkspace', () => {
     it('Mitglieder folgen beim Ziehen des Rahmens ohne Verzögerung', async () => {
       const { wrapper } = await mountWithFlow({
         bits: [
-          { ...looseInFlow, id: 1, packetId: 7, flowId: null, x: 0, order: 0 },
-          { ...looseInFlow, id: 2, packetId: 7, flowId: null, x: 0, order: 1 },
-          { ...looseInFlow, id: 4, title: 'Outside', x: 1600, flowId: null },
+          { ...looseInFlow, id: '1', packetId: '7', flowId: null, x: 0, order: 0 },
+          { ...looseInFlow, id: '2', packetId: '7', flowId: null, x: 0, order: 1 },
+          { ...looseInFlow, id: '4', title: 'Outside', x: 1600, flowId: null },
         ],
-        packets: [{ id: 7, name: 'Stack', x: 0, y: 200, flowId: 9 }],
+        packets: [{ id: '7', name: 'Stack', x: 0, y: 200, flowId: 'f9' }],
       })
       const capsule = () => wrapper.findAll('.flow-item').find((c) => c.text().includes('Loose'))!
       const outsider = () =>
@@ -203,7 +203,7 @@ describe('LWorkspace', () => {
       expect(stack().classes()).not.toContain('stack--dragging')
 
       wrapper
-        .find('[data-flow-id="9"]')
+        .find('[data-flow-id="f9"]')
         .element.dispatchEvent(
           new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
         )
@@ -240,7 +240,7 @@ describe('LWorkspace', () => {
         notes: undefined,
         color: '#6366f1',
       }
-      const frame = wrapper.find('[data-flow-id="9"]')
+      const frame = wrapper.find('[data-flow-id="f9"]')
       const m = /translate3d\(([-\d.]+)px, ([-\d.]+)px/.exec(frame.attributes('style') ?? '')!
       const el = frame.element as HTMLElement
       const inside = {
@@ -252,7 +252,7 @@ describe('LWorkspace', () => {
       await wrapper.vm.$nextTick()
       wrapper.findComponent({ name: 'LBitPanel' }).vm.$emit('confirm', data)
       await new Promise((r) => setTimeout(r, 0))
-      expect(api.post).toHaveBeenCalledWith('/api/bit', expect.objectContaining({ flowId: 9 }))
+      expect(api.post).toHaveBeenCalledWith('/api/bit', expect.objectContaining({ flowId: 'f9' }))
 
       vi.mocked(api.post).mockClear()
       wrapper
@@ -277,7 +277,7 @@ describe('LWorkspace', () => {
           url === '/api/bit'
             ? [
                 {
-                  id: 1,
+                  id: '1',
                   title: 'High',
                   status: 0,
                   x: 0,
@@ -288,7 +288,7 @@ describe('LWorkspace', () => {
                   createdAt: '',
                 },
                 {
-                  id: 2,
+                  id: '2',
                   title: 'Low',
                   status: 0,
                   x: 300,

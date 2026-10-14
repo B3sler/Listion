@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator'
 
 export class UpdatePacketDto {
   @ApiProperty({ example: 'Release', required: false })
@@ -19,8 +19,8 @@ export class UpdatePacketDto {
   @IsInt()
   y?: number
 
-  @ApiProperty({ example: 2, required: false, nullable: true })
+  @ApiProperty({ format: 'uuid', required: false, nullable: true })
   @IsOptional()
-  @IsInt()
-  flowId?: number | null
+  @IsUUID()
+  flowId?: string | null
 }

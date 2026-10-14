@@ -5,9 +5,10 @@ import { Dependency, type NodeType } from './dependency.entity.js'
 import { Bit } from '../bit/bit.entity.js'
 import { Packet } from '../packet/packet.entity.js'
 import { CreateDependencyDto } from '../../dto/create-dependency.dto.js'
+import { insertWithId } from '../../common/insert-with-id.js'
 
 type ResolvedNode =
-  { type: 'bit'; id: number; packetId: number | null } | { type: 'packet'; id: number }
+  { type: 'bit'; id: string; packetId: string | null } | { type: 'packet'; id: string }
 
 @Injectable()
 export class DependencyService {
@@ -20,11 +21,11 @@ export class DependencyService {
     private readonly packets: Repository<Packet>,
   ) {}
 
-  findAll(userId: number): Promise<Dependency[]> {
+  findAll(userId: string): Promise<Dependency[]> {
     return this.deps.find({ where: { userId } })
   }
 
-  async create(dto: CreateDependencyDto, userId: number): Promise<Dependency> {
+  async create(dto: CreateDependencyDto, userId: string): Promise<Dependency> {
     if (dto.fromType === dto.toType && dto.fromId === dto.toId) {
       throw new BadRequestException('A dependency needs two different ends')
     }
@@ -38,30 +39,25 @@ export class DependencyService {
       throw new BadRequestException('A packet cannot depend on one of its own bits')
     }
 
-    const existing = await this.deps.findOne({
-      where: {
-        userId,
-        fromType: dto.fromType,
-        fromId: dto.fromId,
-        toType: dto.toType,
-        toId: dto.toId,
-      },
-    })
+    const { id, ...ends } = dto
+    // The arrow already exists: return it (the caller replaces its own id with this one)
+    const existing = await this.deps.findOne({ where: { userId, ...ends } })
     if (existing) return existing
-    return this.deps.save(this.deps.create({ ...dto, userId }))
+    const depId = await insertWithId(this.deps, { ...ends, userId }, id)
+    return (await this.deps.findOne({ where: { id: depId, userId } }))!
   }
 
-  async remove(id: number, userId: number): Promise<void> {
+  async remove(id: string, userId: string): Promise<void> {
     await this.deps.delete({ id, userId })
   }
 
-  private async resolve(type: NodeType, id: number, userId: number): Promise<ResolvedNode> {
+  private async resolve(type: NodeType, id: string, userId: string): Promise<ResolvedNode> {
     if (type === 'bit') {
-      const bit = await this.bits.findOne({ where: { id, user: userId } })
+      const bit = await this.bits.findOne({ where: { id, userId } })
       if (!bit) throw new BadRequestException('Unknown bit')
       return { type: 'bit', id, packetId: bit.packetId ?? null }
     }
-    const packet = await this.packets.findOne({ where: { id, user: userId } })
+    const packet = await this.packets.findOne({ where: { id, userId } })
     if (!packet) throw new BadRequestException('Unknown packet')
     return { type: 'packet', id }
   }

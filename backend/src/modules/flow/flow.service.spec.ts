@@ -9,37 +9,37 @@ import type { Packet } from '../packet/packet.entity.js'
 function setup() {
   const bits = new FakeRepository<Bit>(
     [
-      { id: 1, user: 5 },
-      { id: 2, user: 5 },
-      { id: 3, user: 5, packetId: 10 },
-      { id: 9, user: 6 },
+      { id: 'x1', userId: 'u5' },
+      { id: 'x2', userId: 'u5' },
+      { id: 'x3', userId: 'u5', packetId: 'x10' },
+      { id: 'x9', userId: 'u6' },
     ],
     { packetId: null, order: 0, flowId: null, status: 0, title: 't' } as Partial<Bit>,
   )
-  const packets = new FakeRepository<Packet>([{ id: 10, user: 5, name: 'P', x: 0, y: 0 }], {
+  const packets = new FakeRepository<Packet>([{ id: 'x10', userId: 'u5', name: 'P', x: 0, y: 0 }], {
     flowId: null,
   } as Partial<Packet>)
   const flows = new FakeRepository<Flow>()
   const service = new FlowService(flows.asRepo(), bits.asRepo(), packets.asRepo())
-  const bit = (id: number) => bits.rows.find((b) => b.id === id)!
-  const packet = (id: number) => packets.rows.find((p) => p.id === id)!
+  const bit = (id: string) => bits.rows.find((b) => b.id === id)!
+  const packet = (id: string) => packets.rows.find((p) => p.id === id)!
   return { service, bits, packets, flows, bit, packet }
 }
 
 describe('FlowService', () => {
   it('legt einen Flow mit Standardname und -farbe an und setzt die Mitglieder', async () => {
     const { service, bit, packet } = setup()
-    const flow = await service.create({ bitIds: [1], packetIds: [10] }, 5)
-    expect(flow).toMatchObject({ name: 'Flow 1', color: '#818cf8', user: 5 })
-    expect(bit(1).flowId).toBe(flow.id)
-    expect(packet(10).flowId).toBe(flow.id)
+    const flow = await service.create({ bitIds: ['x1'], packetIds: ['x10'] }, 'u5')
+    expect(flow).toMatchObject({ name: 'Flow 1', color: '#818cf8', userId: 'u5' })
+    expect(bit('x1').flowId).toBe(flow.id)
+    expect(packet('x10').flowId).toBe(flow.id)
   })
 
   it('übernimmt Mitglieder aus einem alten Flow und löscht ihn, wenn er leer wird', async () => {
     const { service, flows } = setup()
-    const old = await service.create({ bitIds: [1], packetIds: [] }, 5)
-    const keep = await service.create({ bitIds: [2], packetIds: [10] }, 5)
-    await service.create({ bitIds: [1], packetIds: [10] }, 5)
+    const old = await service.create({ bitIds: ['x1'], packetIds: [] }, 'u5')
+    const keep = await service.create({ bitIds: ['x2'], packetIds: ['x10'] }, 'u5')
+    await service.create({ bitIds: ['x1'], packetIds: ['x10'] }, 'u5')
     const ids = flows.rows.map((f) => f.id)
     expect(ids).not.toContain(old.id)
     expect(ids).toContain(keep.id) // still has bit 2
@@ -47,23 +47,32 @@ describe('FlowService', () => {
 
   it.each([
     ['ohne Mitglieder', { bitIds: [], packetIds: [] }],
-    ['mit fremdem Bit', { bitIds: [9], packetIds: [] }],
-    ['mit Bit in einem Stapel', { bitIds: [3], packetIds: [] }],
-    ['mit unbekanntem Packet', { bitIds: [], packetIds: [99] }],
+    ['mit fremdem Bit', { bitIds: ['x9'], packetIds: [] }],
+    ['mit Bit in einem Stapel', { bitIds: ['x3'], packetIds: [] }],
+    ['mit unbekanntem Packet', { bitIds: [], packetIds: ['x99'] }],
   ])('lehnt einen Flow %s ab', async (_name, dto) => {
     const { service, flows } = setup()
-    await expect(service.create(dto, 5)).rejects.toBeInstanceOf(BadRequestException)
+    await expect(service.create(dto, 'u5')).rejects.toBeInstanceOf(BadRequestException)
     expect(flows.rows).toHaveLength(0)
+  })
+
+  it('übernimmt die Client-ID beim Erstellen', async () => {
+    const { service, bit } = setup()
+    const flow = await service.create({ id: 'f-client', bitIds: ['x1'], packetIds: [] }, 'u5')
+    expect(flow.id).toBe('f-client')
+    expect(bit('x1').flowId).toBe('f-client')
   })
 
   it('benennt um und färbt um, fremde Flows sind unbekannt', async () => {
     const { service, flows } = setup()
-    const flow = await service.create({ bitIds: [1], packetIds: [] }, 5)
-    expect(await service.update(flow.id, 5, { name: 'Release', color: '#34d399' })).toMatchObject({
+    const flow = await service.create({ bitIds: ['x1'], packetIds: [] }, 'u5')
+    expect(
+      await service.update(flow.id, 'u5', { name: 'Release', color: '#34d399' }),
+    ).toMatchObject({
       name: 'Release',
       color: '#34d399',
     })
-    await expect(service.update(flow.id, 6, { name: 'x' })).rejects.toBeInstanceOf(
+    await expect(service.update(flow.id, 'u6', { name: 'x' })).rejects.toBeInstanceOf(
       NotFoundException,
     )
     expect(flows.rows[0]!.name).toBe('Release')
@@ -71,37 +80,37 @@ describe('FlowService', () => {
 
   it('update mit leerem Body (nur undefined-Felder) lässt den Flow unverändert', async () => {
     const { service } = setup()
-    const flow = await service.create({ bitIds: [1], packetIds: [], name: 'Keep' }, 5)
-    const result = await service.update(flow.id, 5, { name: undefined, color: undefined })
+    const flow = await service.create({ bitIds: ['x1'], packetIds: [], name: 'Keep' }, 'u5')
+    const result = await service.update(flow.id, 'u5', { name: undefined, color: undefined })
     expect(result).toMatchObject({ id: flow.id, name: 'Keep', color: '#818cf8' })
   })
 
   it('vergibt als Standardname die höchste vorhandene Nummer plus eins', async () => {
     const { service, flows } = setup()
     flows.rows.push(
-      { id: 40, user: 5, name: 'Flow 2', color: '#818cf8', createdAt: new Date() },
-      { id: 42, user: 6, name: 'Flow 9', color: '#818cf8', createdAt: new Date() },
+      { id: 'x40', userId: 'u5', name: 'Flow 2', color: '#818cf8', createdAt: new Date() },
+      { id: 'x42', userId: 'u6', name: 'Flow 9', color: '#818cf8', createdAt: new Date() },
     )
-    const flow = await service.create({ bitIds: [1], packetIds: [] }, 5)
+    const flow = await service.create({ bitIds: ['x1'], packetIds: [] }, 'u5')
     expect(flow.name).toBe('Flow 3')
   })
 
   it('findAll liefert die Flows des Users aufsteigend nach id', async () => {
     const { service, flows } = setup()
     flows.rows.push(
-      { id: 3, user: 5, name: 'c', color: '#818cf8', createdAt: new Date() },
-      { id: 1, user: 5, name: 'a', color: '#818cf8', createdAt: new Date() },
-      { id: 2, user: 6, name: 'x', color: '#818cf8', createdAt: new Date() },
+      { id: 'x3', userId: 'u5', name: 'c', color: '#818cf8', createdAt: new Date() },
+      { id: 'x1', userId: 'u5', name: 'a', color: '#818cf8', createdAt: new Date() },
+      { id: 'x2', userId: 'u6', name: 'x', color: '#818cf8', createdAt: new Date() },
     )
-    expect((await service.findAll(5)).map((f) => f.id)).toEqual([1, 3])
+    expect((await service.findAll('u5')).map((f) => f.id)).toEqual(['x1', 'x3'])
   })
 
   it('auflösen behält die Mitglieder', async () => {
     const { service, flows, bit, packet } = setup()
-    const flow = await service.create({ bitIds: [1], packetIds: [10] }, 5)
-    await service.remove(flow.id, 5)
+    const flow = await service.create({ bitIds: ['x1'], packetIds: ['x10'] }, 'u5')
+    await service.remove(flow.id, 'u5')
     expect(flows.rows).toHaveLength(0)
-    expect(bit(1)).toMatchObject({ id: 1, flowId: null })
-    expect(packet(10)).toMatchObject({ id: 10, flowId: null })
+    expect(bit('x1')).toMatchObject({ id: 'x1', flowId: null })
+    expect(packet('x10')).toMatchObject({ id: 'x10', flowId: null })
   })
 })

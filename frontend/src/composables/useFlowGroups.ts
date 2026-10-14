@@ -1,5 +1,6 @@
 import type { Bit } from '@/stores/bitStore'
 import type { Flow, Packet } from '@/types/flow'
+import { compareIds } from '@/helpers/uuid'
 import { unionRect, type FlowLayout, type Rect } from './useFlowLayout'
 
 export const FLOW_PAD = 24
@@ -30,9 +31,9 @@ export function flowFrames(
   bits: Bit[],
   packets: Packet[],
   flows: Flow[],
-): Map<number, Rect> {
+): Map<string, Rect> {
   const loose = new Set(layout.looseBitIds)
-  const frames = new Map<number, Rect>()
+  const frames = new Map<string, Rect>()
   for (const flow of flows) {
     const rects: Rect[] = []
     for (const b of bits) {
@@ -81,7 +82,7 @@ export function pathLength(points: Point[]): number {
 export function lassoHits(
   poly: Point[],
   layout: FlowLayout,
-): { bitIds: number[]; packetIds: number[] } {
+): { bitIds: string[]; packetIds: string[] } {
   const bitIds = layout.looseBitIds.filter((id) => {
     const r = layout.bitRects.get(id)
     return r ? pointInPolygon(rectCenter(r), poly) : false
@@ -92,14 +93,14 @@ export function lassoHits(
   return { bitIds, packetIds }
 }
 
-/** Flow whose frame contains the point; on overlap the newest (highest id) wins. */
-export function flowAt(p: Point, frames: Map<number, Rect>, flows: Flow[]): number | null {
-  let best: number | null = null
+/** Flow whose frame contains the point; on overlap the newest (highest UUIDv7) wins. */
+export function flowAt(p: Point, frames: Map<string, Rect>, flows: Flow[]): string | null {
+  let best: string | null = null
   for (const f of flows) {
     const r = frames.get(f.id)
     if (!r) continue
     const inside = p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h
-    if (inside && (best === null || f.id > best)) best = f.id
+    if (inside && (best === null || compareIds(f.id, best) > 0)) best = f.id
   }
   return best
 }
