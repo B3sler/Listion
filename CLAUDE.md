@@ -155,7 +155,6 @@ Run before every commit.
 
 ## Key Notes for Claude
 
-- Do **not** commit automatically — the user commits manually
 - Do not add fallback values for secrets (`JWT_SECRET`, `DB_PASS`) — fail fast is intentional
 - When adding a new API endpoint, always add `@UseGuards(JwtAuthGuard)` unless it's explicitly public (login/register)
 - User ID must always come from the JWT payload (`@CurrentUserId()`), never from the request body
