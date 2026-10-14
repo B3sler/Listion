@@ -9,6 +9,7 @@ import LDependencyLayer from '@/components/LDependencyLayer.vue'
 import LFlowFrame from '@/components/LFlowFrame.vue'
 import LLassoPath from '@/components/LLassoPath.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
+import LSplash from '@/components/LSplash.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
 import { useTheme } from '@/composables/useTheme.ts'
@@ -474,6 +475,9 @@ function onKeydown(e: KeyboardEvent) {
 
 const { initTheme, applyTheme, isDark } = useTheme()
 
+// Brand splash plays on every entry into the workspace (login, navigation, reload)
+const showSplash = ref(true)
+
 onMounted(() => {
   initTheme()
   applyTheme()
@@ -696,6 +700,8 @@ onUnmounted(() => {
       :items="menuItems"
       @close="closeContextMenu"
     />
+
+    <LSplash v-if="showSplash" @done="showSplash = false" />
   </div>
 </template>
 
