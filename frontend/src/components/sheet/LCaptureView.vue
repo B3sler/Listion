@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, toRaw, useTemplateRef, watch } from 'vue'
 import { CircleAlert, CircleCheck, Circle, X } from 'lucide-vue-next'
 import { BIT_COMMANDS, type CreateFields } from '@/composables/useBitCommands'
-import { CAPSULE_H, CAPSULE_W } from '@/composables/useFlowLayout'
+import { CAPSULE_W, capsuleHeight } from '@/composables/useFlowLayout'
+import { useCapturePlacement } from '@/composables/useCapturePlacement'
+import { useToday } from '@/composables/useToday'
 import { useBitStore } from '@/stores/bitStore'
-import { useSheetStore } from '@/stores/sheetStore'
+import { useSheetStore, type Ghost, type SeriesEntry } from '@/stores/sheetStore'
+import { dueToApi, fromDateKey } from '@/helpers/localDate'
 import { DEFAULT_COLOR } from '@/helpers/palette'
+import {
+  parseQuickEntry,
+  shiftLiteral,
+  stripToken,
+  type QuickEntryToken,
+} from '@/helpers/quickEntry'
 import { uuidv7 } from '@/helpers/uuid'
+import LQuickEntryInput from './LQuickEntryInput.vue'
+import LCaptureChips, { type CaptureChip } from './LCaptureChips.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -16,49 +27,158 @@ const commands = injected
 
 const sheet = useSheetStore()
 const bitStore = useBitStore()
+const today = useToday()
 
+const inputRef = useTemplateRef<InstanceType<typeof LQuickEntryInput>>('inputRef')
+const chipsRef = useTemplateRef<InstanceType<typeof LCaptureChips>>('chipsRef')
+
+// ── Smart entry ──────────────────────────────────────────────────────
 const text = ref('')
-const inputEl = useTemplateRef<HTMLInputElement>('inputEl')
+/** Start indices of tokens kept as text. */
+const literal = ref<Set<number>>(new Set())
+/** Picked on a chip; applies while the text holds no token of that kind. */
+const picked = ref<{ due?: string; priority?: 1 | 2 | 3; size?: 1 | 2 | 3 | 4 }>({})
 
+const entry = computed(() => parseQuickEntry(text.value, fromDateKey(today.value), literal.value))
+
+/** Every edit moves the kept-as-text marks along with the text. */
+function setText(next: string) {
+  literal.value = shiftLiteral(literal.value, text.value, next)
+  text.value = next
+}
+
+/** The token behind each chip: the last one of its kind (it is the one that counts). */
+const tokens = computed(() => {
+  const out: Partial<Record<CaptureChip, QuickEntryToken>> = {}
+  for (const t of entry.value.tokens) {
+    if (t.kind !== 'recurrence') out[t.kind] = t
+  }
+  return out
+})
+
+// a repeat rule alone also sets a due day; a pick then still wins over that implied one
+const due = computed(
+  () =>
+    (tokens.value.due ? entry.value.dueDate : (picked.value.due ?? entry.value.dueDate)) ?? null,
+)
+const priority = computed(() => entry.value.priority ?? picked.value.priority ?? null)
+const size = computed(() => entry.value.size ?? picked.value.size ?? null)
+const color = computed(() => entry.value.color ?? sheet.seriesColor ?? DEFAULT_COLOR)
+const height = computed(() => capsuleHeight({ size: size.value }))
+
+function keepAsText(kind: CaptureChip) {
+  const token = tokens.value[kind]
+  if (token) literal.value = new Set(literal.value).add(token.start)
+}
+
+function clearToken(kind: CaptureChip) {
+  const token = tokens.value[kind]
+  if (token) setText(stripToken(text.value, token))
+}
+
+function pick<K extends keyof typeof picked.value>(key: K, value: (typeof picked.value)[K] | null) {
+  const next = { ...picked.value }
+  if (value === null) delete next[key]
+  else next[key] = value
+  picked.value = next
+}
+
+// ── Placement and ghost ──────────────────────────────────────────────
+const slot = useCapturePlacement(() => height.value)
+
+/** The ghost this view last showed; a view on its way out must not clear its successor's. */
+let shown: Ghost | null = null
+
+watch(
+  () => ({ ...slot.value, h: height.value, title: entry.value.title, color: color.value }),
+  (ghost) => {
+    // the series is over (closing): the ghost goes with the sheet, it does not move again
+    if (!sheet.open || sheet.view !== 'capture') return
+    shown = ghost
+    sheet.ghost = ghost
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (shown && toRaw(sheet.ghost) === shown) sheet.ghost = null
+})
+
+// ── Series ───────────────────────────────────────────────────────────
 /** The series as shown: live titles from the store; a deleted bit drops out. */
 const rows = computed(() =>
-  sheet.series.flatMap((entry) => {
-    if (entry.failed) return [{ entry, title: entry.fields?.title ?? '', done: false }]
-    const bit = bitStore.bits.find((b) => b.id === entry.id)
-    return bit ? [{ entry, title: bit.title, done: bit.status === 2 }] : []
+  sheet.series.flatMap((item) => {
+    if (item.failed) return [{ item, title: item.fields?.title ?? '', done: false }]
+    const bit = bitStore.bits.find((b) => b.id === item.id)
+    return bit ? [{ item, title: bit.title, done: bit.status === 2 }] : []
   }),
 )
 
-async function submit(openDetail: boolean) {
-  const title = text.value.trim()
-  if (!title) return
-  const fields: CreateFields = { title, color: DEFAULT_COLOR }
-  // centred on the click point, like a bit placed by hand
-  const pos = { x: sheet.origin.x - CAPSULE_W / 2, y: sheet.origin.y - CAPSULE_H / 2 }
-  // the series this bit belongs to, even if the sheet is reopened while the create is in flight
-  const series = sheet.series
-  text.value = ''
-  try {
-    const bit = await commands.create(fields, pos, sheet.flowId)
-    series.push({ id: bit.id, failed: false })
-    if (openDetail && sheet.open && sheet.series === series) sheet.openDetail(bit.id)
-  } catch (e) {
+/** Sends the create; the row and the capsule are there already (optimistic). */
+function send(item: SeriesEntry, fields: CreateFields, pos: { x: number; y: number }) {
+  sheet.materializeId = fields.id ?? null
+  commands.create(fields, pos, sheet.flowId).catch((e: unknown) => {
     console.error('Failed to create bit:', e)
-    series.push({ id: uuidv7(), failed: true, fields })
-  }
+    item.failed = true
+    item.fields = fields
+    item.pos = pos
+    // Ctrl+Enter opened a bit that is gone again: back to the series and its failed row
+    if (sheet.open && sheet.view === 'detail' && sheet.bitId === fields.id) sheet.backToCapture()
+  })
 }
 
-function onKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Enter' || event.isComposing) return
-  event.preventDefault()
-  void submit(event.ctrlKey || event.metaKey)
+function submit({ details }: { details: boolean }) {
+  const parsed = entry.value
+  if (!parsed.title) return
+  const id = uuidv7()
+  const fields: CreateFields = { id, title: parsed.title, color: color.value }
+  if (due.value) fields.dueDate = dueToApi(due.value)
+  if (priority.value) fields.priority = priority.value
+  if (size.value) fields.size = size.value
+  if (parsed.recurrence) fields.recurrence = parsed.recurrence
+  const pos = { x: slot.value.x, y: slot.value.y }
+
+  // the next bit lines up below this one and keeps only its colour
+  sheet.lastRect = { ...pos, w: CAPSULE_W, h: height.value }
+  sheet.seriesColor = parsed.color ?? sheet.seriesColor
+  text.value = ''
+  literal.value = new Set()
+  picked.value = {}
+  chipsRef.value?.close()
+
+  sheet.series.push({ id, failed: false })
+  send(sheet.series[sheet.series.length - 1]!, fields, pos)
+  if (details) sheet.openDetail(id)
+}
+
+/** The same bit again, under a new id (the failed one may still exist on the server). */
+function retry(item: SeriesEntry) {
+  const { fields, pos } = item
+  if (!fields || !pos) return
+  const again = { ...fields, id: uuidv7() }
+  item.id = again.id
+  item.failed = false
+  delete item.fields
+  delete item.pos
+  send(item, again, pos)
 }
 
 function openRow(id: string) {
   sheet.openDetail(id)
 }
 
-onMounted(() => inputEl.value?.focus({ preventScroll: true }))
+function focusInput() {
+  inputRef.value?.focus()
+}
+
+/** For the sheet's Esc: an open chip closes first. */
+function closeOpenChip(): boolean {
+  return chipsRef.value?.closeOpenChip() ?? false
+}
+
+defineExpose({ closeOpenChip })
+
+onMounted(focusInput)
 </script>
 
 <template>
@@ -77,12 +197,12 @@ onMounted(() => inputEl.value?.focus({ preventScroll: true }))
 
     <div class="capture__body">
       <ol v-if="rows.length" class="capture__series" aria-label="Created bits">
-        <li v-for="row in rows" :key="row.entry.id">
+        <li v-for="row in rows" :key="row.item.id">
           <button
-            v-if="!row.entry.failed"
+            v-if="!row.item.failed"
             type="button"
             class="capture__row pressable"
-            @click="openRow(row.entry.id)"
+            @click="openRow(row.item.id)"
           >
             <component
               :is="row.done ? CircleCheck : Circle"
@@ -96,20 +216,39 @@ onMounted(() => inputEl.value?.focus({ preventScroll: true }))
             <CircleAlert class="capture__mark" :size="15" aria-hidden="true" />
             <span class="capture__row-title">{{ row.title }}</span>
             <span class="capture__failed">Couldn’t create</span>
+            <button type="button" class="capture__retry pressable" @click="retry(row.item)">
+              Retry
+            </button>
           </div>
         </li>
       </ol>
 
-      <input
-        ref="inputEl"
-        v-model="text"
-        class="capture__input"
-        type="text"
-        maxlength="500"
+      <LQuickEntryInput
+        ref="inputRef"
+        :model-value="text"
+        :entry="entry"
         placeholder="What needs to be done?"
-        aria-label="New bit title"
-        enterkeyhint="next"
-        @keydown="onKeydown"
+        @update:model-value="setText"
+        @submit="submit"
+      />
+
+      <LCaptureChips
+        ref="chipsRef"
+        class="capture__chips"
+        :today="today"
+        :due="due"
+        :priority="priority"
+        :size="size"
+        :color="color"
+        :color-set="!!entry.color || sheet.seriesColor !== null"
+        :tokens="tokens"
+        @due="(key) => pick('due', key)"
+        @priority="(value) => pick('priority', value)"
+        @size="(value) => pick('size', value)"
+        @color="(hex) => (sheet.seriesColor = hex)"
+        @keep="keepAsText"
+        @clear="clearToken"
+        @done="focusInput"
       />
     </div>
 
@@ -163,7 +302,7 @@ onMounted(() => inputEl.value?.focus({ preventScroll: true }))
   color: var(--text0);
 }
 
-/* ── Series and input ───────────────────────────────────────────────── */
+/* ── Series, input and chips ────────────────────────────────────────── */
 .capture__body {
   display: flex;
   flex-direction: column;
@@ -243,30 +382,26 @@ button.capture__row:hover {
   font-weight: 550;
 }
 
-.capture__input {
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--material-stroke);
-  border-radius: 12px;
-  background-color: var(--fill-hover);
-  color: var(--text0);
-  caret-color: var(--c);
+.capture__retry {
+  flex: none;
+  height: 24px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 999px;
+  background-color: hsl(0 72% 52% / 0.12);
+  color: inherit;
   font-family: inherit;
-  font-size: 0.9375rem;
-  letter-spacing: -0.005em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
   outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
 }
-.capture__input::placeholder {
-  color: var(--text2);
-  opacity: 0.7;
+.capture__retry:hover {
+  background-color: hsl(0 72% 52% / 0.2);
 }
-.capture__input:focus-visible {
-  border-color: var(--c);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 16%, transparent);
+
+.capture__chips {
+  margin-top: 6px;
 }
 
 /* ── Keyboard hints ─────────────────────────────────────────────────── */
@@ -287,7 +422,8 @@ button.capture__row:hover {
 }
 
 .capture__row:focus-visible,
-.capture__close:focus-visible {
+.capture__close:focus-visible,
+.capture__retry:focus-visible {
   box-shadow: 0 0 0 2px var(--brand);
 }
 </style>

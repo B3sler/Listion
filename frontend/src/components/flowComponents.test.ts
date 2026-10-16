@@ -232,6 +232,44 @@ describe('LBitCapsule', () => {
         expect((w.element as HTMLElement).style.getPropertyValue('--settle')).toBe('1')
       })
     })
+
+    describe('materialize', () => {
+      const original = window.matchMedia
+      afterEach(() => {
+        window.matchMedia = original
+      })
+      const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r(null)))
+
+      it('trägt die Klasse nur im ersten Frame und startet bei Skalierung 0,96', async () => {
+        const w = mount(LBitCapsule, { props: { bit: sized({}), state: null, materialize: true } })
+        expect(w.classes()).toContain('capsule--materialize')
+        expect((w.element as HTMLElement).style.getPropertyValue('--settle')).toBe('0.96')
+        await nextFrame()
+        await w.vm.$nextTick()
+        expect(w.classes()).not.toContain('capsule--materialize')
+        w.unmount()
+      })
+
+      it('setzt die Deckkraft im ersten Frame auf 0,45', () => {
+        expect(capsuleSource).toMatch(/\.capsule--materialize\s*\{[^}]*opacity: 0\.45/)
+      })
+
+      it('skaliert bei Reduced Motion nicht', () => {
+        window.matchMedia = ((q: string) => ({
+          matches: true,
+          media: q,
+        })) as typeof window.matchMedia
+        const w = mount(LBitCapsule, { props: { bit: sized({}), state: null, materialize: true } })
+        expect((w.element as HTMLElement).style.getPropertyValue('--settle')).not.toBe('0.96')
+        w.unmount()
+      })
+
+      it('bleibt ohne materialize unverändert', () => {
+        const w = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
+        expect(w.classes()).not.toContain('capsule--materialize')
+        w.unmount()
+      })
+    })
   })
 })
 

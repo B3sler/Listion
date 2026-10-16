@@ -14,6 +14,7 @@ const toolStore = useToolStore()
 
 const root = useTemplateRef<HTMLElement>('root')
 const detail = useTemplateRef<InstanceType<typeof LBitDetailView>>('detail')
+const capture = useTemplateRef<InstanceType<typeof LCaptureView>>('capture')
 
 // The sheet only leaves the store once it has slid out, so its content stays put on the way
 const { x, open, close, onPointerDown } = useSheetGesture({ onClosed: () => sheet.close() })
@@ -49,7 +50,7 @@ const bit = computed(() =>
 const label = computed(() => (bit.value ? `Bit: ${bit.value.title}` : 'New Bits'))
 
 /** Header tint: the bit's colour, in capture the colour the next bit gets. */
-const tint = computed(() => bit.value?.color ?? DEFAULT_COLOR)
+const tint = computed(() => bit.value?.color ?? sheet.ghost?.color ?? DEFAULT_COLOR)
 
 /** Content key: a different bit (or view) cross-fades instead of sliding the sheet again. */
 const paneKey = computed(() => (sheet.view === 'detail' ? `bit-${sheet.bitId}` : 'capture'))
@@ -69,7 +70,7 @@ function onKeydown(event: KeyboardEvent) {
     // there, Esc belongs to the flow tool, the filter or the field being edited
     if (toolStore.activeTool === 'flow' || toolStore.filterOpen || isEditable(event.target)) return
   }
-  if (detail.value?.closeOpenChip()) return
+  if (detail.value?.closeOpenChip() || capture.value?.closeOpenChip()) return
   close()
 }
 
@@ -110,7 +111,7 @@ onUnmounted(() => {
           @close="close()"
           @open-bit="sheet.openDetail"
         />
-        <LCaptureView v-else :key="paneKey" class="sheet__pane" @close="close()" />
+        <LCaptureView v-else ref="capture" :key="paneKey" class="sheet__pane" @close="close()" />
       </Transition>
     </aside>
   </Transition>
