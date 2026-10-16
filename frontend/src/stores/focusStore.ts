@@ -199,7 +199,8 @@ export const useFocusStore = defineStore('focus', () => {
       }
       return
     }
-    if (running.value?.bitId === stored.bitId && running.value.startedAt === stored.startedAt) return
+    if (running.value?.bitId === stored.bitId && running.value.startedAt === stored.startedAt)
+      return
     running.value = stored
     startTicking()
   }
