@@ -382,10 +382,34 @@ describe('LWorkspace', () => {
       await wrapper.find('.hold').trigger('keydown', { key: 'Enter' })
       await wrapper.vm.$nextTick()
       expect(settleScale()).toBe('1.04')
-      expect(sheet.settleBitId).toBeNull()
       expect(sheet.open).toBe(true)
 
       await vi.waitFor(() => expect(sheet.open).toBe(false), { timeout: 2000 })
+      wrapper.unmount()
+    })
+
+    it('lässt auch eine Kapsel im Stapel setteln, jedes Mal erneut', async () => {
+      const { wrapper } = await mountWithFlow({
+        bits: [{ ...looseInFlow, id: '1', packetId: '7', flowId: null, x: 0, order: 0 }],
+        packets: [{ id: '7', name: 'Stack', x: 0, y: 200, flowId: null }],
+      })
+      setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+      const sheet = useSheetStore()
+      const stacked = () => wrapper.find('.stack [data-node-type="bit"]')
+      const settleScale = () =>
+        (stacked().element as HTMLElement).style.getPropertyValue('--settle')
+      expect(stacked().exists()).toBe(true)
+      expect(settleScale()).toBe('')
+
+      sheet.requestSettle('1')
+      await wrapper.vm.$nextTick()
+      expect(settleScale()).toBe('1.04')
+
+      // a second completion of the same bit fires again
+      ;(stacked().element as HTMLElement).style.setProperty('--settle', '1')
+      sheet.requestSettle('1')
+      await wrapper.vm.$nextTick()
+      expect(settleScale()).toBe('1.04')
       wrapper.unmount()
     })
 

@@ -645,6 +645,17 @@ describe('LHoldToComplete', () => {
     expect(w.find('[role="tooltip"]').exists()).toBe(false)
   })
 
+  it('unterdrückt das Kontextmenü eines langen Drucks, ohne das Halten abzubrechen', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(500)
+    const menu = new Event('contextmenu', { bubbles: true, cancelable: true })
+    w.find('button').element.dispatchEvent(menu)
+    expect(menu.defaultPrevented).toBe(true)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(w.emitted('complete')).toHaveLength(1)
+  })
+
   it('hakt per Leertaste und Enter sofort ab', async () => {
     const w = mountHold()
     await w.find('button').trigger('keydown', { key: ' ' })

@@ -370,23 +370,6 @@ watch(
   },
 )
 
-// A bit ticked off in the sheet: its capsule on the canvas settles (scale 1.04 -> 1)
-const capsules = new Map<string, InstanceType<typeof LBitCapsule>>()
-
-function setCapsuleRef(id: string, el: unknown) {
-  if (el) capsules.set(id, el as InstanceType<typeof LBitCapsule>)
-  else capsules.delete(id)
-}
-
-watch(
-  () => sheetStore.settleBitId,
-  (id) => {
-    if (id === null) return
-    capsules.get(id)?.settle()
-    sheetStore.settleBitId = null
-  },
-)
-
 // --- Context menu (create bit) ---
 type ContextMenuState = { visible: boolean; x: number; y: number }
 const contextMenu = ref<ContextMenuState>({ visible: false, x: 0, y: 0 })
@@ -651,7 +634,6 @@ onUnmounted(() => {
             :in-cycle="flow.cycleBitIds.has(bit.id)"
             :lifted="bitDrag?.bitId === bit.id"
             :dimmed="isBitDimmed(bit.id)"
-            :ref="(el) => setCapsuleRef(bit.id, el)"
             :materialize="bit.id === sheetStore.materializeId"
             :snap-hint="
               bitDrag?.target?.kind === 'pair' && bitDrag.target.bitId === bit.id

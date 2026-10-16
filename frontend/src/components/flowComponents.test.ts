@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import type { Bit } from '@/stores/bitStore'
 import { addDays, todayKey } from '@/helpers/localDate'
 import LBitCapsule from './LBitCapsule.vue'
@@ -20,6 +21,9 @@ const bit = (id: string, status = 0, order = 0): Bit => ({
   createdAt: '',
   priority: 3,
 })
+
+// the capsule listens to the sheet store (settle requests)
+beforeEach(() => setActivePinia(createPinia()))
 
 describe('LBitCapsule', () => {
   it('zeigt Titel, markiert blocked und öffnet per Enter', async () => {

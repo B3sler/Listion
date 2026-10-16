@@ -45,8 +45,15 @@ export const useSheetStore = defineStore('sheet', () => {
   const seriesColor = ref<string | null>(null)
   /** The bit just created from the series: its capsule materialises out of the ghost. */
   const materializeId = ref<string | null>(null)
-  /** Set when a bit is ticked off in the sheet: the workspace settles its capsule, then clears it. */
-  const settleBitId = ref<string | null>(null)
+  /**
+   * A bit ticked off in the sheet: its capsule on the canvas settles. A fresh object per request,
+   * so asking again for the same bit fires again.
+   */
+  const settleRequest = ref<{ bitId: string } | null>(null)
+
+  function requestSettle(bitId: string) {
+    settleRequest.value = { bitId }
+  }
 
   /** A new series starts; the ghost follows from the capture view (it recomputes on its own). */
   function resetSeries() {
@@ -94,7 +101,8 @@ export const useSheetStore = defineStore('sheet', () => {
     lastRect,
     seriesColor,
     materializeId,
-    settleBitId,
+    settleRequest,
+    requestSettle,
     openCapture,
     openDetail,
     backToCapture,

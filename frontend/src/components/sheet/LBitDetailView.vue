@@ -340,7 +340,7 @@ function complete(again: () => void = complete) {
 /** The held ◯: complete, let the capsule on the canvas settle, then close the sheet. */
 function completeByGesture() {
   complete(completeByGesture)
-  sheet.settleBitId = props.bitId
+  sheet.requestSettle(props.bitId)
   cancelClose()
   closeTimer = setTimeout(() => {
     closeTimer = null

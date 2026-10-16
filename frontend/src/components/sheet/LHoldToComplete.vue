@@ -184,6 +184,7 @@ onBeforeUnmount(() => {
       @pointerup="onPointerEnd"
       @pointercancel="onPointerEnd"
       @click="onClick"
+      @contextmenu.prevent
       @keydown="onKeydown"
       @keyup="onKeyup"
     >
@@ -242,6 +243,8 @@ onBeforeUnmount(() => {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  /* a long press must stay a hold, not open the callout or context menu */
+  -webkit-touch-callout: none;
 }
 .hold:hover .hold__track {
   stroke: var(--ring);

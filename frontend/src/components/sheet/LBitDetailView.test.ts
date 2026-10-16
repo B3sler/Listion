@@ -288,8 +288,9 @@ describe('LBitDetailView', () => {
     it('lässt die Capsule setteln und schließt das Sheet 350 ms nach dem Abhaken', async () => {
       const w = mountView()
       const sheet = useSheetStore()
+      const settle = vi.spyOn(sheet, 'requestSettle')
       await w.find('.hold').trigger('keydown', { key: 'Enter' })
-      expect(sheet.settleBitId).toBe('b1')
+      expect(settle).toHaveBeenCalledWith('b1')
       await vi.advanceTimersByTimeAsync(349)
       expect(w.emitted('close')).toBeUndefined()
       await vi.advanceTimersByTimeAsync(1)
