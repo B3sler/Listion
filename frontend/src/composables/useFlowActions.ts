@@ -5,8 +5,8 @@ import { useDependencyStore } from '@/stores/dependencyStore'
 import { useFlowStore } from '@/stores/flowStore'
 import type { Dependency, Flow, NodeRef, Packet } from '@/types/flow'
 import {
-  CAPSULE_H,
   CAPSULE_W,
+  capsuleHeight,
   STACK_HEADER_H,
   STACK_PAD,
   STEP_GAP,
@@ -128,12 +128,12 @@ export function useFlowActions() {
         await packetStore.createPacket({
           x: t.x - STACK_PAD - STEP_NUM_W,
           // the target capsule stays where it is; the stack grows around it
-          y: (above ? t.y - (CAPSULE_H + STEP_GAP) : t.y) - STACK_HEADER_H,
+          y: (above ? t.y - (capsuleHeight(bit) + STEP_GAP) : t.y) - STACK_HEADER_H,
           bitIds: above ? [bitId, target.bitId] : [target.bitId, bitId],
           ...(stackFlow != null ? { flowId: stackFlow } : {}),
         })
       } else {
-        const centre = { x: pos.x + CAPSULE_W / 2, y: pos.y + CAPSULE_H / 2 }
+        const centre = { x: pos.x + CAPSULE_W / 2, y: pos.y + capsuleHeight(bit) / 2 }
         const targetFlow = flowAt(centre, frames, flowStore.flows)
         // a bit inside a packet has no flow of its own; after leaving the packet it is loose
         const currentFlow = bit.packetId != null ? null : (bit.flowId ?? null)

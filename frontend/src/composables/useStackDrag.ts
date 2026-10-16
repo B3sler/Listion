@@ -1,4 +1,4 @@
-import { CAPSULE_H, STACK_HEADER_H, STEP_PITCH, type FlowLayout } from './useFlowLayout'
+import { capsuleHeight, stackGeometry, type FlowLayout } from './useFlowLayout'
 
 export type SnapTarget =
   | { kind: 'stack'; packetId: string; index: number }
@@ -7,11 +7,14 @@ export type SnapTarget =
 export const STACK_SNAP_MARGIN = 16
 export const PAIR_SNAP_DISTANCE = 24
 
-/** Index to insert before: upper half of row i → i, lower half → i + 1. */
-export function insertIndex(pointerY: number, stackTop: number, count: number): number {
-  const rel = pointerY - (stackTop + STACK_HEADER_H)
-  const index = Math.floor((rel + STEP_PITCH / 2) / STEP_PITCH)
-  return Math.max(0, Math.min(count, index))
+/** Index to insert before: the number of rows whose centre lies above the pointer. */
+export function insertIndex(pointerY: number, stackTop: number, heights: number[]): number {
+  const { offsets } = stackGeometry(heights, null)
+  let index = 0
+  for (let i = 0; i < heights.length; i++) {
+    if (stackTop + offsets[i]! + heights[i]! / 2 < pointerY) index++
+  }
+  return index
 }
 
 /**
@@ -31,8 +34,10 @@ export function findSnapTarget(
       probe.y >= rect.y - m &&
       probe.y <= rect.y + rect.h + m
     if (!inside) continue
-    const count = (layout.membersOf.get(packetId) ?? []).filter((b) => b.id !== draggedBitId).length
-    return { kind: 'stack', packetId, index: insertIndex(probe.y, rect.y, count) }
+    const heights = (layout.membersOf.get(packetId) ?? [])
+      .filter((b) => b.id !== draggedBitId)
+      .map(capsuleHeight)
+    return { kind: 'stack', packetId, index: insertIndex(probe.y, rect.y, heights) }
   }
 
   let best: { target: SnapTarget; distance: number } | null = null
@@ -41,8 +46,8 @@ export function findSnapTarget(
     const r = layout.bitRects.get(bitId)
     if (!r) continue
     if (probe.x < r.x - STACK_SNAP_MARGIN || probe.x > r.x + r.w + STACK_SNAP_MARGIN) continue
-    const centerY = r.y + CAPSULE_H / 2
-    const reach = PAIR_SNAP_DISTANCE + CAPSULE_H
+    const centerY = r.y + r.h / 2
+    const reach = PAIR_SNAP_DISTANCE + r.h
     const distance = Math.abs(probe.y - centerY)
     if (distance > reach) continue
     const position = probe.y >= centerY ? 'below' : 'above'

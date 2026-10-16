@@ -28,11 +28,18 @@ const layout = computeLayout({
 
 describe('insertIndex', () => {
   it('teilt jede Zeile in obere/untere Hälfte', () => {
-    expect(insertIndex(100 + 40 + 8, 100, 3)).toBe(0)
-    expect(insertIndex(100 + 40 + 24, 100, 3)).toBe(1)
-    expect(insertIndex(100 + 40 + 36 * 2 + 30, 100, 3)).toBe(3)
-    expect(insertIndex(0, 100, 3)).toBe(0)
-    expect(insertIndex(9999, 100, 3)).toBe(3)
+    const heights = [32, 32, 32]
+    expect(insertIndex(100 + 40 + 8, 100, heights)).toBe(0)
+    expect(insertIndex(100 + 40 + 24, 100, heights)).toBe(1)
+    expect(insertIndex(100 + 40 + 36 * 2 + 30, 100, heights)).toBe(3)
+    expect(insertIndex(0, 100, heights)).toBe(0)
+    expect(insertIndex(9999, 100, heights)).toBe(3)
+  })
+
+  it('richtet sich nach der echten Höhe der Zeilen', () => {
+    // rows at 140–172 and 176–260 (XL): the XL row's centre sits at y = 218
+    expect(insertIndex(217, 100, [32, 84])).toBe(1)
+    expect(insertIndex(219, 100, [32, 84])).toBe(2)
   })
 })
 
@@ -86,6 +93,36 @@ describe('findSnapTarget', () => {
       kind: 'pair',
       bitId: '4',
       position: 'above',
+    })
+  })
+
+  it('greift bei einer XL-Kapsel noch in ihrer vollen Reichweite', () => {
+    const xl = computeLayout({
+      bits: [{ ...bit('4', null, 0, 600, 100), size: 4 }, bit('5', null, 0, 900, 900)],
+      packets: [],
+    })
+    expect(findSnapTarget({ x: 700, y: 100 + 84 + 20 }, '5', xl)).toEqual({
+      kind: 'pair',
+      bitId: '4',
+      position: 'below',
+    })
+  })
+
+  it('zählt Stapel-Zeilen mit ihrer echten Höhe', () => {
+    const tall = computeLayout({
+      bits: [{ ...bit('1', '7', 0), size: 4 }, bit('2', '7', 1), bit('5', null, 0, 900, 900)],
+      packets: [{ id: '7', name: 'P', x: 100, y: 100 }],
+    })
+    // rows: XL 140–224 (centre 182), then 228–260; 180 is above the XL centre, 184 below it
+    expect(findSnapTarget({ x: 200, y: 180 }, '5', tall)).toEqual({
+      kind: 'stack',
+      packetId: '7',
+      index: 0,
+    })
+    expect(findSnapTarget({ x: 200, y: 184 }, '5', tall)).toEqual({
+      kind: 'stack',
+      packetId: '7',
+      index: 1,
     })
   })
 

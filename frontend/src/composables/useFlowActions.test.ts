@@ -78,6 +78,23 @@ describe('useFlowActions.dropBit', () => {
     })
   })
 
+  it('Pair-Ziel darüber: das neue Packet lässt Platz für die Höhe des Ziehlings', async () => {
+    const layout = seed([bit('1', null, 0, 500, 300), { ...bit('2', null, 0), size: 3 }], [])
+    await useFlowActions().dropBit(
+      '2',
+      { kind: 'pair', bitId: '1', position: 'above' },
+      { x: 0, y: 0 },
+      layout,
+      new Map(),
+    )
+    expect(api.post).toHaveBeenCalledWith('/api/packet', {
+      id: expect.any(String),
+      x: 472,
+      y: 300 - (64 + 4) - 40,
+      bitIds: ['2', '1'],
+    })
+  })
+
   it('Pair-Ziel mit Flow: das neue Packet erbt den Flow der Ziel-Kapsel', async () => {
     const layout = seed([{ ...bit('1', null, 0, 500, 300), flowId: 'f5' }, bit('2', null, 0)], [])
     await useFlowActions().dropBit(
