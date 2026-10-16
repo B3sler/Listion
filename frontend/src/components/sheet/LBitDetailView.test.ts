@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { useBitStore, type Bit } from '@/stores/bitStore'
+import { useSheetStore } from '@/stores/sheetStore'
 import { BIT_COMMANDS, type BitCommands } from '@/composables/useBitCommands'
 import { dueToApi, todayKey } from '@/helpers/localDate'
 import { firstDue } from '@/helpers/recurrence'
@@ -265,10 +266,76 @@ describe('LBitDetailView', () => {
     expect(w.emitted('close')).toHaveLength(1)
   })
 
-  it('hakt über den ◯-Button ab', async () => {
-    const w = mountView()
-    await w.find('.detail__complete').trigger('click')
-    expect(commands.complete).toHaveBeenCalledWith('b1')
+  describe('Abhaken-Geste', () => {
+    it('hakt nach 600 ms Halten auf dem ◯ ab, ein Klick allein nicht', async () => {
+      const w = mountView()
+      await w.find('.hold').trigger('click')
+      expect(commands.complete).not.toHaveBeenCalled()
+      await w.find('.hold').trigger('pointerdown')
+      await vi.advanceTimersByTimeAsync(599)
+      expect(commands.complete).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(commands.complete).toHaveBeenCalledTimes(1)
+      expect(commands.complete).toHaveBeenCalledWith('b1')
+    })
+
+    it('hakt per Leertaste auf dem ◯ sofort ab', async () => {
+      const w = mountView()
+      await w.find('.hold').trigger('keydown', { key: ' ' })
+      expect(commands.complete).toHaveBeenCalledWith('b1')
+    })
+
+    it('lässt die Capsule setteln und schließt das Sheet 350 ms nach dem Abhaken', async () => {
+      const w = mountView()
+      const sheet = useSheetStore()
+      await w.find('.hold').trigger('keydown', { key: 'Enter' })
+      expect(sheet.settleBitId).toBe('b1')
+      await vi.advanceTimersByTimeAsync(349)
+      expect(w.emitted('close')).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(w.emitted('close')).toHaveLength(1)
+    })
+
+    it('schließt nicht, wenn das Abhaken scheitert, und bietet Retry an', async () => {
+      commands.complete.mockRejectedValueOnce(new Error('offline'))
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const w = mountView()
+      await w.find('.hold').trigger('keydown', { key: 'Enter' })
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(w.emitted('close')).toBeUndefined()
+      expect(w.find('.detail__save').text()).toContain('Couldn’t save')
+      await w.find('.detail__retry').trigger('click')
+      expect(commands.complete).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(400)
+      expect(w.find('.detail__save').text()).toBe('')
+      expect(w.emitted('close')).toHaveLength(1)
+    })
+
+    it('öffnet ein erledigtes Bit mit einem Klick wieder, ohne das Sheet zu schließen', async () => {
+      const w = mountView({ status: 2 })
+      await w.find('.hold').trigger('click')
+      expect(commands.reopen).toHaveBeenCalledWith('b1')
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(w.emitted('close')).toBeUndefined()
+    })
+
+    it('zeigt einen gescheiterten Reopen als Couldn’t save', async () => {
+      commands.reopen.mockRejectedValueOnce(new Error('offline'))
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const w = mountView({ status: 2 })
+      await w.find('.hold').trigger('click')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(w.find('.detail__save').text()).toContain('Couldn’t save')
+    })
+
+    it('schließt nicht mehr, wenn das Sheet vorher verlassen wurde', async () => {
+      const w = mountView()
+      await w.find('.hold').trigger('keydown', { key: 'Enter' })
+      w.unmount()
+      wrapper = null
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(w.emitted('close')).toBeUndefined()
+    })
   })
 
   it('speichert den Titel live nach 400 ms', async () => {

@@ -4,6 +4,7 @@ import {
   h,
   inject,
   nextTick,
+  onBeforeUnmount,
   onMounted,
   ref,
   toRef,
@@ -15,8 +16,6 @@ import {
 import {
   Calendar,
   ChevronLeft,
-  Circle,
-  CircleCheck,
   Flag,
   Moon,
   RectangleVertical,
@@ -29,6 +28,7 @@ import type { NodeRef } from '@/types/flow'
 import { BIT_COMMANDS } from '@/composables/useBitCommands'
 import { useBitEditor } from '@/composables/useBitEditor'
 import { useToday } from '@/composables/useToday'
+import { useSheetStore } from '@/stores/sheetStore'
 import { addDays, dueToApi, formatDayShort, toDateKey, weekdayOf } from '@/helpers/localDate'
 import { DEFAULT_COLOR, PALETTE } from '@/helpers/palette'
 import { isOverdue, isSnoozed, SIZE_LABEL, SIZE_MINUTES } from '@/helpers/bitMeta'
@@ -37,6 +37,7 @@ import LSegmented from './LSegmented.vue'
 import LPropertyChip from './LPropertyChip.vue'
 import LDatePicker from './LDatePicker.vue'
 import LColorGrid from './LColorGrid.vue'
+import LHoldToComplete from './LHoldToComplete.vue'
 
 interface Props {
   bitId: string
@@ -58,6 +59,7 @@ const commands = injected
 const editor = useBitEditor(toRef(props, 'bitId'))
 const { bit, title, notes, saveState, shake } = editor
 const today = useToday()
+const sheet = useSheetStore()
 
 const accent = computed(() => bit.value?.color ?? DEFAULT_COLOR)
 const done = computed(() => bit.value?.status === 2)
@@ -315,9 +317,54 @@ function report(e: unknown) {
   console.error('Failed to update bit status', e)
 }
 
-function complete() {
-  commands.complete(props.bitId).catch(report)
+/** What "Couldn't save · Retry" repeats when completing or reopening failed. */
+const retryStatus = ref<(() => void) | null>(null)
+/** Ticking off by the gesture closes the sheet this long after the check has landed. */
+const CLOSE_AFTER_COMPLETE_MS = 350
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+
+function cancelClose() {
+  if (closeTimer) clearTimeout(closeTimer)
+  closeTimer = null
 }
+
+function complete(again: () => void = complete) {
+  retryStatus.value = null
+  commands.complete(props.bitId).catch((e: unknown) => {
+    report(e)
+    cancelClose()
+    retryStatus.value = again
+  })
+}
+
+/** The held ◯: complete, let the capsule on the canvas settle, then close the sheet. */
+function completeByGesture() {
+  complete(completeByGesture)
+  sheet.settleBitId = props.bitId
+  cancelClose()
+  closeTimer = setTimeout(() => {
+    closeTimer = null
+    emit('close')
+  }, CLOSE_AFTER_COMPLETE_MS)
+}
+
+function reopen() {
+  retryStatus.value = null
+  commands.reopen(props.bitId).catch((e: unknown) => {
+    report(e)
+    retryStatus.value = reopen
+  })
+}
+
+/** Footer retry: repeats a failed status change, and what the editor could not save. */
+function retry() {
+  const again = retryStatus.value
+  retryStatus.value = null
+  again?.()
+  if (saveState.value === 'error') void editor.retry()
+}
+
+onBeforeUnmount(cancelClose)
 
 async function setStatus(value: number) {
   const b = bit.value
@@ -332,11 +379,6 @@ async function setStatus(value: number) {
     if (value === 0) return
   }
   await editor.set({ status: value }, 'Status')
-}
-
-function toggleDone() {
-  if (done.value) commands.reopen(props.bitId).catch(report)
-  else complete()
 }
 
 function remove() {
@@ -372,18 +414,12 @@ const created = computed(() =>
 
     <div class="detail__body">
       <div class="detail__head">
-        <slot name="complete" :bit="bit" :done="done" :complete="complete">
-          <button
-            type="button"
-            class="detail__complete pressable"
-            :class="{ 'detail__complete--done': done }"
-            :aria-label="done ? 'Mark as open' : 'Mark as done'"
-            :aria-pressed="done"
-            @click="toggleDone"
-          >
-            <component :is="done ? CircleCheck : Circle" :size="20" aria-hidden="true" />
-          </button>
-        </slot>
+        <LHoldToComplete
+          :done="done"
+          :color="accent"
+          @complete="completeByGesture"
+          @reopen="reopen"
+        />
         <textarea
           ref="titleEl"
           class="detail__title"
@@ -558,11 +594,9 @@ const created = computed(() =>
         <span class="detail__created">Created {{ created }}</span>
         <span class="detail__save" role="status" aria-live="polite">
           <template v-if="saveState === 'saving'">Saving…</template>
-          <template v-else-if="saveState === 'error'">
+          <template v-else-if="saveState === 'error' || retryStatus">
             Couldn’t save ·
-            <button type="button" class="detail__retry pressable" @click="editor.retry()">
-              Retry
-            </button>
+            <button type="button" class="detail__retry pressable" @click="retry">Retry</button>
           </template>
         </span>
       </div>
@@ -655,29 +689,6 @@ const created = computed(() =>
   display: flex;
   align-items: flex-start;
   gap: 8px;
-}
-
-.detail__complete {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  /* optical alignment with the first title line (1.25rem × 1.25) */
-  margin-top: 1px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text2);
-  cursor: pointer;
-  outline: none;
-}
-.detail__complete:hover {
-  color: var(--c);
-}
-.detail__complete--done {
-  color: var(--c);
 }
 
 .detail__title {
@@ -858,7 +869,6 @@ const created = computed(() =>
 /* ── Focus rings ────────────────────────────────────────────────────── */
 .detail__back:focus-visible,
 .detail__close:focus-visible,
-.detail__complete:focus-visible,
 .picker__quick:focus-visible,
 .detail__retry:focus-visible,
 .detail__delete:focus-visible {

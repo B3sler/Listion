@@ -366,6 +366,29 @@ describe('LWorkspace', () => {
       return event
     }
 
+    it('Abhaken im Sheet lässt die Kapsel setteln und schließt das Sheet nach 350 ms', async () => {
+      const { wrapper } = await mountWithFlow()
+      setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+      const sheet = useSheetStore()
+      sheet.openDetail('3')
+      await wrapper.vm.$nextTick()
+      const capsule = () => wrapper.findAll('.flow-item').find((c) => c.text().includes('Loose'))!
+      const settleScale = () =>
+        (capsule().element as HTMLElement)
+          .querySelector<HTMLElement>('[data-node-type="bit"]')!
+          .style.getPropertyValue('--settle')
+      expect(settleScale()).toBe('')
+
+      await wrapper.find('.hold').trigger('keydown', { key: 'Enter' })
+      await wrapper.vm.$nextTick()
+      expect(settleScale()).toBe('1.04')
+      expect(sheet.settleBitId).toBeNull()
+      expect(sheet.open).toBe(true)
+
+      await vi.waitFor(() => expect(sheet.open).toBe(false), { timeout: 2000 })
+      wrapper.unmount()
+    })
+
     describe('Undo-Tastatur und Toast', () => {
       async function mountWithHistory() {
         const { wrapper } = await mountWithFlow()
