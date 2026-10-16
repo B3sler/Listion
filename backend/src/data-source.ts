@@ -6,6 +6,7 @@ import { Packet } from './modules/packet/packet.entity.js'
 import { Flow } from './modules/flow/flow.entity.js'
 import { Dependency } from './modules/dependency/dependency.entity.js'
 import { Init1791981763517 } from './migrations/1791981763517-Init.js'
+import { BitSheetFields1792135979470 } from './migrations/1792135979470-BitSheetFields.js'
 
 /**
  * Shared by AppModule and the TypeORM CLI (migration:generate / run / check). A function, so
@@ -20,7 +21,7 @@ export const dataSourceOptions = (): DataSourceOptions => ({
   database: process.env.DB_NAME || 'listion',
   entities: [User, Bit, Packet, Flow, Dependency],
   // explicit list instead of a glob: works the same from src (vitest) and dist (node)
-  migrations: [Init1791981763517],
+  migrations: [Init1791981763517, BitSheetFields1792135979470],
 })
 
 export default new DataSource(dataSourceOptions())
