@@ -36,7 +36,7 @@ const title = computed(() =>
       :title="fullTitle"
       @click="sheet.openDetail(focus.running.bitId)"
     >
-      {{ title }}
+      <span class="focus-pill__label">{{ title }}</span>
     </button>
     <span class="focus-pill__time" role="timer">{{ formatClock(focus.elapsed) }}</span>
     <button
@@ -54,10 +54,12 @@ const title = computed(() =>
 <style scoped>
 /* Sits on the taskbar tab: light on the dark tab, dark on the light tab (like the tools) */
 .focus-pill {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
   height: 28px;
   padding: 0 4px 0 10px;
   margin-right: 4px;
@@ -91,6 +93,12 @@ const title = computed(() =>
 .focus-pill__title:hover {
   text-decoration: underline;
 }
+/* the whole pill opens the bit; only the stop button sits above it */
+.focus-pill__title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
 
 .focus-pill__time {
   flex: none;
@@ -99,6 +107,8 @@ const title = computed(() =>
 }
 
 .focus-pill__stop {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -119,5 +129,23 @@ const title = computed(() =>
 .focus-pill__stop:focus-visible {
   box-shadow: 0 0 0 2px var(--brand);
   border-radius: 6px;
+}
+
+/* A narrow column (small window): only the dot and the time; stop is in the detail view */
+@container taskbar-end (max-width: 200px) {
+  .focus-pill {
+    padding: 0 8px;
+  }
+  .focus-pill__title .focus-pill__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .focus-pill__stop {
+    display: none;
+  }
 }
 </style>
