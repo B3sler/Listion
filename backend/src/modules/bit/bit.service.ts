@@ -61,6 +61,12 @@ export class BitService {
     return this.findOne(id, userId)
   }
 
+  async addFocus(id: string, userId: string, seconds: number): Promise<Bit> {
+    await this.findOne(id, userId) // throws 404 if not found or not owned
+    await this.bitRepository.increment({ id, userId }, 'focusSeconds', seconds)
+    return this.findOne(id, userId)
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const bit = await this.findOne(id, userId) // throws 404 if not found or not owned
     await this.deps.delete({ userId, fromType: 'bit', fromId: id })

@@ -16,6 +16,7 @@ import { CurrentUserId } from '../user/current-user.decorator.js'
 import { BitService } from './bit.service.js'
 import { CreateBitDto } from '../../dto/create-bit.dto.js'
 import { UpdateBitDto } from '../../dto/update-bit.dto.js'
+import { AddFocusDto } from '../../dto/add-focus.dto.js'
 import { Bit } from './bit.entity.js'
 
 @ApiTags('Bit')
@@ -57,6 +58,19 @@ export class BitController {
     @CurrentUserId() userId: string,
   ) {
     return this.bitService.update(id, userId, updateBitDto)
+  }
+
+  @Post(':id/focus')
+  @ApiOperation({ summary: 'Add tracked focus time to a bit' })
+  @ApiResponse({ status: 201, type: Bit })
+  @ApiResponse({ status: 400, description: 'Invalid id or seconds' })
+  @ApiResponse({ status: 404, description: 'Bit not found' })
+  addFocus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() addFocusDto: AddFocusDto,
+    @CurrentUserId() userId: string,
+  ) {
+    return this.bitService.addFocus(id, userId, addFocusDto.seconds)
   }
 
   @Delete(':id')
