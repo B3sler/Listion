@@ -47,6 +47,18 @@ const bit = computed(() =>
   sheet.view === 'detail' ? (bitStore.bits.find((b) => b.id === sheet.bitId) ?? null) : null,
 )
 
+// The open bit is gone (deleted elsewhere, a reload without it): no empty pane. Only a change
+// counts, so a sheet opened before the bits have loaded stays. A bit of the capture series goes
+// back to the series instead (a failed Ctrl+Enter create shows there as its failed row).
+watch(
+  () => sheet.open && sheet.view === 'detail' && bit.value === null,
+  (missing) => {
+    if (!missing) return
+    if (sheet.series.some((s) => s.id === sheet.bitId)) sheet.backToCapture()
+    else sheet.close()
+  },
+)
+
 const label = computed(() => (bit.value ? `Bit: ${bit.value.title}` : 'New Bits'))
 
 /** Header tint: the bit's colour, in capture the colour the next bit gets. */

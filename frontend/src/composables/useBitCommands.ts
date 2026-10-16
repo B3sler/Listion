@@ -296,11 +296,16 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
 
   const pendingDeletes = new Map<string, PendingDelete>()
 
+  /** A bit goes away: its focus timer ends without booking, its open detail sheet closes. */
+  function leaving(id: string): void {
+    opts.onRemove?.(id)
+    if (sheet.open && sheet.view === 'detail' && sheet.bitId === id) sheet.close()
+  }
+
   function startDelete(id: string, entry: HistoryEntry): void {
     if (!exists(id) || bitStore.hiddenIds.has(id)) return
     bitStore.hide(id)
-    opts.onRemove?.(id)
-    if (sheet.open && sheet.view === 'detail' && sheet.bitId === id) sheet.close()
+    leaving(id)
     const pending: PendingDelete = { bitId: id, toastId: uuidv7(), state: 'pending' }
     pendingDeletes.set(id, pending)
     history.showToast({
@@ -406,8 +411,12 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
       bitId: id,
       label: 'Create',
       sealed: true,
-      // at once, without a toast
-      undo: () => (exists(id) ? actions.deleteBit(id, opts.layout()) : Promise.resolve()),
+      // at once, without a toast; otherwise like a delete (timer, open sheet)
+      undo: () => {
+        if (!exists(id)) return Promise.resolve()
+        leaving(id)
+        return actions.deleteBit(id, opts.layout())
+      },
       redo: async () => {
         if (!exists(id)) await bitStore.createBit(payload)
       },
