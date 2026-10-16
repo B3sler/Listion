@@ -108,7 +108,20 @@ describe('LBitDetailView', () => {
       .findAll('[role="radio"]')
       .find((r) => r.text() === 'Open')!
       .trigger('click')
-    expect(commands.reopen).toHaveBeenCalledWith('b1')
+    expect(commands.reopen).toHaveBeenCalledWith('b1', 0)
+  })
+
+  it('setzt ein erledigtes Bit per In Progress mit einem einzigen reopen auf status 1', async () => {
+    const w = mountView({ status: 2 })
+    await w
+      .find('[aria-label="Status"]')
+      .findAll('[role="radio"]')
+      .find((r) => r.text() === 'In Progress')!
+      .trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(commands.reopen).toHaveBeenCalledTimes(1)
+    expect(commands.reopen).toHaveBeenCalledWith('b1', 1)
+    expect(commands.update).not.toHaveBeenCalled()
   })
 
   it('öffnet mit dem Priorität-Chip die Auswahl, !!! sendet priority 3', async () => {

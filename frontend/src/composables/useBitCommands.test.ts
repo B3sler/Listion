@@ -388,6 +388,21 @@ describe('useBitCommands: History', () => {
     expect(store.bits[0]!.status).toBe(2)
   })
 
+  it('reopen mit status 1 geht in einem Schritt von Done auf In Progress zurück', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ status: 2 })]
+    const history = useHistoryStore()
+    const commands = makeCommands()
+    await commands.reopen('1', 1)
+    expect(api.put).toHaveBeenCalledTimes(1)
+    expect(api.put).toHaveBeenCalledWith('/api/bit/1', { status: 1 })
+    expect(store.bits[0]!.status).toBe(1)
+
+    await history.undo()
+    expect(store.bits[0]!.status).toBe(2)
+    expect(history.canUndo).toBe(false)
+  })
+
   it('create: Undo löscht sofort über deleteBit, Redo legt mit derselben ID neu an', async () => {
     const store = useBitStore()
     api.post.mockImplementation((_url: string, body: Bit) =>

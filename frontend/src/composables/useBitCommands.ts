@@ -24,7 +24,8 @@ export interface BitCommands {
   update(id: string, patch: Partial<Bit>, meta?: UpdateMeta): Promise<void>
   /** Repeating bits roll to their next due day; `rolledTo` is that day, otherwise null. */
   complete(id: string): Promise<{ rolledTo: string | null }>
-  reopen(id: string): Promise<void>
+  /** Back to Open, or straight to In Progress (`status` 1): one step either way. */
+  reopen(id: string, status?: 0 | 1): Promise<void>
   remove(id: string): void
   create(fields: CreateFields, pos: { x: number; y: number }, flowId: string | null): Promise<Bit>
   removeDependency(depId: string): Promise<void>
@@ -274,7 +275,7 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
     })
   }
 
-  function reopen(id: string): Promise<void> {
+  function reopen(id: string, status: 0 | 1 = 0): Promise<void> {
     if (cancelRoll(id)) {
       // reopening inside the 800 ms takes the tick back, toast and entry included
       const t = completionToast
@@ -287,9 +288,9 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
       completionToast = null
     }
     const bit = find(id)
-    if (!bit || bit.status === 0) return Promise.resolve()
-    record(patchEntry(id, 'Reopen', { status: bit.status }, { status: 0 }))
-    return bitStore.queueUpdate(id, { status: 0 })
+    if (!bit || bit.status === status) return Promise.resolve()
+    record(patchEntry(id, 'Reopen', { status: bit.status }, { status }))
+    return bitStore.queueUpdate(id, { status })
   }
 
   // --- remove (deferred) ---------------------------------------------------------------------
