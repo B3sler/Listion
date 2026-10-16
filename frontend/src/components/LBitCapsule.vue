@@ -297,8 +297,20 @@ const ariaLabel = computed(() => {
   min-width: 0;
 }
 
+/*
+ * Sized capsules (M and up) pin the title row to the top. Its centre sits at
+ * border (1) + padding-top (1) + row / 2 (14) = 16 = CAPSULE_H / 2 from the outer top,
+ * exactly where the arrows anchor (useFlowLayout.anchor). The link handle follows suit.
+ */
+.capsule--sized {
+  justify-content: flex-start;
+  padding-top: 1px;
+}
 .capsule--sized .capsule__row {
   height: 28px;
+}
+.capsule--sized .capsule__handle {
+  top: 8px;
 }
 
 .capsule__meta {
