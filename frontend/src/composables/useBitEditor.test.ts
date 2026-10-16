@@ -35,6 +35,7 @@ function mockCommands() {
 
 let pinia: Pinia
 let commands: ReturnType<typeof mockCommands>
+const mounted: { unmount(): void }[] = []
 
 function setup(id: Ref<string | null> = ref('b1')) {
   let editor!: ReturnType<typeof useBitEditor>
@@ -47,6 +48,7 @@ function setup(id: Ref<string | null> = ref('b1')) {
     }),
     { global: { plugins: [pinia], provide: { [BIT_COMMANDS as symbol]: commands } } },
   )
+  mounted.push(wrapper)
   return { editor, wrapper, id }
 }
 
@@ -59,6 +61,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  // a mounted editor keeps listening for pagehide
+  for (const w of mounted.splice(0)) w.unmount()
   vi.useRealTimers()
 })
 
@@ -231,19 +235,63 @@ describe('useBitEditor', () => {
     expect(editor.notes.value).toBe('x')
   })
 
-  it('flusht auf pagehide', async () => {
-    const { editor } = setup()
-    editor.onNotesInput('Notiz')
-    window.dispatchEvent(new Event('pagehide'))
-    expect(commands.update).toHaveBeenCalledWith('b1', { notes: 'Notiz' }, expect.anything())
-  })
+  describe('pagehide', () => {
+    let fetchMock: ReturnType<typeof vi.fn>
 
-  it('flusht beim Unmount und hört danach nicht mehr auf pagehide', async () => {
-    const { editor, wrapper } = setup()
-    editor.onNotesInput('Notiz')
-    wrapper.unmount()
-    expect(commands.update).toHaveBeenCalledTimes(1)
-    window.dispatchEvent(new Event('pagehide'))
-    expect(commands.update).toHaveBeenCalledTimes(1)
+    beforeEach(() => {
+      fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('sendet wartenden Text per fetch mit keepalive statt über axios', () => {
+      const { editor } = setup()
+      editor.onTitleInput('Neu')
+      editor.onNotesInput('Notiz')
+      window.dispatchEvent(new Event('pagehide'))
+      expect(commands.update).not.toHaveBeenCalled()
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('/api/bit/b1')
+      expect(init).toMatchObject({ method: 'PUT', keepalive: true, credentials: 'include' })
+      expect(new Headers(init.headers).get('Content-Type')).toBe('application/json')
+      expect(JSON.parse(init.body as string)).toEqual({ title: 'Neu', notes: 'Notiz' })
+    })
+
+    it('sendet nichts, wenn kein Text wartet', () => {
+      setup()
+      window.dispatchEvent(new Event('pagehide'))
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('sendet einen leeren Titel nicht', () => {
+      const { editor } = setup()
+      editor.onTitleInput('')
+      editor.onNotesInput('Notiz')
+      window.dispatchEvent(new Event('pagehide'))
+      expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({ notes: 'Notiz' })
+    })
+
+    it('verschickt den Text nach pagehide nicht noch einmal über den Debounce', async () => {
+      const { editor } = setup()
+      editor.onNotesInput('Notiz')
+      window.dispatchEvent(new Event('pagehide'))
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(commands.update).not.toHaveBeenCalled()
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('flusht beim Unmount und hört danach nicht mehr auf pagehide', async () => {
+      const { editor, wrapper } = setup()
+      editor.onNotesInput('Notiz')
+      wrapper.unmount()
+      expect(commands.update).toHaveBeenCalledTimes(1)
+      editor.onNotesInput('Später')
+      window.dispatchEvent(new Event('pagehide'))
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 })
