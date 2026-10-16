@@ -178,4 +178,15 @@ onBeforeUnmount(() => {
 .segmented__item:focus-visible {
   box-shadow: 0 0 0 2px var(--brand);
 }
+
+/* dark: --surface1 barely differs from the track, so the selected pill is a lifted fill with an edge */
+.theme-dark .segmented__pill {
+  background-color: color-mix(in srgb, var(--text0) 16%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text0) 14%, transparent),
+    0 1px 2px hsl(var(--surface-shadow) / 0.3);
+}
+.theme-dark .segmented__item--active {
+  font-weight: 600;
+}
 </style>
