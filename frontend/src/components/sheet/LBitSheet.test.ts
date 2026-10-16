@@ -269,4 +269,24 @@ describe('LBitSheet', () => {
     expect(commands.remove).toHaveBeenCalledWith('b1')
     expect(useSheetStore().open).toBe(false)
   })
+
+  it('schließt sich auch, wenn der Store von außen schließt, und gibt den Canvas frei', async () => {
+    useBitStore().bits = [bitWith()]
+    const w = mountSheet()
+    const sheet = useSheetStore()
+    sheet.openDetail('b1')
+    await w.vm.$nextTick()
+    expect(sheet.revealed).toBe(320)
+
+    // e.g. a command deleting the open bit, without the view's own close
+    sheet.close()
+    await w.vm.$nextTick()
+    expect(sheet.revealed).toBe(0)
+    expect(w.find('[role="dialog"]').exists()).toBe(false)
+
+    // and it opens again as usual
+    sheet.openDetail('b1')
+    await w.vm.$nextTick()
+    expect(sheet.revealed).toBe(320)
+  })
 })

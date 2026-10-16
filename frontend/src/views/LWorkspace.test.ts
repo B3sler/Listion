@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import LWorkspace from './LWorkspace.vue'
 import { useBitStore } from '@/stores/bitStore'
+import { useSheetStore } from '@/stores/sheetStore'
+import { useHistoryStore } from '@/stores/historyStore'
 
 // Keine echten HTTP-Requests im Test: Stores laden Bits/Verbindungen über den API-Client.
 vi.mock('../helpers/api', () => ({
@@ -313,6 +315,44 @@ describe('LWorkspace', () => {
         await wrapper.find('.bg-surface1').trigger('dblclick')
         expect(canvas().style.transform).toBe('translateX(320px)')
         expect(canvas().style.transition).toBe('')
+        wrapper.unmount()
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('Redo eines Löschens bei offenem Sheet schließt es und gibt den Canvas frei', async () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+      try {
+        const { wrapper } = await mountWithFlow()
+        // the stores of this mount (an earlier, still mounted workspace may own the active pinia)
+        setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        const sheet = useSheetStore()
+        const history = useHistoryStore()
+        const canvas = () => wrapper.find('.bg-surface1').element as HTMLElement
+        const capsules = () => wrapper.findAll('[data-node-type="bit"]')
+
+        sheet.openDetail('3')
+        await wrapper.vm.$nextTick()
+        await wrapper.find('.detail__delete').trigger('click')
+        expect(capsules()).toHaveLength(0)
+        expect(canvas().style.transform).toBe('translateX(0px)')
+
+        await history.undo()
+        await wrapper.vm.$nextTick()
+        expect(capsules()).toHaveLength(1)
+        sheet.openDetail('3')
+        await wrapper.vm.$nextTick()
+        expect(canvas().style.transform).toBe('translateX(320px)')
+
+        // the redo deletes again through the command alone, no close from the detail view
+        await history.redo()
+        await wrapper.vm.$nextTick()
+        expect(capsules()).toHaveLength(0)
+        expect(sheet.open).toBe(false)
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        expect(canvas().style.transform).toBe('translateX(0px)')
+        history.dismissToast()
         wrapper.unmount()
       } finally {
         vi.unstubAllGlobals()
