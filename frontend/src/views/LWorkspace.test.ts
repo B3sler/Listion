@@ -7,6 +7,7 @@ import LWorkspace from './LWorkspace.vue'
 import { useBitStore } from '@/stores/bitStore'
 import { useSheetStore } from '@/stores/sheetStore'
 import { useHistoryStore } from '@/stores/historyStore'
+import { FOCUS_KEY, FOCUS_PENDING_KEY, useFocusStore } from '@/stores/focusStore'
 
 // Keine echten HTTP-Requests im Test: Stores laden Bits/Verbindungen über den API-Client.
 vi.mock('../helpers/api', () => ({
@@ -411,6 +412,53 @@ describe('LWorkspace', () => {
       await wrapper.vm.$nextTick()
       expect(settleScale()).toBe('1.04')
       wrapper.unmount()
+    })
+
+    describe('Fokus-Timer', () => {
+      beforeEach(() => localStorage.clear())
+      afterEach(() => {
+        useFocusStore().cancel()
+        localStorage.clear()
+      })
+
+      it('Löschen eines Bits mit laufendem Timer beendet ihn ohne Buchung', async () => {
+        vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+        try {
+          const { wrapper, api } = await mountWithFlow()
+          setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+          const focus = useFocusStore()
+          focus.start('3')
+          vi.mocked(api.post).mockClear()
+          useSheetStore().openDetail('3')
+          await wrapper.vm.$nextTick()
+          await wrapper.find('.detail__delete').trigger('click')
+          expect(focus.running).toBeNull()
+          expect(api.post).not.toHaveBeenCalled()
+          useHistoryStore().dismissToast()
+          wrapper.unmount()
+        } finally {
+          vi.unstubAllGlobals()
+        }
+      })
+
+      it('stellt einen Timer wieder her und reicht Offenes nach dem Laden nach', async () => {
+        localStorage.setItem(
+          FOCUS_KEY,
+          JSON.stringify({ bitId: '3', startedAt: Date.now() - 90_000 }),
+        )
+        localStorage.setItem(FOCUS_PENDING_KEY, JSON.stringify({ '3': 40 }))
+        const { default: api } = await import('../helpers/api')
+        vi.mocked(api.post).mockClear()
+        const { wrapper } = await mountWithFlow()
+        setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        await vi.waitFor(() =>
+          expect(api.post).toHaveBeenCalledWith('/api/bit/3/focus', { seconds: 40 }),
+        )
+        const focus = useFocusStore()
+        expect(focus.running?.bitId).toBe('3')
+        expect(focus.elapsed).toBeGreaterThanOrEqual(90)
+        wrapper.unmount()
+      })
     })
 
     describe('Undo-Tastatur und Toast', () => {

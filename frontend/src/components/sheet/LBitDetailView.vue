@@ -38,6 +38,7 @@ import LPropertyChip from './LPropertyChip.vue'
 import LDatePicker from './LDatePicker.vue'
 import LColorGrid from './LColorGrid.vue'
 import LHoldToComplete from './LHoldToComplete.vue'
+import LFocusSection from './LFocusSection.vue'
 
 interface Props {
   bitId: string
@@ -585,7 +586,7 @@ const created = computed(() =>
         @blur="editor.onTextBlur()"
       />
 
-      <slot name="focus" :bit="bit" />
+      <slot name="focus" :bit="bit"><LFocusSection :bit="bit" /></slot>
       <slot name="dependencies" :bit="bit" />
     </div>
 

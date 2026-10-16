@@ -40,6 +40,7 @@ import { useFlowStore } from '@/stores/flowStore'
 import { isEditable, useToolStore } from '@/stores/toolStore'
 import { useSheetStore } from '@/stores/sheetStore'
 import { useHistoryStore } from '@/stores/historyStore'
+import { useFocusStore } from '@/stores/focusStore'
 import type { Dependency, DependencyItem, PacketCard } from '@/types/flow'
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -90,7 +91,14 @@ const baseLayout = computed(() =>
   }),
 )
 
-const commands = useBitCommands({ layout: () => baseLayout.value })
+const focus = useFocusStore()
+const commands = useBitCommands({
+  layout: () => baseLayout.value,
+  // a deleted bit ends its timer without booking
+  onRemove: (id) => {
+    if (focus.running?.bitId === id) focus.cancel()
+  },
+})
 provide(BIT_COMMANDS, commands)
 
 // Frames before any gesture — drop membership is judged against these
@@ -518,7 +526,15 @@ onMounted(() => {
   window.addEventListener('mouseup', handleMouseUp)
   window.addEventListener('mousemove', handleMouseMove)
   window.addEventListener('keydown', onKeydown)
-  actions.reloadAll().catch((e) => console.error('Failed to load workspace:', e))
+  focus.restore()
+  actions
+    .reloadAll()
+    .then(() => {
+      // a timer on a bit that is gone (deleted elsewhere, other account) ends without booking
+      if (focus.running && !bitStore.bits.some((b) => b.id === focus.running?.bitId)) focus.cancel()
+      return focus.flushPending()
+    })
+    .catch((e) => console.error('Failed to load workspace:', e))
 })
 
 onUnmounted(() => {

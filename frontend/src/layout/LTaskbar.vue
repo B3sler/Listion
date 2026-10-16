@@ -4,6 +4,7 @@ import { Lasso, ListFilter, MousePointer2 } from 'lucide-vue-next'
 import { useTheme } from '@/composables/useTheme.ts'
 import { useToolStore } from '@/stores/toolStore'
 import LFilterPopover from '@/components/LFilterPopover.vue'
+import LFocusPill from '@/components/LFocusPill.vue'
 
 const { isDark } = useTheme()
 const toolStore = useToolStore()
@@ -68,30 +69,33 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
         </button>
       </div>
       <img :src="logoSrc" alt="Listion Logo" class="h-8" />
-      <div ref="filterGroup" class="relative flex items-center justify-end">
-        <button
-          class="tool pressable"
-          :class="{ 'tool--active': toolStore.filterOpen }"
-          type="button"
-          aria-label="Filter"
-          title="Filter"
-          aria-haspopup="dialog"
-          :aria-expanded="toolStore.filterOpen"
-          @click="toolStore.filterOpen = !toolStore.filterOpen"
-        >
-          <ListFilter :size="17" />
-          <span v-if="toolStore.activeFilterCount > 0" class="tool__badge">
-            {{ toolStore.activeFilterCount }}
-          </span>
-        </button>
-        <Transition name="filter-pop">
-          <LFilterPopover
-            v-if="toolStore.filterOpen"
-            :filters="toolStore.filters"
-            @toggle="(group, value) => toolStore.toggleFilter(group, value as never)"
-            @reset="toolStore.resetFilters()"
-          />
-        </Transition>
+      <div class="flex min-w-0 items-center justify-end">
+        <LFocusPill />
+        <div ref="filterGroup" class="relative flex items-center justify-end">
+          <button
+            class="tool pressable"
+            :class="{ 'tool--active': toolStore.filterOpen }"
+            type="button"
+            aria-label="Filter"
+            title="Filter"
+            aria-haspopup="dialog"
+            :aria-expanded="toolStore.filterOpen"
+            @click="toolStore.filterOpen = !toolStore.filterOpen"
+          >
+            <ListFilter :size="17" />
+            <span v-if="toolStore.activeFilterCount > 0" class="tool__badge">
+              {{ toolStore.activeFilterCount }}
+            </span>
+          </button>
+          <Transition name="filter-pop">
+            <LFilterPopover
+              v-if="toolStore.filterOpen"
+              :filters="toolStore.filters"
+              @toggle="(group, value) => toolStore.toggleFilter(group, value as never)"
+              @reset="toolStore.resetFilters()"
+            />
+          </Transition>
+        </div>
       </div>
     </div>
     <div class="flex-1">

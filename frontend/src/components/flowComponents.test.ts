@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import type { Bit } from '@/stores/bitStore'
 import { addDays, todayKey } from '@/helpers/localDate'
 import LBitCapsule from './LBitCapsule.vue'
+import { useFocusStore } from '@/stores/focusStore'
 import LPacketStack from './LPacketStack.vue'
 import LDependencyLayer from './LDependencyLayer.vue'
 import depLayerSource from './LDependencyLayer.vue?raw'
@@ -186,11 +187,17 @@ describe('LBitCapsule', () => {
       expect(none.find('.capsule__repeat').exists()).toBe(false)
     })
 
-    it('markiert einen laufenden Fokus mit eigener Klasse', () => {
-      const on = mount(LBitCapsule, { props: { bit: sized({}), state: null, focusing: true } })
-      expect(on.classes()).toContain('capsule--focusing')
-      const off = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
-      expect(off.classes()).not.toContain('capsule--focusing')
+    it('markiert einen laufenden Fokus mit eigener Klasse, nur am Bit mit dem Timer', async () => {
+      const bit = sized({})
+      const w = mount(LBitCapsule, { props: { bit, state: null } })
+      expect(w.classes()).not.toContain('capsule--focusing')
+      const focus = useFocusStore()
+      focus.running = { bitId: bit.id, startedAt: Date.now() }
+      await w.vm.$nextTick()
+      expect(w.classes()).toContain('capsule--focusing')
+      focus.running = { bitId: 'anderes', startedAt: Date.now() }
+      await w.vm.$nextTick()
+      expect(w.classes()).not.toContain('capsule--focusing')
     })
 
     // jsdom applies no scoped styles, so the geometry contract is read from the SFC source.
