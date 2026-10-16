@@ -79,7 +79,7 @@ const highlightedPacketId = ref<string | null>(null)
 // Layout of the stored state — what snap detection and drops reason about
 const baseLayout = computed(() =>
   computeLayout({
-    bits: bitStore.bits,
+    bits: bitStore.visibleBits,
     packets: packetStore.packets,
   }),
 )
@@ -89,7 +89,7 @@ provide(BIT_COMMANDS, commands)
 
 // Frames before any gesture — drop membership is judged against these
 const baseFrames = computed(() =>
-  flowFrames(baseLayout.value, bitStore.bits, packetStore.packets, flowStore.flows),
+  flowFrames(baseLayout.value, bitStore.visibleBits, packetStore.packets, flowStore.flows),
 )
 
 const {
@@ -147,12 +147,12 @@ const liveLayout = computed(() => {
     return p
   })
   const bits = fd
-    ? bitStore.bits.map((b) =>
+    ? bitStore.visibleBits.map((b) =>
         b.packetId == null && inDraggedFlow(b.flowId)
           ? { ...b, x: b.x + fd.dx, y: b.y + fd.dy }
           : b,
       )
-    : bitStore.bits
+    : bitStore.visibleBits
   const layout = computeLayout({ bits, packets })
   const bd = bitDrag.value
   if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: draggedHeight.value })
@@ -161,11 +161,11 @@ const liveLayout = computed(() => {
 
 // Frames follow their members live, including while one is dragged
 const liveFrames = computed(() =>
-  flowFrames(liveLayout.value, bitStore.bits, packetStore.packets, flowStore.flows),
+  flowFrames(liveLayout.value, bitStore.visibleBits, packetStore.packets, flowStore.flows),
 )
 
 const flow = computed(() =>
-  computeFlowState(bitStore.bits, packetStore.packets, dependencyStore.dependencies),
+  computeFlowState(bitStore.visibleBits, packetStore.packets, dependencyStore.dependencies),
 )
 
 const filterActive = computed(() => toolStore.activeFilterCount > 0)
@@ -175,7 +175,7 @@ const filterDimmed = computed(() => {
   const dimmed = new Set<string>()
   if (!filterActive.value) return dimmed
   const today = new Date()
-  for (const b of bitStore.bits) {
+  for (const b of bitStore.visibleBits) {
     if (!matchesFilter(b, flow.value.bitState.get(b.id) ?? null, toolStore.filters, today))
       dimmed.add(b.id)
   }
@@ -183,7 +183,9 @@ const filterDimmed = computed(() => {
 })
 
 const looseBits = computed(() =>
-  liveLayout.value.looseBitIds.map((id) => bitStore.bits.find((b) => b.id === id)!).filter(Boolean),
+  liveLayout.value.looseBitIds
+    .map((id) => bitStore.visibleBits.find((b) => b.id === id)!)
+    .filter(Boolean),
 )
 
 /** A bit dragged out of a stack floats above everything until it is dropped. */
@@ -483,7 +485,7 @@ onUnmounted(() => {
       }"
     >
       <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
-        <div v-if="bitStore.bits.length === 0" class="p-5">
+        <div v-if="bitStore.visibleBits.length === 0" class="p-5">
           <div class="max-w-7xl">
             <h1 class="text-[2rem] text-text0 mb-2">Workspace</h1>
             <p class="text-text2 text-[0.9375rem] leading-relaxed">

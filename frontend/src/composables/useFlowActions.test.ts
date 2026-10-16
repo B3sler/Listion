@@ -313,3 +313,45 @@ describe('useFlowActions flows', () => {
     expect(api.put).not.toHaveBeenCalledWith('/api/bit/4', expect.anything())
   })
 })
+
+describe('useFlowActions: versteckte Bits und deleteBit', () => {
+  it('Stack-Ziel mit einem versteckten Mitglied behält es an seiner Stelle im Packet', async () => {
+    const all = [bit('1', '7', 0), bit('2', '7', 1), bit('3', '7', 2), bit('4', null, 0)]
+    seed(all, [])
+    usePacketStore().packets = [{ id: '7', name: 'P', x: 100, y: 100 }]
+    useBitStore().hide('2')
+    // the canvas only lays out what is visible
+    const layout = computeLayout({
+      bits: useBitStore().visibleBits,
+      packets: usePacketStore().packets,
+    })
+    await useFlowActions().dropBit(
+      '4',
+      { kind: 'stack', packetId: '7', index: 1 },
+      { x: 0, y: 0 },
+      layout,
+      new Map(),
+    )
+    expect(api.put).toHaveBeenCalledWith('/api/packet/7/bits', { bitIds: ['1', '2', '4', '3'] })
+  })
+
+  it('deleteBit wirft weiter, wenn das DELETE fehlschlägt, und lädt den Server-Stand', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const layout = seed([bit('1', null, 0)], [])
+    server.bits = [bit('1', null, 0)]
+    api.delete.mockRejectedValue(new Error('offline'))
+    await expect(useFlowActions().deleteBit('1', layout)).rejects.toThrow('offline')
+    expect(api.get).toHaveBeenCalledWith('/api/bit')
+    expect(useBitStore().bits.map((b) => b.id)).toEqual(['1'])
+    error.mockRestore()
+  })
+
+  it('deleteBit löscht und lädt neu', async () => {
+    const layout = seed([bit('1', null, 0), bit('2', null, 0)], [])
+    server.bits = [bit('2', null, 0)]
+    api.delete.mockResolvedValue({})
+    await useFlowActions().deleteBit('1', layout)
+    expect(api.delete).toHaveBeenCalledWith('/api/bit/1')
+    expect(useBitStore().bits.map((b) => b.id)).toEqual(['2'])
+  })
+})

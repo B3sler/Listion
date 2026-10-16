@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import LWorkspace from './LWorkspace.vue'
+import { useBitStore } from '@/stores/bitStore'
 
 // Keine echten HTTP-Requests im Test: Stores laden Bits/Verbindungen über den API-Client.
 vi.mock('../helpers/api', () => ({
@@ -362,5 +363,55 @@ describe('LWorkspace', () => {
     expect(high.classes()).not.toContain('capsule--dimmed')
     expect(low.classes()).toContain('capsule--dimmed')
     localStorage.clear()
+  })
+
+  it('versteckte Bits, ihre Stapel und Pfeile werden nicht gerendert', async () => {
+    const { default: api } = await import('../helpers/api')
+    const bit = (id: string, packetId: string | null, order = 0, x = 0) => ({
+      id,
+      title: `B${id}`,
+      status: 0,
+      x,
+      y: 0,
+      packetId,
+      order,
+      createdAt: '',
+    })
+    vi.mocked(api.get).mockImplementation((url: string) =>
+      Promise.resolve({
+        data:
+          url === '/api/bit'
+            ? [bit('1', null), bit('2', null, 0, 400), bit('3', '7'), bit('4', '7', 1)]
+            : url === '/api/packet'
+              ? [{ id: '7', name: 'Release', x: 800, y: 0 }]
+              : url === '/api/dependency'
+                ? [{ id: 'd', fromType: 'bit', fromId: '1', toType: 'bit', toId: '2' }]
+                : [],
+      }),
+    )
+    const pinia = createPinia()
+    const wrapper = mount(LWorkspace, { global: { plugins: [router, pinia] } })
+    await router.isReady()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(4)
+    expect(wrapper.findAll('.dep__line')).toHaveLength(1)
+
+    setActivePinia(pinia)
+    const store = useBitStore()
+    store.hide('1')
+    store.hide('3')
+    store.hide('4')
+    await wrapper.vm.$nextTick()
+    const titles = wrapper.findAll('[data-node-type="bit"]').map((c) => c.text())
+    expect(titles).toHaveLength(1)
+    expect(titles[0]).toContain('B2')
+    expect(wrapper.findAll('[data-node-type="packet"]')).toHaveLength(0)
+    expect(wrapper.findAll('.dep__line')).toHaveLength(0)
+
+    store.unhide('1')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(2)
+    expect(wrapper.findAll('.dep__line')).toHaveLength(1)
+    wrapper.unmount()
   })
 })

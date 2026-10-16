@@ -63,6 +63,12 @@ export const useHistoryStore = defineStore('history', () => {
     redoStack.value = redoStack.value.filter((e) => e.id !== id)
   }
 
+  /** Forgets every entry of a bit that no longer exists, so Ctrl+Z goes on with the next one. */
+  function dropBit(bitId: string) {
+    undoStack.value = undoStack.value.filter((e) => e.bitId !== bitId)
+    redoStack.value = redoStack.value.filter((e) => e.bitId !== bitId)
+  }
+
   function insertAt(stack: HistoryEntry[], index: number, entry: HistoryEntry): HistoryEntry[] {
     const at = Math.min(index, stack.length)
     return [...stack.slice(0, at), entry, ...stack.slice(at)]
@@ -178,20 +184,27 @@ export const useHistoryStore = defineStore('history', () => {
     paused = false
   }
 
-  /** Undo via the toast: no commit. If the undo fails the toast stays and its clock keeps going. */
+  /**
+   * Undo via the toast: no commit. If the undo fails the toast stays and its clock keeps going.
+   * If its entry is gone (dropped, or pushed off the stack), nothing was undone, so the action
+   * stands and the toast commits like on expiry — a deferred delete must not stay pending forever.
+   */
   async function undoToast() {
     const t = toast.value
     if (!t?.entryId || busy) return
     const wasPaused = paused
     pauseToast()
+    let undone: boolean
     try {
-      await undoEntry(t.entryId)
+      undone = await undoEntry(t.entryId)
     } catch (e) {
       if (toast.value === t && !wasPaused) resumeToast()
       throw e
     }
     // Replaced meanwhile: showToast already ran this toast's commit, so leave the new one alone.
-    if (toast.value === t) dismissToast()
+    if (toast.value !== t) return
+    dismissToast()
+    if (!undone) void commit(t)
   }
 
   return {
@@ -201,6 +214,7 @@ export const useHistoryStore = defineStore('history', () => {
     top,
     seal,
     drop,
+    dropBit,
     undo,
     redo,
     undoEntry,

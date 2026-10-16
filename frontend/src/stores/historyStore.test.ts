@@ -426,3 +426,38 @@ describe('historyStore: Toast', () => {
     expect(h.toast).not.toBeNull()
   })
 })
+
+describe('historyStore: Toast-Undo ohne Eintrag, dropBit', () => {
+  it('undoToast committet, wenn der Eintrag nicht mehr auf dem Stapel liegt', async () => {
+    const h = useHistoryStore()
+    const e = entry()
+    h.push(e)
+    const onCommit = vi.fn(async () => {})
+    h.showToast(toastOf({ entryId: e.id, onCommit }))
+    h.drop(e.id)
+
+    await h.undoToast()
+    expect(e.undo).not.toHaveBeenCalled()
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(h.toast).toBeNull()
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('dropBit entfernt alle Einträge eines Bits aus beiden Stapeln', async () => {
+    const h = useHistoryStore()
+    const a = entry({ bitId: 'x' })
+    const b = entry({ bitId: 'y' })
+    const c = entry({ bitId: 'x' })
+    h.push(a)
+    h.push(b)
+    h.push(c)
+    await h.undo()
+    h.dropBit('x')
+    expect(h.canRedo).toBe(false)
+    expect(h.top()).toBe(b)
+    await h.undo()
+    expect(h.canUndo).toBe(false)
+    expect(a.undo).not.toHaveBeenCalled()
+  })
+})

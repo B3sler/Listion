@@ -13,10 +13,13 @@ export const useDependencyStore = defineStore('dependency', () => {
     dependencies.value = res.data
   }
 
-  /** Optimistic: the arrow shows at once; a new bit at either end is created first. */
-  async function createDependency(from: NodeRef, to: NodeRef): Promise<Dependency> {
+  /**
+   * Optimistic: the arrow shows at once; a new bit at either end is created first. A given `id`
+   * recreates a removed arrow under its old id (undo); otherwise a new one is generated.
+   */
+  async function createDependency(from: NodeRef, to: NodeRef, id?: string): Promise<Dependency> {
     const draft: Dependency = {
-      id: uuidv7(),
+      id: id ?? uuidv7(),
       fromType: from.type,
       fromId: from.id,
       toType: to.type,
