@@ -189,7 +189,13 @@ watch(
         <Transition name="cal-slide">
           <div :key="viewMonth" class="cal__body" role="rowgroup">
             <div v-for="(week, w) in weeks" :key="w" class="cal__row" role="row">
-              <div v-for="(cell, i) in week" :key="i" class="cal__cell" role="gridcell">
+              <div
+                v-for="(cell, i) in week"
+                :key="i"
+                class="cal__cell"
+                role="gridcell"
+                :aria-selected="cell.key ? cell.key === modelValue : undefined"
+              >
                 <button
                   v-if="cell.key"
                   type="button"
@@ -200,7 +206,6 @@ watch(
                   }"
                   :data-key="cell.key"
                   :aria-current="cell.key === today ? 'date' : undefined"
-                  :aria-selected="cell.key === modelValue"
                   :tabindex="cell.key === activeKey ? 0 : -1"
                   @click="select(cell.key)"
                   @keydown="onKeydown($event, cell.key)"
