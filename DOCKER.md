@@ -156,7 +156,9 @@ docker compose exec postgres psql -U listion_user -d listion -c "CREATE DATABASE
 # apply the existing migrations first, then diff the entities against them
 docker compose exec -e DB_NAME=listion_migrations backend npm run migration:run --workspace backend
 docker compose exec -e DB_NAME=listion_migrations backend npm run migration:generate --workspace backend -- src/migrations/<Name>
-# after registering the new file: must report "No changes in database schema were found"
+# after registering the new file: apply it too, otherwise the check still sees its changes
+docker compose exec -e DB_NAME=listion_migrations backend npm run migration:run --workspace backend
+# must report "No changes in database schema were found"
 docker compose exec -e DB_NAME=listion_migrations backend npm run migration:check --workspace backend
 docker compose exec postgres psql -U listion_user -d listion -c "DROP DATABASE listion_migrations;"
 ```
