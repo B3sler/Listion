@@ -6,6 +6,8 @@ import LBitCapsule from './LBitCapsule.vue'
 import LPacketStack from './LPacketStack.vue'
 import LDependencyLayer from './LDependencyLayer.vue'
 import depLayerSource from './LDependencyLayer.vue?raw'
+import capsuleSource from './LBitCapsule.vue?raw'
+import { CAPSULE_H } from '@/composables/useFlowLayout'
 
 const bit = (id: string, status = 0, order = 0): Bit => ({
   id,
@@ -185,6 +187,26 @@ describe('LBitCapsule', () => {
       expect(on.classes()).toContain('capsule--focusing')
       const off = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
       expect(off.classes()).not.toContain('capsule--focusing')
+    })
+
+    // jsdom applies no scoped styles, so the geometry contract is read from the SFC source.
+    // Arrows anchor CAPSULE_H / 2 below the capsule's outer top (useFlowLayout.anchor).
+    it('hält die Titelzeile gestufter Kapseln auf Höhe des Pfeil-Ankers', () => {
+      const rule = (selector: string) => {
+        const at = capsuleSource.indexOf('\n' + selector + ' {')
+        return capsuleSource.slice(at, capsuleSource.indexOf('}', at))
+      }
+      const px = (css: string, prop: string) =>
+        parseInt(css.slice(css.indexOf(prop + ': ') + prop.length + 2), 10)
+      const border = 1
+      expect(rule('.capsule')).toMatch(/border: 1px/)
+      // plain (S) row sits in the flex-centred 32px box
+      expect(border + px(rule('.capsule__row'), 'height') / 2).toBe(CAPSULE_H / 2)
+      // sized rows are pinned to the top, so their centre must land on the same line
+      const sized = rule('.capsule--sized')
+      expect(sized).toMatch(/justify-content: flex-start/)
+      const rowHeight = px(rule('.capsule--sized .capsule__row'), 'height')
+      expect(border + px(sized, 'padding-top') + rowHeight / 2).toBe(CAPSULE_H / 2)
     })
 
     describe('settle', () => {
