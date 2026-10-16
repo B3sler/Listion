@@ -6,10 +6,21 @@ import LFilterPopover from './LFilterPopover.vue'
 import LLassoPath from './LLassoPath.vue'
 import LPacketStack from './LPacketStack.vue'
 import LUndoToast from './LUndoToast.vue'
+import LFocusPill from './LFocusPill.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import { useToolStore } from '@/stores/toolStore'
 import { useHistoryStore } from '@/stores/historyStore'
-import type { Bit } from '@/stores/bitStore'
+import { useFocusStore } from '@/stores/focusStore'
+import { useSheetStore } from '@/stores/sheetStore'
+import { useBitStore, type Bit } from '@/stores/bitStore'
+
+const api = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn().mockResolvedValue({ data: {} }),
+  put: vi.fn(),
+  delete: vi.fn(),
+}))
+vi.mock('@/helpers/api', () => ({ default: api }))
 
 beforeEach(() => {
   localStorage.clear()
@@ -264,5 +275,103 @@ describe('LUndoToast', () => {
     expect((w.find('.toast').element as HTMLElement).style.transform).toBe('')
     history.dismissToast()
     await vi.waitFor(() => expect(w.find('.toast').exists()).toBe(false))
+  })
+})
+
+describe('LFocusPill', () => {
+  const T0 = new Date(2026, 9, 16, 10, 0, 0).getTime()
+
+  function pillBit(extra: Partial<Bit> = {}): Bit {
+    return {
+      id: 'b1',
+      title: 'Steuer abgeben',
+      status: 0,
+      x: 0,
+      y: 0,
+      packetId: null,
+      order: 0,
+      createdAt: '',
+      color: '#ef4444',
+      ...extra,
+    }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(T0)
+    api.post.mockClear()
+    useBitStore().bits = [pillBit()]
+  })
+
+  afterEach(() => {
+    useFocusStore().cancel()
+    vi.useRealTimers()
+  })
+
+  it('wird nur gerendert, wenn ein Timer läuft', async () => {
+    const w = mount(LFocusPill)
+    expect(w.find('.focus-pill').exists()).toBe(false)
+    useFocusStore().start('b1')
+    await w.vm.$nextTick()
+    expect(w.find('.focus-pill').exists()).toBe(true)
+    useFocusStore().cancel()
+    await w.vm.$nextTick()
+    expect(w.find('.focus-pill').exists()).toBe(false)
+  })
+
+  it('zeigt Titel und laufende Zeit', async () => {
+    const w = mount(LFocusPill)
+    useFocusStore().start('b1')
+    vi.advanceTimersByTime(724_000)
+    await w.vm.$nextTick()
+    expect(w.find('.focus-pill__title').text()).toBe('Steuer abgeben')
+    expect(w.find('.focus-pill__time').text()).toBe('12:04')
+  })
+
+  it('kürzt lange Titel auf höchstens 18 Zeichen mit …', async () => {
+    useBitStore().bits = [pillBit({ title: 'Steuererklärung für das Jahr 2025 abgeben' })]
+    const w = mount(LFocusPill)
+    useFocusStore().start('b1')
+    await w.vm.$nextTick()
+    const title = w.find('.focus-pill__title').text()
+    expect(title).toBe('Steuererklärung f…')
+    expect(title).toHaveLength(18)
+  })
+
+  it('öffnet per Klick auf den Titel das Bit im Sheet', async () => {
+    const w = mount(LFocusPill)
+    const sheet = useSheetStore()
+    const open = vi.spyOn(sheet, 'openDetail')
+    useFocusStore().start('b1')
+    await w.vm.$nextTick()
+    await w.find('.focus-pill__title').trigger('click')
+    expect(open).toHaveBeenCalledWith('b1')
+  })
+
+  it('■ stoppt den Timer und bucht die Zeit', async () => {
+    const w = mount(LFocusPill)
+    const focus = useFocusStore()
+    focus.start('b1')
+    vi.advanceTimersByTime(65_000)
+    await w.vm.$nextTick()
+    await w.find('[aria-label="Stop focus"]').trigger('click')
+    expect(focus.running).toBeNull()
+    expect(api.post).toHaveBeenCalledWith('/api/bit/b1/focus', { seconds: 65 })
+    await w.vm.$nextTick()
+    expect(w.find('.focus-pill').exists()).toBe(false)
+  })
+
+  it('steht in der Taskbar rechts vor dem Filter', async () => {
+    const w = mount(LTaskbar, { attachTo: document.body })
+    expect(w.find('.focus-pill').exists()).toBe(false)
+    useFocusStore().start('b1')
+    await w.vm.$nextTick()
+    const pill = w.find('.focus-pill')
+    const filter = w.find('[aria-label="Filter"]')
+    expect(pill.exists()).toBe(true)
+    expect(
+      pill.element.compareDocumentPosition(filter.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    w.unmount()
   })
 })

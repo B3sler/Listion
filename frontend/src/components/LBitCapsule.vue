@@ -9,6 +9,7 @@ import { formatDayShort, toDateKey } from '@/helpers/localDate'
 import { isSnoozed } from '@/helpers/bitMeta'
 import { prefersReducedMotion, Spring, SPRING_DEFAULT } from '@/helpers/motion'
 import { useSheetStore } from '@/stores/sheetStore'
+import { useFocusStore } from '@/stores/focusStore'
 
 const props = defineProps<{
   bit: Bit
@@ -17,8 +18,6 @@ const props = defineProps<{
   lifted?: boolean
   dimmed?: boolean
   snapHint?: 'above' | 'below' | null
-  /** A focus session runs on this bit. */
-  focusing?: boolean
   /** Just created from the capture series: it materialises out of the ghost capsule. */
   materialize?: boolean
 }>()
@@ -32,6 +31,10 @@ const emit = defineEmits<{
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High' }
 const STATUS_LABEL: Record<number, string> = { 0: 'Open', 1: 'In progress', 2: 'Done' }
+
+const focus = useFocusStore()
+/** A focus session runs on this bit. */
+const focusing = computed(() => focus.running?.bitId === props.bit.id)
 
 const color = computed(() => props.bit.color ?? '#6366f1')
 const isDone = computed(() => props.bit.status === 2)

@@ -229,6 +229,28 @@ export const useBitStore = defineStore('bit', () => {
     bits.value = bits.value.filter((b) => b.id !== id)
   }
 
+  function shiftFocus(id: string, delta: number): void {
+    const idx = bits.value.findIndex((b) => b.id === id)
+    if (idx === -1) return
+    const current = bits.value[idx]!
+    bits.value[idx] = { ...current, focusSeconds: Math.max(0, (current.focusSeconds ?? 0) + delta) }
+  }
+
+  /**
+   * Adds finished focus time. Optimistic like the other writes; the server increments atomically,
+   * so a failure takes back exactly this amount and leaves concurrent edits alone.
+   */
+  async function addFocus(id: string, seconds: number): Promise<void> {
+    shiftFocus(id, seconds)
+    try {
+      await whenCreated(id)
+      await api.post(`/api/bit/${id}/focus`, { seconds })
+    } catch (e) {
+      shiftFocus(id, -seconds)
+      throw e
+    }
+  }
+
   return {
     bits,
     hiddenIds,
@@ -239,6 +261,7 @@ export const useBitStore = defineStore('bit', () => {
     createBit,
     updateBit,
     queueUpdate,
+    addFocus,
     deleteBit,
   }
 })
