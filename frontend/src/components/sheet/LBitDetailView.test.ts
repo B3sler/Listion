@@ -3,6 +3,7 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { useBitStore, type Bit } from '@/stores/bitStore'
 import { useSheetStore } from '@/stores/sheetStore'
+import { useDependencyStore } from '@/stores/dependencyStore'
 import { BIT_COMMANDS, type BitCommands } from '@/composables/useBitCommands'
 import { dueToApi, todayKey } from '@/helpers/localDate'
 import { firstDue } from '@/helpers/recurrence'
@@ -362,5 +363,42 @@ describe('LBitDetailView', () => {
     expect(w.find('.detail__save').text()).toContain('Couldn’t save')
     await w.find('.detail__retry').trigger('click')
     expect(commands.update).toHaveBeenLastCalledWith('b1', { priority: 1 }, expect.anything())
+  })
+
+  describe('Abhängigkeiten', () => {
+    function withDependency() {
+      useBitStore().bits.push(bitWith({ id: 'b2', title: 'Belege sammeln' }))
+      useDependencyStore().dependencies = [
+        { id: 'd1', fromType: 'bit', fromId: 'b2', toType: 'bit', toId: 'b1' },
+      ]
+    }
+
+    it('zeigt die Abhängigkeiten des Bits, ohne Pfeile keinen Abschnitt', async () => {
+      const w = mountView()
+      expect(w.find('.deplist').exists()).toBe(false)
+      withDependency()
+      await w.vm.$nextTick()
+      expect(w.find('.deplist').text()).toContain('Belege sammeln')
+    })
+
+    it('leitet navigate als focus-node weiter', async () => {
+      const w = mountView()
+      withDependency()
+      await w.vm.$nextTick()
+      await w.find('.deplist__main').trigger('click')
+      expect(w.emitted('focus-node')).toEqual([[{ type: 'bit', id: 'b2' }]])
+    })
+
+    it('legt hover in den sheetStore und räumt ihn beim Schließen ab', async () => {
+      const w = mountView()
+      withDependency()
+      await w.vm.$nextTick()
+      const sheet = useSheetStore()
+      await w.find('.deplist__row').trigger('mouseenter')
+      expect(sheet.hoverDependencyId).toBe('d1')
+      w.unmount()
+      wrapper = null
+      expect(sheet.hoverDependencyId).toBeNull()
+    })
   })
 })

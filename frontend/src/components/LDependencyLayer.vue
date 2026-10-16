@@ -6,6 +6,8 @@ defineProps<{
   items: DependencyItem[]
   preview: string | null
   selectedId: string | null
+  /** Drawn like a selected arrow, but without the delete handle (hovered in the bit sheet). */
+  highlightId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -49,7 +51,10 @@ function onDeleteKey(e: KeyboardEvent, id: string) {
       v-for="item in items"
       :key="item.id"
       class="dep"
-      :class="{ 'dep--dimmed': item.dimmed, 'dep--selected': selectedId === item.id }"
+      :class="{
+        'dep--dimmed': item.dimmed,
+        'dep--selected': selectedId === item.id || highlightId === item.id,
+      }"
     >
       <path
         :d="item.d"

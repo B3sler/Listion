@@ -6,6 +6,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LWorkspace from './LWorkspace.vue'
 import { useBitStore } from '@/stores/bitStore'
 import { useSheetStore } from '@/stores/sheetStore'
+import { useDependencyStore } from '@/stores/dependencyStore'
 import { useHistoryStore } from '@/stores/historyStore'
 import { FOCUS_KEY, FOCUS_PENDING_KEY, useFocusStore } from '@/stores/focusStore'
 
@@ -412,6 +413,83 @@ describe('LWorkspace', () => {
       await wrapper.vm.$nextTick()
       expect(settleScale()).toBe('1.04')
       wrapper.unmount()
+    })
+
+    describe('Abhängigkeiten im Sheet', () => {
+      let rect: ReturnType<typeof vi.spyOn>
+      beforeEach(() => {
+        // the canvas restores its last pan from localStorage; start from the origin
+        localStorage.clear()
+        vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+        rect = vi
+          .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+          .mockReturnValue(DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 800 }))
+      })
+      afterEach(() => {
+        rect.mockRestore()
+        vi.unstubAllGlobals()
+      })
+
+      async function mountWithArrow() {
+        const mounted = await mountWithFlow({
+          bits: [
+            { ...looseInFlow, id: '4', title: 'Far', x: 1600, flowId: null },
+            { ...looseInFlow, id: '5', title: 'Packed', x: 0, packetId: '7', flowId: null },
+          ],
+          packets: [{ id: '7', name: 'Stack', x: 2400, y: 200, flowId: null }],
+        })
+        setActivePinia((mounted.wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        useDependencyStore().dependencies = [
+          { id: 'd1', fromType: 'bit', fromId: '3', toType: 'bit', toId: '4' },
+        ]
+        await mounted.wrapper.vm.$nextTick()
+        const layer = () =>
+          (mounted.wrapper.find('.bg-surface1 > .origin-top-left').element as HTMLElement).style
+            .transform
+        return { ...mounted, layer }
+      }
+
+      it('hebt beim Hover im Sheet den Pfeil hervor, ohne Löschgriff', async () => {
+        const { wrapper } = await mountWithArrow()
+        const sheet = useSheetStore()
+        expect(wrapper.find('.dep--selected').exists()).toBe(false)
+        sheet.hoverDependencyId = 'd1'
+        await wrapper.vm.$nextTick()
+        expect(wrapper.find('.dep--selected').exists()).toBe(true)
+        expect(wrapper.find('.dep__delete').exists()).toBe(false)
+        sheet.hoverDependencyId = null
+        await wrapper.vm.$nextTick()
+        expect(wrapper.find('.dep--selected').exists()).toBe(false)
+        wrapper.unmount()
+      })
+
+      it('navigate zu einem Bit schwenkt dorthin und wechselt das Sheet', async () => {
+        const { wrapper, layer } = await mountWithArrow()
+        const sheet = useSheetStore()
+        sheet.openDetail('3')
+        await wrapper.vm.$nextTick()
+        expect(layer()).toBe('translate3d(0px, 0px, 0) scale(1)')
+        sheet.requestNavigate({ type: 'bit', id: '4' })
+        await wrapper.vm.$nextTick()
+        expect(sheet.bitId).toBe('4')
+        expect(sheet.view).toBe('detail')
+        expect(layer()).toMatch(/^translate3d\(-\d+(\.\d+)?px,/)
+        wrapper.unmount()
+      })
+
+      it('navigate zu einem Packet fokussiert den Stapel', async () => {
+        const { wrapper, layer } = await mountWithArrow()
+        const sheet = useSheetStore()
+        sheet.openDetail('3')
+        await wrapper.vm.$nextTick()
+        expect(layer()).toBe('translate3d(0px, 0px, 0) scale(1)')
+        sheet.requestNavigate({ type: 'packet', id: '7' })
+        await wrapper.vm.$nextTick()
+        expect(layer()).toMatch(/^translate3d\(-\d+(\.\d+)?px,/)
+        // the sheet stays on its bit
+        expect(sheet.bitId).toBe('3')
+        wrapper.unmount()
+      })
     })
 
     describe('Fokus-Timer', () => {

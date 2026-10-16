@@ -4,6 +4,7 @@ import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { useBitStore, type Bit } from '@/stores/bitStore'
 import { useSheetStore } from '@/stores/sheetStore'
 import { useToolStore } from '@/stores/toolStore'
+import { useDependencyStore } from '@/stores/dependencyStore'
 import { BIT_COMMANDS, type BitCommands, type CreateFields } from '@/composables/useBitCommands'
 import { CAPSULE_H, CAPSULE_W } from '@/composables/useFlowLayout'
 import { DEFAULT_COLOR } from '@/helpers/palette'
@@ -534,5 +535,18 @@ describe('Capture-Ansicht', () => {
     expect(sheet.view).toBe('capture')
     await w.vm.$nextTick()
     expect(w.find('.capture__row--failed').exists()).toBe(true)
+  })
+
+  it('reicht einen Klick auf eine Abhängigkeit als Navigationswunsch an den Store weiter', async () => {
+    useBitStore().bits = [bitWith(), bitWith({ id: 'b2', title: 'Belege sammeln' })]
+    useDependencyStore().dependencies = [
+      { id: 'd1', fromType: 'bit', fromId: 'b2', toType: 'bit', toId: 'b1' },
+    ]
+    const w = mountSheet()
+    const sheet = useSheetStore()
+    sheet.openDetail('b1')
+    await w.vm.$nextTick()
+    await w.find('.deplist__main').trigger('click')
+    expect(sheet.navigateRequest).toEqual({ type: 'bit', id: 'b2' })
   })
 })

@@ -355,6 +355,22 @@ function ensureVisible(rect: Rect) {
   animateView(z, 48 - rect.x * z, height / 2 - (rect.y + rect.h / 2) * z)
 }
 
+// A dependency row in the sheet was clicked: pan to the bit and show it in the sheet, or focus the
+// stack (the same focus the packets HUD uses)
+watch(
+  () => sheetStore.navigateRequest,
+  (target) => {
+    if (!target) return
+    if (target.type === 'packet') {
+      focusPacket(target.id)
+      return
+    }
+    const rect = liveLayout.value.bitRects.get(target.id)
+    if (rect) ensureVisible(rect)
+    sheetStore.openDetail(target.id)
+  },
+)
+
 /**
  * Where the series stands: a new click point or the bit just placed. Only when this moves does
  * the canvas follow the ghost; typing, size or colour changes and edits elsewhere leave the
@@ -594,6 +610,7 @@ onUnmounted(() => {
           :items="dependencyItems"
           :preview="linkPreview"
           :selected-id="selectedDependencyId"
+          :highlight-id="sheetStore.hoverDependencyId"
           @select="(id) => (selectedDependencyId = selectedDependencyId === id ? null : id)"
           @remove="
             (id) => {

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { CreateFields } from '@/composables/useBitCommands'
 import type { Rect } from '@/composables/useFlowLayout'
+import type { NodeRef } from '@/types/flow'
 
 export type SheetView = 'capture' | 'detail'
 
@@ -51,8 +52,21 @@ export const useSheetStore = defineStore('sheet', () => {
    */
   const settleRequest = ref<{ bitId: string } | null>(null)
 
+  /** The arrow a dependency row in the sheet is hovered over: the canvas highlights it. */
+  const hoverDependencyId = ref<string | null>(null)
+  /**
+   * A dependency row was clicked: the workspace pans to the bit (and the sheet switches to it)
+   * or focuses the stack. A fresh object per request, so asking again for the same node fires
+   * again.
+   */
+  const navigateRequest = ref<NodeRef | null>(null)
+
   function requestSettle(bitId: string) {
     settleRequest.value = { bitId }
+  }
+
+  function requestNavigate(target: NodeRef) {
+    navigateRequest.value = { type: target.type, id: target.id }
   }
 
   /** A new series starts; the ghost follows from the capture view (it recomputes on its own). */
@@ -102,7 +116,10 @@ export const useSheetStore = defineStore('sheet', () => {
     seriesColor,
     materializeId,
     settleRequest,
+    hoverDependencyId,
+    navigateRequest,
     requestSettle,
+    requestNavigate,
     openCapture,
     openDetail,
     backToCapture,
