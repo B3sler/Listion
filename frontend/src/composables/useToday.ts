@@ -10,10 +10,21 @@ function msUntilMidnight(now = new Date()): number {
 }
 
 function schedule(): void {
+  if (timer !== null) clearTimeout(timer)
   timer = setTimeout(() => {
     today.value = todayKey()
     schedule()
   }, msUntilMidnight())
+}
+
+/**
+ * A machine waking from sleep after midnight may not have fired the timer yet (or fires it
+ * late): look at the clock again when the page comes back, and aim the timer anew.
+ */
+function recheck(): void {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+  today.value = todayKey()
+  schedule()
 }
 
 /** Local calendar day as `YYYY-MM-DD`; flips at local midnight. Shared by all callers. */
@@ -21,6 +32,10 @@ export function useToday(): Readonly<Ref<string>> {
   if (timer === null) {
     today.value = todayKey()
     schedule()
+    if (typeof window !== 'undefined') {
+      document.addEventListener('visibilitychange', recheck)
+      window.addEventListener('focus', recheck)
+    }
   }
   return readonly(today)
 }
