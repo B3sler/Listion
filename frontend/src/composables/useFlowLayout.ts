@@ -1,10 +1,10 @@
 import type { Bit } from '@/stores/bitStore'
 import type { NodeRef, Packet } from '@/types/flow'
 import { compareIds } from '@/helpers/uuid'
+import { SIZE_HEIGHT } from '@/helpers/bitMeta'
 
 export const CAPSULE_W = 200
 export const CAPSULE_H = 32
-export const CAPSULE_EXPANDED_EXTRA = 20
 export const STEP_GAP = 4
 export const STACK_PAD = 8
 export const STACK_HEADER_H = 40
@@ -31,30 +31,35 @@ export interface FlowLayout {
   looseBitIds: string[]
 }
 
-export function capsuleHeight(expanded: boolean): number {
-  return CAPSULE_H + (expanded ? CAPSULE_EXPANDED_EXTRA : 0)
+/** Height of a capsule on the canvas, set by the bit's effort size. */
+export function capsuleHeight(bit: Pick<Bit, 'size'>): number {
+  return SIZE_HEIGHT[bit.size ?? 0]
 }
 
-/** Vertical layout inside a stack, relative to its top edge. */
+/**
+ * Vertical layout inside a stack, relative to its top edge.
+ * `gapHeight` is the space opened at `gapIndex` (capsule height plus step gap).
+ */
 export function stackGeometry(
-  count: number,
-  expandedIndex: number | null,
+  heights: number[],
   gapIndex: number | null,
+  gapHeight: number = INSERT_GAP,
 ): { offsets: number[]; gapY: number | null; height: number } {
+  const count = heights.length
   const offsets: number[] = []
   let gapY: number | null = null
   let y = STACK_HEADER_H
   for (let i = 0; i < count; i++) {
     if (gapIndex === i) {
-      gapY = y + (INSERT_GAP - STEP_GAP) / 2
-      y += INSERT_GAP
+      gapY = y + (gapHeight - STEP_GAP) / 2
+      y += gapHeight
     }
     offsets.push(y)
-    y += capsuleHeight(i === expandedIndex) + STEP_GAP
+    y += heights[i]! + STEP_GAP
   }
   if (gapIndex !== null && gapIndex >= count) {
-    gapY = y + (INSERT_GAP - STEP_GAP) / 2
-    y += INSERT_GAP
+    gapY = y + (gapHeight - STEP_GAP) / 2
+    y += gapHeight
   }
   const height =
     count === 0 && gapIndex === null ? STACK_HEADER_H + STACK_PAD : y - STEP_GAP + STACK_PAD
@@ -64,7 +69,6 @@ export function stackGeometry(
 export function computeLayout(input: {
   bits: Bit[]
   packets: Packet[]
-  expandedBitId: string | null
 }): FlowLayout {
   const packetIds = new Set(input.packets.map((p) => p.id))
   const membersOf = new Map<string, Bit[]>()
@@ -87,15 +91,14 @@ export function computeLayout(input: {
   for (const packet of input.packets) {
     const members = membersOf.get(packet.id)
     if (!members) continue
-    const expandedIndex = members.findIndex((b) => b.id === input.expandedBitId)
-    const geo = stackGeometry(members.length, expandedIndex === -1 ? null : expandedIndex, null)
+    const geo = stackGeometry(members.map(capsuleHeight), null)
     packetRects.set(packet.id, { x: packet.x, y: packet.y, w: STACK_W, h: geo.height })
     members.forEach((bit, i) => {
       bitRects.set(bit.id, {
         x: packet.x + STACK_PAD + STEP_NUM_W,
         y: packet.y + geo.offsets[i]!,
         w: CAPSULE_W,
-        h: capsuleHeight(bit.id === input.expandedBitId),
+        h: capsuleHeight(bit),
       })
     })
   }
@@ -106,7 +109,7 @@ export function computeLayout(input: {
       x: bit.x ?? 0,
       y: bit.y ?? 0,
       w: CAPSULE_W,
-      h: capsuleHeight(bit.id === input.expandedBitId),
+      h: capsuleHeight(bit),
     })
   }
 
@@ -121,7 +124,7 @@ export function anchor(
 ): { x: number; y: number } | null {
   const rect = ref.type === 'bit' ? layout.bitRects.get(ref.id) : layout.packetRects.get(ref.id)
   if (!rect) return null
-  // bits attach at the middle of the (collapsed) capsule row, packets at the header row
+  // bits attach at the middle of the capsule's title row, packets at the header row
   const y = ref.type === 'bit' ? rect.y + CAPSULE_H / 2 : rect.y + 20
   return { x: end === 'out' ? rect.x + rect.w : rect.x, y }
 }

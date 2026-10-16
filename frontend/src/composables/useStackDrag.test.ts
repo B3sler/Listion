@@ -24,7 +24,6 @@ const layout = computeLayout({
     bit('5', null, 0, 900, 900),
   ],
   packets: [{ id: '7', name: 'P', x: 100, y: 100 }],
-  expandedBitId: null,
 })
 
 describe('insertIndex', () => {

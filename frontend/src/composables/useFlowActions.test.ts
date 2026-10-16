@@ -42,7 +42,7 @@ beforeEach(() => {
 function seed(bits: Bit[], packets: Packet[]) {
   useBitStore().bits = bits.map((b) => ({ ...b }))
   usePacketStore().packets = packets.map((p) => ({ ...p }))
-  return computeLayout({ bits, packets, expandedBitId: null })
+  return computeLayout({ bits, packets })
 }
 
 describe('useFlowActions.dropBit', () => {

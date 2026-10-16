@@ -26,7 +26,7 @@ const bits = [
 ]
 const packets: Packet[] = [{ id: 'p7', name: 'P', x: 0, y: 200, flowId: 'f5' }]
 const flows: Flow[] = [{ id: 'f5', name: 'F', color: '#818cf8' }]
-const layout = computeLayout({ bits, packets, expandedBitId: null })
+const layout = computeLayout({ bits, packets })
 
 describe('flowFrames', () => {
   it('umschließt alle Mitglieder mit Abstand und Platz für den Namen', () => {

@@ -18,6 +18,7 @@ import {
   CAPSULE_H,
   CAPSULE_W,
   anchor,
+  capsuleHeight,
   computeLayout,
   dependencyGeometry,
   unionRect,
@@ -77,7 +78,6 @@ const baseLayout = computed(() =>
   computeLayout({
     bits: bitStore.bits,
     packets: packetStore.packets,
-    expandedBitId: null,
   }),
 )
 
@@ -123,6 +123,13 @@ const {
   onMoveFlowEnd: (id, dx, dy) => actions.moveFlow(id, dx, dy),
 })
 
+// Height of the capsule being dragged (sizes its drop gap and its live rect)
+const draggedHeight = computed(() => {
+  const id = bitDrag.value?.bitId
+  const bit = id ? bitStore.bits.find((b) => b.id === id) : undefined
+  return bit ? capsuleHeight(bit) : CAPSULE_H
+})
+
 // Layout including in-flight gestures — what is rendered and where arrows attach
 const liveLayout = computed(() => {
   const pd = packetDrag.value
@@ -140,9 +147,9 @@ const liveLayout = computed(() => {
           : b,
       )
     : bitStore.bits
-  const layout = computeLayout({ bits, packets, expandedBitId: null })
+  const layout = computeLayout({ bits, packets })
   const bd = bitDrag.value
-  if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: CAPSULE_H })
+  if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: draggedHeight.value })
   return layout
 })
 
@@ -573,6 +580,7 @@ onUnmounted(() => {
           :cycle-bit-ids="flow.cycleBitIds"
           :summary="flow.packetSummary.get(s.packet.id)!"
           :gap-index="s.gapIndex"
+          :gap-height="draggedHeight"
           :dimmed-bit-ids="filterDimmed"
           :highlighted="highlightedPacketId === s.packet.id"
           :dimmed="highlightedPacketId !== null && highlightedPacketId !== s.packet.id"
