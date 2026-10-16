@@ -110,6 +110,7 @@ onUnmounted(() => {
           @back="sheet.backToCapture()"
           @close="close()"
           @open-bit="sheet.openDetail"
+          @focus-node="sheet.requestNavigate"
         />
         <LCaptureView v-else ref="capture" :key="paneKey" class="sheet__pane" @close="close()" />
       </Transition>

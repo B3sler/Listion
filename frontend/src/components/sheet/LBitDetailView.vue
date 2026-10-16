@@ -39,6 +39,7 @@ import LDatePicker from './LDatePicker.vue'
 import LColorGrid from './LColorGrid.vue'
 import LHoldToComplete from './LHoldToComplete.vue'
 import LFocusSection from './LFocusSection.vue'
+import LDependencyList from './LDependencyList.vue'
 
 interface Props {
   bitId: string
@@ -367,6 +368,11 @@ function retry() {
 
 onBeforeUnmount(cancelClose)
 
+// leaving the sheet (or this bit) ends the hover: no mouseleave reaches a removed row
+onBeforeUnmount(() => {
+  sheet.hoverDependencyId = null
+})
+
 async function setStatus(value: number) {
   const b = bit.value
   if (!b || value === b.status) return
@@ -587,7 +593,13 @@ const created = computed(() =>
       />
 
       <slot name="focus" :bit="bit"><LFocusSection :bit="bit" /></slot>
-      <slot name="dependencies" :bit="bit" />
+      <slot name="dependencies" :bit="bit">
+        <LDependencyList
+          :bit-id="bit.id"
+          @navigate="(target) => emit('focus-node', target)"
+          @hover="(depId) => (sheet.hoverDependencyId = depId)"
+        />
+      </slot>
     </div>
 
     <footer class="detail__footer">
