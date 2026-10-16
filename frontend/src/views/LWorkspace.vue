@@ -30,6 +30,8 @@ import { SHEET_WIDTH } from '@/composables/useSheetGesture'
 import { computeFlowState } from '@/composables/useFlowState'
 import { flowAt, flowFrames, pathLength } from '@/composables/useFlowGroups'
 import { matchesFilter } from '@/composables/useFilter'
+import { useToday } from '@/composables/useToday'
+import { isSnoozed } from '@/helpers/bitMeta'
 import { useFlowGestures } from '@/composables/useFlowGestures'
 import { useFlowActions } from '@/composables/useFlowActions'
 import { BIT_COMMANDS, useBitCommands } from '@/composables/useBitCommands'
@@ -196,8 +198,26 @@ const filterDimmed = computed(() => {
   return dimmed
 })
 
+const dayKey = useToday()
+
+/**
+ * Snoozed loose bits that "Hide snoozed" keeps off the canvas. They stay in the layout (so
+ * stacks and snap targets do not move) and are only skipped when rendering; bits inside a
+ * stack are never hidden.
+ */
+const hiddenSnoozedIds = computed(() => {
+  const ids = new Set<string>()
+  if (!toolStore.filters.hideSnoozed) return ids
+  for (const id of liveLayout.value.looseBitIds) {
+    const bit = bitStore.visibleBits.find((b) => b.id === id)
+    if (bit && isSnoozed(bit, dayKey.value)) ids.add(id)
+  }
+  return ids
+})
+
 const looseBits = computed(() =>
   liveLayout.value.looseBitIds
+    .filter((id) => !hiddenSnoozedIds.value.has(id))
     .map((id) => bitStore.visibleBits.find((b) => b.id === id)!)
     .filter(Boolean),
 )
@@ -255,6 +275,11 @@ function isDependencyDimmed(dep: Dependency): boolean {
 
 const dependencyItems = computed<DependencyItem[]>(() =>
   dependencyStore.dependencies.flatMap((dep) => {
+    if (
+      (dep.fromType === 'bit' && hiddenSnoozedIds.value.has(dep.fromId)) ||
+      (dep.toType === 'bit' && hiddenSnoozedIds.value.has(dep.toId))
+    )
+      return []
     const from = anchor(liveLayout.value, { type: dep.fromType, id: dep.fromId }, 'out')
     const to = anchor(liveLayout.value, { type: dep.toType, id: dep.toId }, 'in')
     if (!from || !to) return []

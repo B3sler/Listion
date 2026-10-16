@@ -78,7 +78,7 @@ describe('LFlowFrame', () => {
 describe('LFilterPopover', () => {
   it('Chips schalten Filter, Zurücksetzen leert', async () => {
     const w = mount(LFilterPopover, {
-      props: { filters: { workflow: ['ready'], priority: [], due: [] } },
+      props: { filters: { workflow: ['ready'], priority: [], due: [], hideSnoozed: false } },
     })
     const ready = w.find('[data-filter="workflow:ready"]')
     expect(ready.attributes('aria-pressed')).toBe('true')
@@ -90,6 +90,20 @@ describe('LFilterPopover', () => {
     ])
     await w.find('.filter__reset').trigger('click')
     expect(w.emitted('reset')).toHaveLength(1)
+  })
+
+  it('Schalter „Hide snoozed“ zeigt den Zustand und meldet toggle-snoozed', async () => {
+    const w = mount(LFilterPopover, {
+      props: { filters: { workflow: [], priority: [], due: [], hideSnoozed: false } },
+    })
+    const sw = w.find('[role="switch"]')
+    expect(sw.text()).toContain('Hide snoozed')
+    expect(sw.attributes('aria-checked')).toBe('false')
+    await sw.trigger('click')
+    expect(w.emitted('toggle-snoozed')).toHaveLength(1)
+    expect(w.emitted('toggle')).toBeUndefined()
+    await w.setProps({ filters: { workflow: [], priority: [], due: [], hideSnoozed: true } })
+    expect(w.find('[role="switch"]').attributes('aria-checked')).toBe('true')
   })
 })
 

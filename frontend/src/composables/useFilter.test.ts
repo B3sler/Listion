@@ -16,7 +16,7 @@ const bit = (extra: Partial<Bit> = {}): Bit => ({
   createdAt: '',
   ...extra,
 })
-const none = { workflow: [], priority: [], due: [] }
+const none = { workflow: [], priority: [], due: [], hideSnoozed: false }
 
 describe('dueMatches', () => {
   it.each([
@@ -51,11 +51,17 @@ describe('matchesFilter', () => {
   })
 
   it('UND zwischen Gruppen', () => {
-    const f = { workflow: ['ready' as const], priority: [3], due: [] }
+    const f = { workflow: ['ready' as const], priority: [3], due: [], hideSnoozed: false }
     expect(matchesFilter(bit({ priority: 3 }), 'ready', f, TODAY)).toBe(true)
     expect(matchesFilter(bit({ priority: 3 }), 'blocked', f, TODAY)).toBe(false)
     expect(matchesFilter(bit({ priority: 1 }), 'ready', f, TODAY)).toBe(false)
     expect(matchesFilter(bit({ priority: 3 }), null, f, TODAY)).toBe(false)
+  })
+
+  it('„Hide snoozed“ dimmt nichts, auch nicht gesnoozte Bits', () => {
+    const f = { ...none, hideSnoozed: true }
+    expect(matchesFilter(bit({ snoozedUntil: '2099-01-01' }), null, f, TODAY)).toBe(true)
+    expect(matchesFilter(bit(), null, f, TODAY)).toBe(true)
   })
 
   it('Fälligkeit als Gruppe', () => {

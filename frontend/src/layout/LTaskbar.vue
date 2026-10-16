@@ -92,6 +92,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
               v-if="toolStore.filterOpen"
               :filters="toolStore.filters"
               @toggle="(group, value) => toolStore.toggleFilter(group, value as never)"
+              @toggle-snoozed="toolStore.setHideSnoozed(!toolStore.filters.hideSnoozed)"
               @reset="toolStore.resetFilters()"
             />
           </Transition>
