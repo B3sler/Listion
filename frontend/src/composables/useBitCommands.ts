@@ -384,6 +384,13 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
     onScopeDispose(() => {
       if (typeof window !== 'undefined') window.removeEventListener('pagehide', onPageHide)
       clearSealTimer()
+      // the workspace goes away without committing (its toast is dropped): the bits come back
+      for (const pending of pendingDeletes.values()) {
+        if (pending.state !== 'pending') continue
+        pending.state = 'undone'
+        bitStore.unhide(pending.bitId)
+        pendingDeletes.delete(pending.bitId)
+      }
     })
   }
 

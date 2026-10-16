@@ -37,6 +37,8 @@ export const useHistoryStore = defineStore('history', () => {
   const redoStack = shallowRef<HistoryEntry[]>([])
   /** Bumped by every push, so an undo/redo that finishes later can tell it is stale. */
   let epoch = 0
+  /** Bumped by `clear`, so an undo/redo still running puts its entry on no stack afterwards. */
+  let generation = 0
   let busy = false
 
   const canUndo = computed(() => undoStack.value.length > 0)
@@ -91,15 +93,17 @@ export const useHistoryStore = defineStore('history', () => {
     if (!entry) return false
     busy = true
     const startEpoch = epoch
+    const startGeneration = generation
     from.value = from.value.filter((e) => e !== entry)
     try {
       await run(entry)
     } catch (e) {
-      from.value = insertAt(from.value, index, entry)
+      if (generation === startGeneration) from.value = insertAt(from.value, index, entry)
       throw e
     } finally {
       busy = false
     }
+    if (generation !== startGeneration) return true
     // A new action while we were waiting already cleared Redo; do not resurrect an outdated entry.
     if (toRedo && epoch !== startEpoch) return true
     to.value = [...to.value, entry]
@@ -185,6 +189,25 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   /**
+   * Commits the toast's action now and waits for it (e.g. before logging out, while the session
+   * still allows the request). The toast goes away; its expiry does not commit a second time.
+   */
+  async function commitToast(): Promise<void> {
+    const t = toast.value
+    dismissToast()
+    if (t) await commit(t)
+  }
+
+  /** Forgets everything (leaving the workspace): no entries, the toast goes without a commit. */
+  function clear() {
+    generation++
+    epoch++
+    undoStack.value = []
+    redoStack.value = []
+    dismissToast()
+  }
+
+  /**
    * Undo via the toast: no commit. If the undo fails the toast stays and its clock keeps going.
    * If its entry is gone (dropped, or pushed off the stack), nothing was undone, so the action
    * stands and the toast commits like on expiry — a deferred delete must not stay pending forever.
@@ -224,5 +247,7 @@ export const useHistoryStore = defineStore('history', () => {
     resumeToast,
     undoToast,
     dismissToast,
+    commitToast,
+    clear,
   }
 })
