@@ -26,6 +26,22 @@ export interface Bit {
   focusSeconds?: number
 }
 
+type Field = keyof Bit
+
+/** One queueUpdate call: what it changed, and what those fields held right before. */
+interface QueuedUpdate {
+  patch: Partial<Bit>
+  before: Map<Field, unknown>
+  resolve: () => void
+  reject: (e: unknown) => void
+}
+
+/** Per bit with a PUT underway: the updates that wait for it and who wrote each field last. */
+interface BitQueue {
+  waiting: QueuedUpdate[]
+  lastWriter: Map<Field, QueuedUpdate>
+}
+
 export const useBitStore = defineStore('bit', () => {
   const bits = ref<Bit[]>([])
 
@@ -47,6 +63,8 @@ export const useBitStore = defineStore('bit', () => {
     dueDate?: string
     notes?: string
     color?: string
+    size?: Bit['size']
+    recurrence?: Bit['recurrence']
     flowId?: string
   }): Promise<Bit> {
     const body = {
@@ -98,11 +116,90 @@ export const useBitStore = defineStore('bit', () => {
     }
   }
 
+  const queues = new Map<string, BitQueue>()
+
+  function patchLocal(id: string, patch: Partial<Bit>): void {
+    const idx = bits.value.findIndex((b) => b.id === id)
+    if (idx === -1) return
+    const next: Record<string, unknown> = { ...bits.value[idx]! }
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete next[k]
+      else next[k] = v
+    }
+    bits.value[idx] = next as unknown as Bit
+  }
+
+  /**
+   * A failed PUT undoes its own fields only. A field a later update has since written keeps that
+   * value; the earlier value moves into that update's undo state instead, so a second failure
+   * falls back to what the server really holds.
+   */
+  function rollBack(queue: BitQueue, id: string, batch: QueuedUpdate[]): void {
+    const restore: Partial<Bit> = {}
+    const earliest = new Map<Field, unknown>()
+    for (const u of batch) {
+      for (const [k, v] of u.before) if (!earliest.has(k)) earliest.set(k, v)
+    }
+    for (const [k, v] of earliest) {
+      const writer = queue.lastWriter.get(k)
+      if (!writer || batch.includes(writer)) {
+        ;(restore as Record<string, unknown>)[k] = v
+        queue.lastWriter.delete(k)
+      } else {
+        const next = queue.waiting.find((u) => u.before.has(k))
+        if (next) next.before.set(k, v)
+      }
+    }
+    patchLocal(id, restore)
+  }
+
+  async function drain(id: string, queue: BitQueue): Promise<void> {
+    while (queue.waiting.length) {
+      const batch = queue.waiting.splice(0)
+      const merged = Object.assign({}, ...batch.map((u) => u.patch)) as Partial<Bit>
+      try {
+        await whenCreated(id, merged.packetId)
+        await api.put(`/api/bit/${id}`, merged)
+        for (const [k, w] of queue.lastWriter) if (batch.includes(w)) queue.lastWriter.delete(k)
+        for (const u of batch) u.resolve()
+      } catch (e) {
+        rollBack(queue, id, batch)
+        for (const u of batch) u.reject(e)
+      }
+    }
+    queues.delete(id)
+  }
+
+  /**
+   * Updates of one bit go out one PUT at a time, so an older response can never overwrite newer
+   * local state. Updates made while a PUT is underway merge into one follow-up PUT (the last value
+   * of each field wins). The promise settles with the PUT that carries this patch.
+   */
+  function queueUpdate(id: string, patch: Partial<Bit>): Promise<void> {
+    const current = bits.value.find((b) => b.id === id)
+    const before = new Map<Field, unknown>()
+    for (const k of Object.keys(patch) as Field[]) before.set(k, current?.[k])
+    patchLocal(id, patch)
+
+    return new Promise<void>((resolve, reject) => {
+      const update: QueuedUpdate = { patch, before, resolve, reject }
+      let queue = queues.get(id)
+      const idle = !queue
+      if (!queue) {
+        queue = { waiting: [], lastWriter: new Map() }
+        queues.set(id, queue)
+      }
+      queue.waiting.push(update)
+      for (const k of before.keys()) queue.lastWriter.set(k, update)
+      if (idle) void drain(id, queue)
+    })
+  }
+
   async function deleteBit(id: string): Promise<void> {
     await whenCreated(id)
     await api.delete(`/api/bit/${id}`)
     bits.value = bits.value.filter((b) => b.id !== id)
   }
 
-  return { bits, fetchBits, createBit, updateBit, deleteBit }
+  return { bits, fetchBits, createBit, updateBit, queueUpdate, deleteBit }
 })

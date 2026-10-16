@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { Fullscreen, ScanSearch, ZoomIn, ZoomOut } from 'lucide-vue-next'
 import LContextMenu from '@/components/LContextMenu.vue'
 import LBitPanel from '@/components/LBitPanel.vue'
@@ -28,6 +28,7 @@ import { flowAt, flowFrames, pathLength } from '@/composables/useFlowGroups'
 import { matchesFilter } from '@/composables/useFilter'
 import { useFlowGestures } from '@/composables/useFlowGestures'
 import { useFlowActions } from '@/composables/useFlowActions'
+import { BIT_COMMANDS, useBitCommands } from '@/composables/useBitCommands'
 import { useBitStore } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
@@ -80,6 +81,9 @@ const baseLayout = computed(() =>
     packets: packetStore.packets,
   }),
 )
+
+const commands = useBitCommands({ layout: () => baseLayout.value })
+provide(BIT_COMMANDS, commands)
 
 // Frames before any gesture — drop membership is judged against these
 const baseFrames = computed(() =>
@@ -399,7 +403,8 @@ async function toggleDone(id: string) {
   const bit = bitStore.bits.find((b) => b.id === id)
   if (!bit) return
   try {
-    await bitStore.updateBit(id, { status: bit.status === 2 ? 0 : 2 })
+    if (bit.status === 2) await commands.reopen(id)
+    else await commands.complete(id)
   } catch (e) {
     console.error('Failed to update bit status:', e)
   }

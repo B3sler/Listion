@@ -243,3 +243,158 @@ describe('flow stores', () => {
     expect(api.post).toHaveBeenCalledTimes(2)
   })
 })
+
+/** A PUT that only answers when the test says so. */
+function pendingPut() {
+  let resolve!: () => void
+  let reject!: (e: Error) => void
+  api.put.mockReturnValueOnce(
+    new Promise<void>((res, rej) => {
+      resolve = res
+      reject = rej
+    }),
+  )
+  return { resolve: () => resolve(), reject: (e: Error) => reject(e) }
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0))
+
+function bitWith(extra: Partial<Bit> = {}): Bit {
+  return {
+    id: '1',
+    title: 'a',
+    status: 0,
+    x: 0,
+    y: 0,
+    packetId: null,
+    order: 0,
+    createdAt: '',
+    ...extra,
+  }
+}
+
+describe('bitStore.queueUpdate', () => {
+  it('wendet den Patch sofort lokal an und sendet ihn', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith()]
+    api.put.mockResolvedValue({})
+    const saved = store.queueUpdate('1', { title: 'b' })
+    expect(store.bits[0]!.title).toBe('b')
+    await saved
+    expect(api.put).toHaveBeenCalledTimes(1)
+    expect(api.put).toHaveBeenCalledWith('/api/bit/1', { title: 'b' })
+  })
+
+  it('merged schnelle Patches während eines laufenden PUT in genau einen zweiten PUT', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith()]
+    const first = pendingPut()
+    api.put.mockResolvedValue({})
+    const p1 = store.queueUpdate('1', { title: 'b' })
+    const p2 = store.queueUpdate('1', { notes: 'n' })
+    const p3 = store.queueUpdate('1', { title: 'c' })
+    await flush()
+    expect(api.put).toHaveBeenCalledTimes(1)
+    first.resolve()
+    await Promise.all([p1, p2, p3])
+    expect(api.put).toHaveBeenCalledTimes(2)
+    expect(api.put).toHaveBeenLastCalledWith('/api/bit/1', { title: 'c', notes: 'n' })
+    expect(store.bits[0]).toMatchObject({ title: 'c', notes: 'n' })
+  })
+
+  it('erfüllt das Promise erst, wenn der PUT mit diesem Patch gespeichert ist', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith()]
+    const first = pendingPut()
+    const second = pendingPut()
+    const p1 = store.queueUpdate('1', { title: 'b' })
+    let secondDone = false
+    const p2 = store.queueUpdate('1', { notes: 'n' }).then(() => (secondDone = true))
+    first.resolve()
+    await p1
+    await flush()
+    expect(secondDone).toBe(false)
+    second.resolve()
+    await p2
+    expect(secondDone).toBe(true)
+  })
+
+  it('setzt bei einem Fehler nur die Felder des Patches zurück', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ title: 'a', notes: 'x' })]
+    const first = pendingPut()
+    api.put.mockResolvedValue({})
+    const p1 = store.queueUpdate('1', { title: 'b' })
+    const p2 = store.queueUpdate('1', { notes: 'y' })
+    first.reject(new Error('offline'))
+    await expect(p1).rejects.toThrow('offline')
+    await p2
+    expect(store.bits[0]).toMatchObject({ title: 'a', notes: 'y' })
+  })
+
+  it('setzt ein Feld nicht zurück, das ein späterer Patch inzwischen neu gesetzt hat', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ title: 'a' })]
+    const first = pendingPut()
+    api.put.mockResolvedValue({})
+    const p1 = store.queueUpdate('1', { title: 'b' })
+    const p2 = store.queueUpdate('1', { title: 'c' })
+    first.reject(new Error('offline'))
+    await expect(p1).rejects.toThrow('offline')
+    await p2
+    expect(store.bits[0]!.title).toBe('c')
+    expect(api.put).toHaveBeenLastCalledWith('/api/bit/1', { title: 'c' })
+  })
+
+  it('fällt nach zwei Fehlern in Folge auf den Server-Stand zurück', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ title: 'a' })]
+    const first = pendingPut()
+    const second = pendingPut()
+    const p1 = store.queueUpdate('1', { title: 'b' })
+    const p2 = store.queueUpdate('1', { title: 'c' })
+    first.reject(new Error('one'))
+    await expect(p1).rejects.toThrow('one')
+    await flush()
+    second.reject(new Error('two'))
+    await expect(p2).rejects.toThrow('two')
+    expect(store.bits[0]!.title).toBe('a')
+  })
+
+  it('serialisiert nicht über Bits hinweg', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ id: '1' }), bitWith({ id: '2' })]
+    pendingPut()
+    pendingPut()
+    void store.queueUpdate('1', { title: 'b' })
+    void store.queueUpdate('2', { title: 'c' })
+    await flush()
+    expect(api.put).toHaveBeenCalledTimes(2)
+  })
+
+  it('wartet bei einem frisch erstellten Bit auf dessen POST', async () => {
+    const store = useBitStore()
+    const answer = pendingPost<Bit>()
+    const created = store.createBit({ title: 'neu', x: 0, y: 0 })
+    const id = store.bits[0]!.id
+    api.put.mockResolvedValue({})
+    const saved = store.queueUpdate(id, { title: 'neuer' })
+    await flush()
+    expect(api.put).not.toHaveBeenCalled()
+    answer({ ...store.bits[0]! })
+    await created
+    await saved
+    expect(api.put).toHaveBeenCalledWith(`/api/bit/${id}`, { title: 'neuer' })
+  })
+
+  it('createBit nimmt size und recurrence an', () => {
+    const store = useBitStore()
+    api.post.mockResolvedValue({ data: {} })
+    void store.createBit({ title: 'x', x: 0, y: 0, size: 2, recurrence: 'daily' })
+    expect(store.bits[0]).toMatchObject({ size: 2, recurrence: 'daily' })
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/bit',
+      expect.objectContaining({ size: 2, recurrence: 'daily' }),
+    )
+  })
+})
