@@ -4,7 +4,7 @@ import { Calendar, Flag, RectangleVertical } from 'lucide-vue-next'
 import type { QuickEntryToken } from '@/helpers/quickEntry'
 import { addDays, formatDayShort, weekdayOf } from '@/helpers/localDate'
 import { PALETTE } from '@/helpers/palette'
-import { SIZE_LABEL } from '@/helpers/bitMeta'
+import { PRIORITY_NAME, SIZE_LABEL } from '@/helpers/bitMeta'
 import LPropertyChip from './LPropertyChip.vue'
 import LDatePicker from './LDatePicker.vue'
 import LSegmented from './LSegmented.vue'
@@ -92,7 +92,6 @@ const dueQuick = computed(() => [
   { label: 'None', key: null },
 ])
 
-const PRIORITY_NAME: Record<Priority, string> = { 1: 'Low', 2: 'Medium', 3: 'High' }
 const PRIORITY_OPTIONS: { value: number | null; label: string; title: string }[] = [
   { value: null, label: '—', title: 'None' },
   { value: 1, label: '!', title: 'Low' },

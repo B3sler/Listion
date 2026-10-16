@@ -8,6 +8,8 @@ export const SIZE_MINUTES = { 1: 30, 2: 60, 3: 180, 4: 360 } as const
 
 export const SIZE_LABEL = { 1: 'S', 2: 'M', 3: 'L', 4: 'XL' } as const
 
+export const PRIORITY_NAME: Record<1 | 2 | 3, string> = { 1: 'Low', 2: 'Medium', 3: 'High' }
+
 /** Snoozed only strictly before the target day; on the day itself the bit is back. */
 export function isSnoozed(bit: Pick<Bit, 'snoozedUntil'>, today: string): boolean {
   return !!bit.snoozedUntil && bit.snoozedUntil > today
