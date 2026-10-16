@@ -11,6 +11,7 @@ import {
 import { User } from '../user/user.entity.js'
 import { Packet } from '../packet/packet.entity.js'
 import { Flow } from '../flow/flow.entity.js'
+import type { Recurrence } from '../../dto/create-bit.dto.js'
 
 @Entity()
 @Index(['userId'])
@@ -73,4 +74,23 @@ export class Bit {
   @ManyToOne(() => Flow, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'flowId' })
   flow?: Relation<Flow> | null
+
+  // visual size 1-4 for the bit sheet
+  @Column({ type: 'smallint', nullable: true })
+  size?: number | null
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  recurrence?: Recurrence | null
+
+  // how often a recurring bit has been completed
+  @Column({ type: 'int', default: 0 })
+  completedCount!: number
+
+  // calendar day (YYYY-MM-DD) until which the bit is snoozed
+  @Column({ type: 'date', nullable: true })
+  snoozedUntil?: string | null
+
+  // total focus time, only changed through the focus endpoint
+  @Column({ type: 'int', default: 0 })
+  focusSeconds!: number
 }

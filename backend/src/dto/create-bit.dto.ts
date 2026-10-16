@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
   IsDate,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -12,6 +13,9 @@ import {
   MaxLength,
   Min,
 } from 'class-validator'
+
+export const RECURRENCES = ['daily', 'weekdays', 'weekly', 'monthly'] as const
+export type Recurrence = (typeof RECURRENCES)[number]
 
 export class CreateBitDto {
   @ApiProperty({
@@ -86,4 +90,37 @@ export class CreateBitDto {
   @IsOptional()
   @IsUUID()
   flowId?: string
+
+  @ApiProperty({
+    example: 3,
+    description: 'Visual size of the bit (1-4)',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  size?: number | null
+
+  @ApiProperty({
+    enum: RECURRENCES,
+    example: 'weekdays',
+    description: 'How often the bit repeats',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsIn(RECURRENCES)
+  recurrence?: Recurrence | null
+
+  @ApiProperty({
+    example: '2026-10-21',
+    description: 'Calendar day (YYYY-MM-DD) until which the bit is snoozed',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  snoozedUntil?: string | null
 }
