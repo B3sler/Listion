@@ -2,7 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 import type { Bit } from '@/stores/bitStore'
 import type { NodeRef, Packet, PacketSummary, WorkflowState } from '@/types/flow'
-import { stackGeometry } from '@/composables/useFlowLayout'
+import { capsuleHeight, stackGeometry, STEP_GAP } from '@/composables/useFlowLayout'
 import LBitCapsule from './LBitCapsule.vue'
 
 const props = defineProps<{
@@ -14,6 +14,8 @@ const props = defineProps<{
   cycleBitIds: Set<string>
   summary: PacketSummary
   gapIndex: number | null
+  /** Height of the capsule being dragged over this stack; sizes the insert gap. */
+  gapHeight?: number
   highlighted?: boolean
   dimmed?: boolean
   dragging?: boolean
@@ -29,7 +31,13 @@ const emit = defineEmits<{
   rename: [name: string]
 }>()
 
-const geometry = computed(() => stackGeometry(props.members.length, null, props.gapIndex))
+const geometry = computed(() =>
+  stackGeometry(
+    props.members.map(capsuleHeight),
+    props.gapIndex,
+    props.gapHeight === undefined ? undefined : props.gapHeight + STEP_GAP,
+  ),
+)
 
 const editing = ref(false)
 const draft = ref('')

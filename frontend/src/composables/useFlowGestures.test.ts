@@ -35,7 +35,6 @@ function setup(options: { zoom?: number; bits?: Bit[]; packets?: Packet[] } = {}
     computeLayout({
       bits: options.bits ?? [bit('1', null, 0, 0, 0), bit('2', null, 0, 0, 300)],
       packets: options.packets ?? [],
-      expandedBitId: null,
     }),
   )
   const opts = {
