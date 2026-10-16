@@ -122,6 +122,26 @@ describe('parseQuickEntry', () => {
       expect(result.tokens).toEqual([])
     })
 
+    it.each([
+      ['Müll jeden montag', 5],
+      ['Meeting next friday', 8],
+      ['Meeting every friday', 8],
+      ['Termin nächsten freitag', 7],
+    ])('hält das mehrwortige Token in %s als Text', (input, start) => {
+      const result = parseQuickEntry(input, now, new Set([start]))
+      expect(result.title).toBe(input)
+      expect(result.dueDate).toBeUndefined()
+      expect(result.recurrence).toBeUndefined()
+      expect(result.tokens).toEqual([])
+    })
+
+    it('beendet den Endbereich an einem als Text behaltenen Token', () => {
+      const result = parseQuickEntry('Steuer morgen !!', now, new Set([14]))
+      expect(result.title).toBe('Steuer morgen !!')
+      expect(result.dueDate).toBeUndefined()
+      expect(result.priority).toBeUndefined()
+    })
+
     it('überspringt auch ein Sigil-Token in literal', () => {
       const result = parseQuickEntry('Steuer !!', now, new Set([7]))
       expect(result.title).toBe('Steuer !!')

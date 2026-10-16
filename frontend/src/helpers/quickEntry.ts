@@ -276,10 +276,11 @@ function matchEndingAt(
 ): { found: Found; length: number } | undefined {
   for (let length = Math.min(MAX_WORDS_PER_TOKEN, end); length >= 1; length--) {
     const slice = words.slice(end - length, end)
-    if (literal.has(slice[0].start)) continue
     if (slice.some((_, i) => sigils.has(end - length + i))) continue
     const hit = matchPhrase(slice.map((w) => w.text.toLowerCase()).join(' '), today)
     if (hit) {
+      // A dismissed token is plain text as a whole: no shorter window may match inside it.
+      if (literal.has(slice[0].start)) return undefined
       const token = { start: slice[0].start, end: slice[length - 1].end, kind: hit.kind }
       return { found: { hit, token }, length }
     }
