@@ -1,5 +1,5 @@
 import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger'
-import { IsInt, IsOptional, IsUUID, Min } from 'class-validator'
+import { IsInt, IsOptional, IsUUID, Min, ValidateIf } from 'class-validator'
 import { CreateBitDto } from './create-bit.dto.js'
 
 // the id is fixed at creation; flowId gets its own nullable field below
@@ -29,7 +29,8 @@ export class UpdateBitDto extends PartialType(OmitType(CreateBitDto, ['id', 'flo
     example: 4,
     description: 'Number of completed repetitions of a recurring bit',
   })
-  @IsOptional()
+  // not @IsOptional: that would let null through into the NOT NULL column
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   @Min(0)
   completedCount?: number

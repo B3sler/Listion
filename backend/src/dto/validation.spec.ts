@@ -196,4 +196,10 @@ describe('Bit-Sheet-Felder', () => {
     const c = await validate(CreateBitDto, { title: 'T', completedCount: 3, focusSeconds: 5 })
     expect(c).toEqual({ title: 'T' })
   })
+
+  it('lehnt completedCount null ab, weil die Spalte NOT NULL ist', async () => {
+    await expect(validate(UpdateBitDto, { completedCount: null })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+  })
 })
