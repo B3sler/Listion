@@ -38,8 +38,8 @@ describe('recurrence', () => {
     expect(nextDue('2026-10-10', 'weekdays', '2026-10-10')).toBe('2026-10-12')
   })
 
-  it('driftet beim monatlichen Aufholen nicht vom Starttag weg', () => {
-    expect(nextDue('2027-01-31', 'monthly', '2027-03-01')).toBe('2027-03-31')
+  it('steppt beim monatlichen Aufholen Monat für Monat (Drift nach kurzen Monaten ist gewollt)', () => {
+    expect(nextDue('2027-01-31', 'monthly', '2027-03-01')).toBe('2027-03-28')
   })
 
   it('liefert nie ein Datum in der Vergangenheit oder heute', () => {

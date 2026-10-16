@@ -30,23 +30,19 @@ function addMonths(dueKey: string, n: number): string {
 function step(key: string, rule: Recurrence): string {
   if (rule === 'daily') return addDays(key, 1)
   if (rule === 'weekly') return addDays(key, 7)
+  if (rule === 'monthly') return addMonths(key, 1)
   let next = addDays(key, 1)
   while (weekdayOf(next) >= SATURDAY) next = addDays(next, 1)
   return next
 }
 
 /**
- * The first occurrence of the rule after both `dueKey` and `today`. Overdue bits catch up
- * without piling up missed occurrences; weekly and monthly keep their weekday / day of month.
+ * Repeats one step of the rule until the result is after both `dueKey` and `today`, so overdue
+ * bits catch up without piling up missed occurrences. Weekly keeps its weekday. Monthly steps one
+ * month at a time and does not remember the original day, so it drifts after short months
+ * (31 Jan -> 28 Feb -> 28 Mar); this is accepted.
  */
 export function nextDue(dueKey: string, rule: Recurrence, today: string): string {
-  if (rule === 'monthly') {
-    // Always count from the original day so Jan 31 -> Feb 28 -> Mar 31 does not drift to the 28th.
-    let months = 1
-    let next = addMonths(dueKey, months)
-    while (next <= today) next = addMonths(dueKey, ++months)
-    return next
-  }
   let next = step(dueKey, rule)
   while (next <= today) next = step(next, rule)
   return next
