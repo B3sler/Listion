@@ -157,12 +157,19 @@ describe('LMiniCalendar', () => {
     host.remove()
   })
 
-  it('markiert heute mit aria-current und die Auswahl mit aria-selected', () => {
+  it('markiert heute mit aria-current und die Auswahl mit aria-selected an der Gitterzelle', () => {
     const { w, host } = mountCalendar('2026-10-20')
+    const cell = (key: string) => w.find(`[data-key="${key}"]`).element.parentElement!
     expect(w.find('[data-key="2026-10-16"]').attributes('aria-current')).toBe('date')
     expect(w.find('[data-key="2026-10-17"]').attributes('aria-current')).toBeUndefined()
-    expect(w.find('[data-key="2026-10-20"]').attributes('aria-selected')).toBe('true')
-    expect(w.find('[data-key="2026-10-16"]').attributes('aria-selected')).toBe('false')
+    // aria-selected belongs to the gridcell, not to the button inside it
+    expect(cell('2026-10-20').getAttribute('role')).toBe('gridcell')
+    expect(cell('2026-10-20').getAttribute('aria-selected')).toBe('true')
+    expect(cell('2026-10-16').getAttribute('aria-selected')).toBe('false')
+    expect(w.find('[data-key="2026-10-20"]').attributes('aria-selected')).toBeUndefined()
+    // an empty cell before the 1st is no day to select
+    const empty = w.findAll('[role="gridcell"]').find((c) => !c.find('button').exists())!
+    expect(empty.attributes('aria-selected')).toBeUndefined()
     w.unmount()
     host.remove()
   })
@@ -279,7 +286,9 @@ describe('LMiniCalendar', () => {
     const { w, host } = mountCalendar('2026-10-20')
     await w.setProps({ modelValue: '2027-01-05' })
     expect(monthLabel(w)).toBe('January 2027')
-    expect(w.find('[data-key="2027-01-05"]').attributes('aria-selected')).toBe('true')
+    expect(
+      w.find('[data-key="2027-01-05"]').element.parentElement!.getAttribute('aria-selected'),
+    ).toBe('true')
     w.unmount()
     host.remove()
   })
