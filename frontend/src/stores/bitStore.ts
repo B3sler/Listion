@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '@/helpers/api'
 import { uuidv7 } from '@/helpers/uuid'
+import type { Recurrence } from '@/helpers/recurrence'
 import { trackCreate, whenCreated } from './pendingCreates'
 
 export interface Bit {
@@ -18,6 +19,11 @@ export interface Bit {
   notes?: string
   createdAt: string
   color?: string
+  size?: 1 | 2 | 3 | 4 | null
+  recurrence?: Recurrence | null
+  completedCount?: number
+  snoozedUntil?: string | null
+  focusSeconds?: number
 }
 
 export const useBitStore = defineStore('bit', () => {
