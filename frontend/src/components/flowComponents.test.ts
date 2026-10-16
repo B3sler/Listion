@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { Bit } from '@/stores/bitStore'
+import { addDays, todayKey } from '@/helpers/localDate'
 import LBitCapsule from './LBitCapsule.vue'
 import LPacketStack from './LPacketStack.vue'
 import LDependencyLayer from './LDependencyLayer.vue'
@@ -69,6 +70,146 @@ describe('LBitCapsule', () => {
 
     const done = mount(LBitCapsule, { props: { bit: bit('2', 2), state: null } })
     expect(done.attributes('aria-label')).toContain('Done')
+  })
+
+  describe('Größe, Meta-Zeile und Zustände', () => {
+    const tomorrow = addDays(todayKey(), 1)
+    const later = addDays(todayKey(), 10)
+    const sized = (extra: Partial<Bit>): Bit => ({ ...bit('1'), ...extra })
+    const settleOf = (w: { vm: unknown }) => (w.vm as { settle: () => void }).settle()
+
+    it('rendert die Höhe fest nach Aufwand', () => {
+      const heights = [undefined, 1, 2, 3, 4].map((size) => {
+        const w = mount(LBitCapsule, {
+          props: { bit: sized({ size: size as Bit['size'] }), state: null },
+        })
+        return (w.element as HTMLElement).style.height
+      })
+      expect(heights).toEqual(['32px', '32px', '44px', '64px', '84px'])
+    })
+
+    it('zeigt bei M eine Meta-Zeile mit Fälligkeit', () => {
+      const w = mount(LBitCapsule, {
+        props: { bit: sized({ size: 2, dueDate: tomorrow }), state: null },
+      })
+      expect(w.find('.capsule__meta').text()).toContain('Tomorrow')
+    })
+
+    it('trennt die Meta-Einträge mit Punkt und formatiert die Fokuszeit', () => {
+      const w = mount(LBitCapsule, {
+        props: {
+          bit: sized({ size: 2, dueDate: tomorrow, focusSeconds: 4800, recurrence: 'daily' }),
+          state: null,
+        },
+      })
+      const meta = w.find('.capsule__meta')
+      expect(meta.text()).toContain('Tomorrow')
+      expect(meta.text()).toContain('1h20')
+      expect(meta.text()).toContain('·')
+      expect(meta.find('.capsule__repeat').exists()).toBe(true)
+      const short = mount(LBitCapsule, {
+        props: { bit: sized({ size: 2, focusSeconds: 2700 }), state: null },
+      })
+      expect(short.find('.capsule__meta').text()).toContain('45m')
+    })
+
+    it('zeigt keine Meta-Zeile, wenn nichts anzuzeigen ist', () => {
+      const w = mount(LBitCapsule, { props: { bit: sized({ size: 2 }), state: null } })
+      expect(w.find('.capsule__meta').exists()).toBe(false)
+    })
+
+    it('zeigt bei L eine Notiz-Zeile, bei XL zwei', () => {
+      const l = mount(LBitCapsule, {
+        props: { bit: sized({ size: 3, notes: 'Eine längere Notiz' }), state: null },
+      })
+      expect(l.find('.capsule__notes').text()).toBe('Eine längere Notiz')
+      expect(l.find('.capsule__notes').attributes('style')).toContain('--lines: 1')
+      const xl = mount(LBitCapsule, {
+        props: { bit: sized({ size: 4, notes: 'Eine längere Notiz' }), state: null },
+      })
+      expect(xl.find('.capsule__notes').attributes('style')).toContain('--lines: 2')
+    })
+
+    it('zeigt bei S und M keine Notiz-Vorschau', () => {
+      for (const size of [1, 2] as const) {
+        const w = mount(LBitCapsule, {
+          props: { bit: sized({ size, notes: 'Notiz' }), state: null },
+        })
+        expect(w.find('.capsule__notes').exists()).toBe(false)
+      }
+    })
+
+    it('zeigt bei S keine Meta-Zeile', () => {
+      const w = mount(LBitCapsule, {
+        props: { bit: sized({ size: 1, dueDate: tomorrow, focusSeconds: 600 }), state: null },
+      })
+      expect(w.find('.capsule__meta').exists()).toBe(false)
+    })
+
+    it('blendet gesnoozte Bits aus und nennt das Datum im aria-label', () => {
+      const w = mount(LBitCapsule, {
+        props: { bit: sized({ size: 2, snoozedUntil: later }), state: null },
+      })
+      expect(w.classes()).toContain('capsule--snoozed')
+      expect(w.attributes('aria-label')).toContain('snoozed until')
+      // M: the moon sits in the meta line, not behind the title
+      expect(w.find('.capsule__meta .capsule__snooze').exists()).toBe(true)
+    })
+
+    it('setzt bei S das Snooze-Datum hinter den Titel', () => {
+      const w = mount(LBitCapsule, {
+        props: { bit: sized({ size: 1, snoozedUntil: later }), state: null },
+      })
+      expect(w.classes()).toContain('capsule--snoozed')
+      expect(w.find('.capsule__meta').exists()).toBe(false)
+      expect(w.find('.capsule__row .capsule__snooze').exists()).toBe(true)
+    })
+
+    it('snoozt nicht, wenn der Tag erreicht ist', () => {
+      const w = mount(LBitCapsule, {
+        props: { bit: sized({ snoozedUntil: todayKey() }), state: null },
+      })
+      expect(w.classes()).not.toContain('capsule--snoozed')
+      expect(w.attributes('aria-label')).not.toContain('snoozed')
+    })
+
+    it('zeigt das Wiederholungs-Symbol bei wiederkehrenden Bits', () => {
+      const w = mount(LBitCapsule, { props: { bit: sized({ recurrence: 'daily' }), state: null } })
+      expect(w.find('.capsule__repeat').exists()).toBe(true)
+      const none = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
+      expect(none.find('.capsule__repeat').exists()).toBe(false)
+    })
+
+    it('markiert einen laufenden Fokus mit eigener Klasse', () => {
+      const on = mount(LBitCapsule, { props: { bit: sized({}), state: null, focusing: true } })
+      expect(on.classes()).toContain('capsule--focusing')
+      const off = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
+      expect(off.classes()).not.toContain('capsule--focusing')
+    })
+
+    describe('settle', () => {
+      const original = window.matchMedia
+      afterEach(() => {
+        window.matchMedia = original
+      })
+
+      it('startet bei 1,04 und federt auf 1', () => {
+        const w = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
+        settleOf(w)
+        expect((w.element as HTMLElement).style.getPropertyValue('--settle')).toBe('1.04')
+        w.unmount()
+      })
+
+      it('skaliert bei Reduced Motion nicht', () => {
+        window.matchMedia = ((q: string) => ({
+          matches: true,
+          media: q,
+        })) as typeof window.matchMedia
+        const w = mount(LBitCapsule, { props: { bit: sized({}), state: null } })
+        settleOf(w)
+        expect((w.element as HTMLElement).style.getPropertyValue('--settle')).toBe('1')
+      })
+    })
   })
 })
 

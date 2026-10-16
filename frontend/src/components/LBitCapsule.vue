@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Check, Flag, Lock } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { Check, Flag, Lock, Moon, Repeat } from 'lucide-vue-next'
 import type { Bit } from '@/stores/bitStore'
 import type { WorkflowState } from '@/types/flow'
+import { capsuleHeight } from '@/composables/useFlowLayout'
+import { useToday } from '@/composables/useToday'
+import { formatDayShort, toDateKey } from '@/helpers/localDate'
+import { isSnoozed } from '@/helpers/bitMeta'
+import { Spring, SPRING_DEFAULT } from '@/helpers/motion'
 
 const props = defineProps<{
   bit: Bit
@@ -11,6 +16,8 @@ const props = defineProps<{
   lifted?: boolean
   dimmed?: boolean
   snapHint?: 'above' | 'below' | null
+  /** A focus session runs on this bit. */
+  focusing?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -29,20 +36,78 @@ const priorityLabel = computed(() =>
   props.bit.priority ? PRIORITY_LABEL[props.bit.priority] : undefined,
 )
 
+const today = useToday()
+const height = computed(() => capsuleHeight(props.bit))
+/** Sizes M and up carry a meta line; S stays a single title row. */
+const sized = computed(() => (props.bit.size ?? 0) >= 2)
+const snoozed = computed(() => isSnoozed(props.bit, today.value))
+const snoozeLabel = computed(() =>
+  snoozed.value ? formatDayShort(props.bit.snoozedUntil as string, today.value) : '',
+)
+const isRepeating = computed(() => !!props.bit.recurrence)
+/** L shows one line of notes, XL two. */
+const noteLines = computed(() => (props.bit.size === 3 ? 1 : props.bit.size === 4 ? 2 : 0))
+
+/** 4800 -> '1h20', 2700 -> '45m', 3600 -> '1h'. */
+function formatFocus(seconds: number): string {
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 1) return '<1m'
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}m`
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`
+}
+
+type MetaItem = { key: 'due' | 'repeat' | 'focus' | 'snooze'; text?: string }
+const metaItems = computed<MetaItem[]>(() => {
+  if (!sized.value) return []
+  const items: MetaItem[] = []
+  if (props.bit.dueDate) {
+    items.push({ key: 'due', text: formatDayShort(toDateKey(props.bit.dueDate), today.value) })
+  }
+  if (isRepeating.value) items.push({ key: 'repeat' })
+  if ((props.bit.focusSeconds ?? 0) > 0) {
+    items.push({ key: 'focus', text: formatFocus(props.bit.focusSeconds as number) })
+  }
+  if (snoozed.value) items.push({ key: 'snooze', text: snoozeLabel.value })
+  return items
+})
+
+const root = ref<HTMLElement | null>(null)
+// The settle scale rides on the individual `scale` property via --settle, so it composes
+// with the hover/lift `transform` instead of fighting it.
+const settleSpring = new Spring(1, (v) => root.value?.style.setProperty('--settle', String(v)), {
+  restDelta: 0.0005,
+  restSpeed: 0.005,
+})
+
+/** Land animation after a drop: scale 1.04 -> 1. Reduced motion jumps straight to 1. */
+function settle(): void {
+  settleSpring.set(1.04)
+  settleSpring.to(1, SPRING_DEFAULT)
+}
+onBeforeUnmount(() => settleSpring.stop())
+defineExpose({ settle })
+
 const ariaLabel = computed(() => {
   const parts = [props.bit.title, STATUS_LABEL[props.bit.status] ?? 'Open']
   if (priorityLabel.value) parts.push(`${priorityLabel.value} priority`)
   if (props.state === 'blocked') parts.push('blocked')
   if (props.state === 'ready') parts.push('ready')
   if (props.inCycle) parts.push('in a cycle')
+  if (snoozed.value) parts.push(`snoozed until ${snoozeLabel.value}`)
   return parts.join(', ')
 })
 </script>
 
 <template>
   <div
+    ref="root"
     class="capsule"
     :class="{
+      'capsule--sized': sized,
+      'capsule--snoozed': snoozed,
+      'capsule--focusing': focusing,
       'capsule--ready': state === 'ready',
       'capsule--blocked': state === 'blocked',
       'capsule--cycle': inCycle,
@@ -50,7 +115,7 @@ const ariaLabel = computed(() => {
       'capsule--dimmed': dimmed,
       [`capsule--snap-${snapHint}`]: !!snapHint,
     }"
-    :style="{ '--c': color }"
+    :style="{ '--c': color, height: `${height}px` }"
     data-node-type="bit"
     :data-node-id="bit.id"
     tabindex="0"
@@ -76,6 +141,17 @@ const ariaLabel = computed(() => {
         <Check v-if="isDone" :size="10" :stroke-width="3" />
       </button>
       <span class="capsule__title">{{ bit.title }}</span>
+      <!-- S: snooze date and repeat mark sit behind the title; M and up show them in the meta line -->
+      <Repeat
+        v-if="isRepeating && !sized"
+        :size="11"
+        :stroke-width="2.25"
+        class="capsule__repeat"
+        aria-hidden="true"
+      />
+      <span v-if="snoozed && !sized" class="capsule__snooze">
+        <Moon :size="11" :stroke-width="2.25" aria-hidden="true" />{{ snoozeLabel }}
+      </span>
       <Lock v-if="state === 'blocked'" :size="11" class="capsule__lock" aria-hidden="true" />
       <Flag
         v-if="priorityLabel"
@@ -87,6 +163,25 @@ const ariaLabel = computed(() => {
         aria-hidden="true"
       />
     </div>
+    <div v-if="metaItems.length" class="capsule__meta">
+      <template v-for="(item, i) in metaItems" :key="item.key">
+        <span v-if="i > 0" class="capsule__sep" aria-hidden="true">·</span>
+        <Repeat
+          v-if="item.key === 'repeat'"
+          :size="11"
+          :stroke-width="2.25"
+          class="capsule__repeat"
+          aria-hidden="true"
+        />
+        <span v-else-if="item.key === 'snooze'" class="capsule__snooze">
+          <Moon :size="11" :stroke-width="2.25" aria-hidden="true" />{{ item.text }}
+        </span>
+        <span v-else>{{ item.text }}</span>
+      </template>
+    </div>
+    <p v-if="noteLines && bit.notes" class="capsule__notes" :style="{ '--lines': noteLines }">
+      {{ bit.notes }}
+    </p>
     <button
       class="capsule__handle"
       type="button"
@@ -102,7 +197,7 @@ const ariaLabel = computed(() => {
 .capsule {
   position: relative;
   width: 200px;
-  min-height: 32px;
+  box-sizing: border-box;
   border-radius: 16px;
   padding: 0 12px 0 7px;
   display: flex;
@@ -120,8 +215,10 @@ const ariaLabel = computed(() => {
   user-select: none;
   touch-action: none;
   outline: none;
+  scale: var(--settle, 1);
   transition:
     transform var(--spring-duration) var(--ease-spring),
+    height var(--spring-duration) var(--ease-spring),
     box-shadow 0.2s ease,
     opacity 0.25s ease;
 }
@@ -161,6 +258,36 @@ const ariaLabel = computed(() => {
 .capsule--dimmed {
   opacity: 0.2;
 }
+.capsule--snoozed {
+  opacity: 0.35;
+}
+
+/* a running focus session: a soft pulsing ring in the bit's colour */
+.capsule--focusing::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 20px;
+  border: 2px solid var(--c);
+  pointer-events: none;
+  opacity: 0.8;
+  animation: capsule-focus 2.4s ease-in-out infinite;
+}
+@keyframes capsule-focus {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capsule--focusing::after {
+    animation: none;
+    opacity: 0.7;
+  }
+}
 
 .capsule__row {
   height: 30px;
@@ -168,6 +295,51 @@ const ariaLabel = computed(() => {
   align-items: center;
   gap: 7px;
   min-width: 0;
+}
+
+.capsule--sized .capsule__row {
+  height: 28px;
+}
+
+.capsule__meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 13px;
+  padding-left: 24px;
+  font-size: 11px;
+  line-height: 13px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+.capsule__sep {
+  opacity: 0.6;
+}
+.capsule__repeat {
+  flex-shrink: 0;
+  color: var(--text2);
+}
+.capsule__snooze {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text2);
+}
+.capsule__notes {
+  margin: 0;
+  padding-left: 24px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+  line-clamp: var(--lines);
+  overflow: hidden;
 }
 
 .capsule__check {
