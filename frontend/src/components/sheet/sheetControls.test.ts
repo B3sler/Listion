@@ -5,6 +5,8 @@ import LSegmented from './LSegmented.vue'
 import LMiniCalendar from './LMiniCalendar.vue'
 import LPropertyChip from './LPropertyChip.vue'
 import LDatePicker from './LDatePicker.vue'
+import LQuickEntryInput from './LQuickEntryInput.vue'
+import type { QuickEntry } from '@/helpers/quickEntry'
 import { Calendar } from 'lucide-vue-next'
 
 const sizes = [
@@ -421,5 +423,100 @@ describe('LDatePicker', () => {
     const w = mountPicker()
     await w.find('[data-key="2026-10-20"]').trigger('click')
     expect(w.emitted('update:modelValue')).toEqual([['2026-10-20']])
+  })
+})
+
+describe('LQuickEntryInput', () => {
+  const entry = (tokens: QuickEntry['tokens'], title = 'X'): QuickEntry => ({ title, tokens })
+
+  function mountInput(modelValue: string, tokens: QuickEntry['tokens'] = []) {
+    return mount(LQuickEntryInput, { props: { modelValue, entry: entry(tokens) } })
+  }
+
+  it('markiert im Spiegel das erkannte Token mit seiner Art', () => {
+    const w = mountInput('X morgen', [{ start: 2, end: 8, kind: 'due' }])
+    const mark = w.find('.qe__mirror mark.qe__token--due')
+    expect(mark.exists()).toBe(true)
+    expect(mark.text()).toBe('morgen')
+  })
+
+  it('spiegelt den gesamten Text, auch Teile ohne Token', () => {
+    const w = mountInput('X morgen !!', [
+      { start: 2, end: 8, kind: 'due' },
+      { start: 9, end: 11, kind: 'priority' },
+    ])
+    expect(w.find('.qe__mirror').element.textContent).toBe('X morgen !!')
+    expect(w.findAll('.qe__mirror mark')).toHaveLength(2)
+    expect(w.find('.qe__token--priority').text()).toBe('!!')
+  })
+
+  it('sortiert Token nach ihrem Beginn, bevor sie gerendert werden', () => {
+    const w = mountInput('a b', [
+      { start: 2, end: 3, kind: 'size' },
+      { start: 0, end: 1, kind: 'color' },
+    ])
+    expect(w.find('.qe__mirror').text()).toBe('a b')
+    expect(w.findAll('.qe__mirror mark').map((m) => m.text())).toEqual(['a', 'b'])
+  })
+
+  it('blendet den Spiegel für Hilfstechnik aus', () => {
+    const w = mountInput('X')
+    expect(w.find('.qe__mirror').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('emittiert update:modelValue bei Eingabe', async () => {
+    const w = mountInput('')
+    await w.find('input.qe__input').setValue('Neu')
+    expect(w.emitted('update:modelValue')).toEqual([['Neu']])
+  })
+
+  it('emittiert bei Enter submit ohne Details', async () => {
+    const w = mountInput('X')
+    await w.find('input').trigger('keydown', { key: 'Enter' })
+    expect(w.emitted('submit')).toEqual([[{ details: false }]])
+  })
+
+  it('emittiert bei Strg+Enter und Cmd+Enter submit mit Details', async () => {
+    const w = mountInput('X')
+    await w.find('input').trigger('keydown', { key: 'Enter', ctrlKey: true })
+    await w.find('input').trigger('keydown', { key: 'Enter', metaKey: true })
+    expect(w.emitted('submit')).toEqual([[{ details: true }], [{ details: true }]])
+  })
+
+  it('verhindert die Standardaktion von Enter', async () => {
+    const w = mountInput('X')
+    const ev = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true })
+    w.find('input').element.dispatchEvent(ev)
+    expect(ev.defaultPrevented).toBe(true)
+  })
+
+  it('ignoriert Enter während einer IME-Komposition', async () => {
+    const w = mountInput('X')
+    await w.find('input').trigger('keydown', { key: 'Enter', isComposing: true })
+    expect(w.emitted('submit')).toBeUndefined()
+  })
+
+  it('synchronisiert die Scroll-Position des Spiegels mit dem Input', async () => {
+    const w = mountInput('X')
+    const input = w.find('input').element
+    const mirror = w.find('.qe__mirror').element
+    Object.defineProperty(input, 'scrollLeft', { value: 42, configurable: true })
+    let synced = 0
+    Object.defineProperty(mirror, 'scrollLeft', {
+      get: () => synced,
+      set: (v: number) => {
+        synced = v
+      },
+      configurable: true,
+    })
+    await w.find('input').trigger('scroll')
+    expect(synced).toBe(42)
+  })
+
+  it('reicht den Platzhalter an den Input durch', () => {
+    const w = mount(LQuickEntryInput, {
+      props: { modelValue: '', entry: entry([]), placeholder: 'New bit' },
+    })
+    expect(w.find('input').attributes('placeholder')).toBe('New bit')
   })
 })
