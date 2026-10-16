@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { onScopeDispose, ref } from 'vue'
 import { useBitStore } from './bitStore'
 
 export const FOCUS_KEY = 'listion.focus'
@@ -177,6 +177,39 @@ export const useFocusStore = defineStore('focus', () => {
     const seconds = Math.min(secondsSince(was.startedAt), MAX_BOOKED_SECONDS)
     const ok = seconds < MIN_BOOKED_SECONDS ? true : await book(was.bitId, seconds)
     if (ok) await flushPending()
+  }
+
+  /**
+   * Another tab of this app wrote the timer or the queue. Its timer is the one running now: a
+   * timer it stopped (and booked) or replaced ends here without booking, so no time counts twice.
+   */
+  function onStorage(e: StorageEvent) {
+    if (e.storageArea && e.storageArea !== localStorage) return
+    if (e.key === null || e.key === FOCUS_PENDING_KEY) {
+      for (const bitId of Object.keys(pending)) delete pending[bitId]
+      Object.assign(pending, loadPending())
+    }
+    if (e.key !== null && e.key !== FOCUS_KEY) return
+    const stored = loadRunning()
+    if (!stored) {
+      if (running.value) {
+        running.value = null
+        elapsed.value = 0
+        stopTicking()
+      }
+      return
+    }
+    if (running.value?.bitId === stored.bitId && running.value.startedAt === stored.startedAt) return
+    running.value = stored
+    startTicking()
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage)
+    onScopeDispose(() => {
+      window.removeEventListener('storage', onStorage)
+      stopTicking()
+    })
   }
 
   /** Ends the timer without booking (the bit is gone). */

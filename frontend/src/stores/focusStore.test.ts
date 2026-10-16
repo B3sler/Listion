@@ -221,6 +221,91 @@ describe('focusStore', () => {
   })
 })
 
+describe('focusStore über mehrere Tabs', () => {
+  /** What another tab's write looks like here: the value is stored, then the event arrives. */
+  function otherTabWrites(key: string, value: unknown) {
+    const oldValue = localStorage.getItem(key)
+    const newValue = value === null ? null : JSON.stringify(value)
+    if (newValue === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, newValue)
+    window.dispatchEvent(
+      new StorageEvent('storage', { key, oldValue, newValue, storageArea: localStorage }),
+    )
+  }
+
+  let focus: ReturnType<typeof useFocusStore>
+
+  beforeEach(() => {
+    focus = useFocusStore()
+  })
+
+  afterEach(() => {
+    focus.$dispose()
+  })
+
+  it('beendet den Timer ohne Buchung, wenn ein anderer Tab ihn gestoppt hat', async () => {
+    focus.start('a')
+    vi.advanceTimersByTime(60_000)
+    otherTabWrites(FOCUS_KEY, null)
+    expect(focus.running).toBeNull()
+    expect(focus.elapsed).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+    await focus.stop()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('übernimmt einen Timer, den ein anderer Tab gestartet hat, ohne den alten zu buchen', async () => {
+    focus.start('a')
+    vi.advanceTimersByTime(30_000)
+    otherTabWrites(FOCUS_KEY, { bitId: 'b', startedAt: T0 + 30_000 })
+    expect(focus.running).toEqual({ bitId: 'b', startedAt: T0 + 30_000 })
+    expect(focus.elapsed).toBe(0)
+    vi.advanceTimersByTime(3000)
+    expect(focus.elapsed).toBe(3)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('zeigt einen Timer, den ein anderer Tab startet, während hier keiner läuft', () => {
+    otherTabWrites(FOCUS_KEY, { bitId: 'a', startedAt: T0 - 5000 })
+    expect(focus.running?.bitId).toBe('a')
+    expect(focus.elapsed).toBe(5)
+  })
+
+  it('behandelt ein geleertes localStorage wie einen Stopp', () => {
+    focus.start('a')
+    localStorage.clear()
+    window.dispatchEvent(new StorageEvent('storage', { key: null, storageArea: localStorage }))
+    expect(focus.running).toBeNull()
+  })
+
+  it('bucht Offenes nicht nach, das ein anderer Tab schon gebucht hat', async () => {
+    api.post.mockRejectedValueOnce(new Error('offline'))
+    focus.start('a')
+    vi.advanceTimersByTime(40_000)
+    await focus.stop()
+    expect(pendingInStorage()).toEqual({ a: 40 })
+    // the other tab sends the 40 s and takes them out of storage
+    otherTabWrites(FOCUS_PENDING_KEY, null)
+    api.post.mockClear()
+    await focus.flushPending()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('reicht Offenes nach, das ein anderer Tab hinterlegt hat', async () => {
+    otherTabWrites(FOCUS_PENDING_KEY, { b: 12 })
+    await focus.flushPending()
+    expect(api.post).toHaveBeenCalledWith('/api/bit/b/focus', { seconds: 12 })
+    expect(pendingInStorage()).toEqual({})
+  })
+
+  it('ignoriert Änderungen an anderen Schlüsseln', () => {
+    focus.start('a')
+    otherTabWrites('listion.theme', 'dark')
+    expect(focus.running?.bitId).toBe('a')
+  })
+})
+
 describe('bitStore.addFocus', () => {
   it('erhöht lokal vorab und sendet die Sekunden', async () => {
     const store = useBitStore()
