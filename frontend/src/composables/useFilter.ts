@@ -8,7 +8,7 @@ function startOfDay(d: Date): number {
 
 /** Due-date groups in local time; weeks run Monday … Sunday. */
 export function dueMatches(
-  due: Date | string | undefined,
+  due: Date | string | null | undefined,
   kinds: DueFilter[],
   today: Date,
 ): boolean {
