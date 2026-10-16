@@ -699,6 +699,11 @@ const created = computed(() =>
   );
 }
 
+/* the body scrolls instead of squashing content: no child (notes, chips, …) may shrink */
+.detail__body > :deep(*) {
+  flex-shrink: 0;
+}
+
 .detail__head {
   display: flex;
   align-items: flex-start;
