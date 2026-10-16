@@ -70,6 +70,40 @@ describe('LMenu', () => {
     wrapper.unmount()
   })
 
+  it('löst bei einem Doppelklick keinen zweiten Logout vor dem Delete-Commit aus', async () => {
+    const history = useHistoryStore()
+    const order: string[] = []
+    let finish!: () => void
+    history.showToast({
+      id: 't',
+      message: 'Bit deleted',
+      undoable: true,
+      onCommit: () =>
+        new Promise<void>((r) => {
+          order.push('commit')
+          finish = () => {
+            order.push('committed')
+            r()
+          }
+        }),
+    })
+    api.post.mockImplementation(async (url: string) => {
+      order.push(url)
+      return { data: {} }
+    })
+
+    const wrapper = await logout()
+    const button = wrapper.findAll('[role="menuitem"]').find((b) => b.text().includes('Logout'))!
+    await button.trigger('click')
+    await Promise.resolve()
+    expect(order).toEqual(['commit'])
+    finish()
+    await vi.waitFor(() => expect(order).toEqual(['commit', 'committed', '/api/auth/logout']))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(order).toEqual(['commit', 'committed', '/api/auth/logout'])
+    wrapper.unmount()
+  })
+
   it('meldet sich auch ohne Toast ab', async () => {
     const wrapper = await logout()
     await vi.waitFor(() => expect(api.post).toHaveBeenCalledWith('/api/auth/logout'))

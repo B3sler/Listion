@@ -25,12 +25,22 @@ const initials = computed(() => {
     .join('')
 })
 
-async function handleLogout() {
-  // a pending action (a deferred delete) goes out now, while the session cookie still exists
-  await history.commitToast()
-  await userStore.logout()
-  isOpen.value = false
-  router.push('/login')
+/** A second click while logging out must not log out before the pending delete has gone out. */
+let loggingOut: Promise<void> | null = null
+
+function handleLogout(): Promise<void> {
+  loggingOut ??= (async () => {
+    try {
+      // a pending action (a deferred delete) goes out now, while the session cookie still exists
+      await history.commitToast()
+      await userStore.logout()
+      isOpen.value = false
+      await router.push('/login')
+    } finally {
+      loggingOut = null
+    }
+  })()
+  return loggingOut
 }
 
 function handleClickOutside(e: MouseEvent) {
