@@ -519,4 +519,12 @@ describe('LQuickEntryInput', () => {
     })
     expect(w.find('input').attributes('placeholder')).toBe('New bit')
   })
+
+  it('beschriftet den Input mit „New bit title“ oder dem übergebenen ariaLabel', () => {
+    expect(mountInput('').find('input').attributes('aria-label')).toBe('New bit title')
+    const w = mount(LQuickEntryInput, {
+      props: { modelValue: '', entry: entry([]), ariaLabel: 'Next bit' },
+    })
+    expect(w.find('input').attributes('aria-label')).toBe('Next bit')
+  })
 })

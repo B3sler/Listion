@@ -13,9 +13,10 @@ interface Props {
   modelValue: string
   entry: QuickEntry
   placeholder?: string
+  ariaLabel?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { ariaLabel: 'New bit title' })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -66,7 +67,8 @@ function onKeydown(e: KeyboardEvent) {
   emit('submit', { details: e.ctrlKey || e.metaKey })
 }
 
-defineExpose({ focus: () => inputEl.value?.focus() })
+// no scrolling: the sheet may still be sliding in when the field takes focus
+defineExpose({ focus: () => inputEl.value?.focus({ preventScroll: true }) })
 </script>
 
 <template>
@@ -85,6 +87,9 @@ defineExpose({ focus: () => inputEl.value?.focus() })
       spellcheck="false"
       :value="modelValue"
       :placeholder="placeholder"
+      :aria-label="ariaLabel"
+      maxlength="500"
+      enterkeyhint="next"
       @input="onInput"
       @scroll="syncScroll"
       @keyup="syncScroll"

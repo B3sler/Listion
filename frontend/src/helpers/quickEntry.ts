@@ -345,6 +345,35 @@ export function parseQuickEntry(
   return { title: tidy(title), ...collectFields(found, today), tokens }
 }
 
+/**
+ * Carries the start indices of tokens kept as text across an edit from `before` to `after`:
+ * indices in front of the change stay, those behind it move with the text, those inside the
+ * changed range are dropped (that text is gone or rewritten).
+ */
+export function shiftLiteral(
+  literal: ReadonlySet<number>,
+  before: string,
+  after: string,
+): Set<number> {
+  const shortest = Math.min(before.length, after.length)
+  let prefix = 0
+  while (prefix < shortest && before[prefix] === after[prefix]) prefix++
+  let suffix = 0
+  while (
+    suffix < shortest - prefix &&
+    before[before.length - 1 - suffix] === after[after.length - 1 - suffix]
+  )
+    suffix++
+  const tail = before.length - suffix
+  const delta = after.length - before.length
+  const out = new Set<number>()
+  for (const index of literal) {
+    if (index < prefix) out.add(index)
+    else if (index >= tail) out.add(index + delta)
+  }
+  return out
+}
+
 /** Removes a token from the text together with the surplus whitespace around it. */
 export function stripToken(text: string, token: { start: number; end: number }): string {
   const before = text.slice(0, token.start).trimEnd()

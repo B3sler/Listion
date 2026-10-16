@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseQuickEntry, stripToken, type QuickEntry } from './quickEntry'
+import { parseQuickEntry, shiftLiteral, stripToken, type QuickEntry } from './quickEntry'
 
 // Freitag, 16.10.2026
 const now = new Date(2026, 9, 16, 10)
@@ -192,5 +192,29 @@ describe('stripToken', () => {
 
   it('lässt nur das Token übrig als leeren Text', () => {
     expect(stripToken('!!', { start: 0, end: 2 })).toBe('')
+  })
+})
+
+describe('shiftLiteral', () => {
+  const set = (...n: number[]) => new Set(n)
+
+  it('lässt Indizes vor der Änderung stehen', () => {
+    expect(shiftLiteral(set(2), 'A !! B', 'A !! BC')).toEqual(set(2))
+  })
+
+  it('verschiebt Indizes hinter einer Einfügung', () => {
+    expect(shiftLiteral(set(2), 'A !!', 'Neu A !!')).toEqual(set(6))
+  })
+
+  it('verschiebt Indizes hinter einer Löschung', () => {
+    expect(shiftLiteral(set(9), 'A morgen !!', 'A !!')).toEqual(set(2))
+  })
+
+  it('verwirft Indizes im geänderten Bereich', () => {
+    expect(shiftLiteral(set(2), 'A !! B', 'A x B')).toEqual(set())
+  })
+
+  it('gibt bei unverändertem Text dieselben Indizes zurück', () => {
+    expect(shiftLiteral(set(0, 3), 'ab cd', 'ab cd')).toEqual(set(0, 3))
   })
 })

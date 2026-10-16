@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, Flag, Lock, Moon, Repeat } from 'lucide-vue-next'
 import type { Bit } from '@/stores/bitStore'
 import type { WorkflowState } from '@/types/flow'
@@ -7,7 +7,7 @@ import { capsuleHeight } from '@/composables/useFlowLayout'
 import { useToday } from '@/composables/useToday'
 import { formatDayShort, toDateKey } from '@/helpers/localDate'
 import { isSnoozed } from '@/helpers/bitMeta'
-import { Spring, SPRING_DEFAULT } from '@/helpers/motion'
+import { prefersReducedMotion, Spring, SPRING_DEFAULT } from '@/helpers/motion'
 
 const props = defineProps<{
   bit: Bit
@@ -18,6 +18,8 @@ const props = defineProps<{
   snapHint?: 'above' | 'below' | null
   /** A focus session runs on this bit. */
   focusing?: boolean
+  /** Just created from the capture series: it materialises out of the ghost capsule. */
+  materialize?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -86,7 +88,29 @@ function settle(): void {
   settleSpring.set(1.04)
   settleSpring.to(1, SPRING_DEFAULT)
 }
-onBeforeUnmount(() => settleSpring.stop())
+/**
+ * Materialise: for the first frame the capsule looks like the ghost it replaces (opacity 0.45,
+ * scale 0.96), then the class comes off and it springs to full size while the opacity
+ * transitions along. Reduced motion skips the scale and only fades in.
+ */
+const materializing = ref(props.materialize)
+let materializeFrame: number | null = null
+onMounted(() => {
+  if (!materializing.value) return
+  if (!prefersReducedMotion()) settleSpring.set(0.96)
+  // the first frame must be styled as the ghost, or there is nothing to transition from
+  void root.value?.offsetWidth
+  materializeFrame = requestAnimationFrame(() => {
+    materializeFrame = null
+    materializing.value = false
+    settleSpring.to(1, SPRING_DEFAULT)
+  })
+})
+
+onBeforeUnmount(() => {
+  settleSpring.stop()
+  if (materializeFrame !== null) cancelAnimationFrame(materializeFrame)
+})
 defineExpose({ settle })
 
 const ariaLabel = computed(() => {
@@ -113,6 +137,7 @@ const ariaLabel = computed(() => {
       'capsule--cycle': inCycle,
       'capsule--lifted': lifted,
       'capsule--dimmed': dimmed,
+      'capsule--materialize': materializing,
       [`capsule--snap-${snapHint}`]: !!snapHint,
     }"
     :style="{ '--c': color, height: `${height}px` }"
@@ -257,6 +282,10 @@ const ariaLabel = computed(() => {
 }
 .capsule--dimmed {
   opacity: 0.2;
+}
+/* the first frame of a capsule created from the capture series: still the ghost */
+.capsule--materialize {
+  opacity: 0.45;
 }
 .capsule--snoozed {
   opacity: 0.35;

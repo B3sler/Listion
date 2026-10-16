@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
+import { addDays, dueToApi, todayKey } from '@/helpers/localDate'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import LWorkspace from './LWorkspace.vue'
@@ -495,6 +496,122 @@ describe('LWorkspace', () => {
     expect(high.classes()).not.toContain('capsule--dimmed')
     expect(low.classes()).toContain('capsule--dimmed')
     localStorage.clear()
+  })
+
+  describe('Serie in der Capture-Ansicht', () => {
+    async function mountEmpty() {
+      const { default: api } = await import('../helpers/api')
+      vi.mocked(api.get).mockImplementation(() => Promise.resolve({ data: [] }))
+      vi.mocked(api.post).mockReset()
+      vi.mocked(api.post).mockImplementation((_url: string, body?: unknown) =>
+        Promise.resolve({ data: body }),
+      )
+      const wrapper = mount(LWorkspace, {
+        global: { plugins: [router, createPinia()] },
+        attachTo: document.body,
+      })
+      await router.isReady()
+      await new Promise((r) => setTimeout(r, 0))
+      return { wrapper, api }
+    }
+
+    async function enter(wrapper: VueWrapper, text: string) {
+      const input = wrapper.find('.capture input')
+      await input.setValue(text)
+      await input.trigger('keydown', { key: 'Enter' })
+    }
+
+    it('legt per Enter untereinander an, behält nur die Farbe und zeigt die Geister-Capsule', async () => {
+      const { wrapper, api } = await mountEmpty()
+      await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 400, clientY: 300 })
+      expect(wrapper.find('.ghost').exists()).toBe(true)
+
+      await enter(wrapper, 'A morgen !! #grün')
+      await enter(wrapper, 'B')
+      await new Promise((r) => setTimeout(r, 0))
+
+      const posts = vi.mocked(api.post).mock.calls.filter((c) => c[0] === '/api/bit')
+      expect(posts).toHaveLength(2)
+      const first = posts[0]![1] as Record<string, number | string>
+      const second = posts[1]![1] as Record<string, number | string>
+      expect(first).toMatchObject({
+        title: 'A',
+        priority: 2,
+        dueDate: dueToApi(addDays(todayKey(), 1)),
+        color: '#22c55e',
+        x: 400 - 100,
+        y: 300 - 16,
+      })
+      expect(second).toMatchObject({ title: 'B', color: '#22c55e', x: first.x })
+      expect(second.y).toBe((first.y as number) + 32 + 12)
+      expect(second).not.toHaveProperty('priority')
+      expect(second).not.toHaveProperty('dueDate')
+
+      // the ghost waits at the next slot
+      expect(wrapper.find('.ghost').exists()).toBe(true)
+      expect(wrapper.find('.ghost').text()).toContain('New Bit')
+      wrapper.unmount()
+    })
+
+    it('zeigt in der Geister-Capsule den bereinigten Titel', async () => {
+      const { wrapper } = await mountEmpty()
+      await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 400, clientY: 300 })
+      await wrapper.find('.capture input').setValue('Steuer abgeben morgen !!')
+      expect(wrapper.find('.ghost').text()).toBe('Steuer abgeben')
+      wrapper.unmount()
+    })
+
+    it('blendet die Geister-Capsule mit dem Schließen des Sheets aus', async () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+      try {
+        const { wrapper } = await mountEmpty()
+        await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 400, clientY: 300 })
+        expect(wrapper.find('.ghost').exists()).toBe(true)
+        await wrapper.find('.capture [aria-label="Close"]').trigger('click')
+        expect(wrapper.find('.ghost').exists()).toBe(false)
+        wrapper.unmount()
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('markiert die neue Capsule für die Materialisierung', async () => {
+      const { wrapper } = await mountEmpty()
+      await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 400, clientY: 300 })
+      await enter(wrapper, 'A')
+      const capsule = wrapper.find('[data-node-type="bit"]')
+      expect(capsule.classes()).toContain('capsule--materialize')
+      await new Promise((r) => requestAnimationFrame(() => r(null)))
+      await wrapper.vm.$nextTick()
+      expect(capsule.classes()).not.toContain('capsule--materialize')
+      wrapper.unmount()
+    })
+
+    it('schwenkt den Canvas, wenn der Slot hinter dem Sheet oder außerhalb liegt', async () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+      const rect = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 800 }))
+      try {
+        const { wrapper } = await mountEmpty()
+        const layer = () =>
+          (wrapper.find('.bg-surface1 > .origin-top-left').element as HTMLElement).style.transform
+
+        // well inside the visible part: nothing moves
+        await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 300, clientY: 400 })
+        expect(layer()).toBe('translate3d(0px, 0px, 0) scale(1)')
+        await wrapper.find('.capture [aria-label="Close"]').trigger('click')
+
+        // the slot 800…1000 reaches past 1000 − 320 − 24: x lands 48 px from the left edge,
+        // the slot's middle in the middle of the container
+        await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 900, clientY: 400 })
+        expect(layer()).toBe('translate3d(-752px, 0px, 0) scale(1)')
+        wrapper.unmount()
+      } finally {
+        rect.mockRestore()
+        vi.unstubAllGlobals()
+      }
+    })
   })
 
   it('versteckte Bits, ihre Stapel und Pfeile werden nicht gerendert', async () => {

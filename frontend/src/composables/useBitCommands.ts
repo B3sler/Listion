@@ -11,7 +11,9 @@ import { useFlowActions } from './useFlowActions'
 import type { FlowLayout } from './useFlowLayout'
 
 export type CreateFields = Pick<Bit, 'title'> &
-  Partial<Pick<Bit, 'status' | 'priority' | 'dueDate' | 'notes' | 'color' | 'size' | 'recurrence'>>
+  Partial<
+    Pick<Bit, 'id' | 'status' | 'priority' | 'dueDate' | 'notes' | 'color' | 'size' | 'recurrence'>
+  >
 
 export interface UpdateMeta {
   label?: string
@@ -387,11 +389,12 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
     pos: { x: number; y: number },
     flowId: string | null,
   ): Promise<Bit> {
-    const { dueDate, ...rest } = fields
+    // a client id lets the caller show the bit (series row, detail) before the server answers
+    const { dueDate, id: clientId, ...rest } = fields
     const payload = {
       ...rest,
       ...pos,
-      id: uuidv7(),
+      id: clientId ?? uuidv7(),
       ...(dueDate != null
         ? { dueDate: typeof dueDate === 'string' ? dueDate : toApiDate(dueDate) }
         : {}),

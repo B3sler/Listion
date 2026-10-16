@@ -10,6 +10,7 @@ import LLassoPath from '@/components/LLassoPath.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
 import LSplash from '@/components/LSplash.vue'
 import LUndoToast from '@/components/LUndoToast.vue'
+import LGhostCapsule from '@/components/LGhostCapsule.vue'
 import LBitSheet from '@/components/sheet/LBitSheet.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
@@ -23,7 +24,9 @@ import {
   computeLayout,
   dependencyGeometry,
   unionRect,
+  type Rect,
 } from '@/composables/useFlowLayout'
+import { SHEET_WIDTH } from '@/composables/useSheetGesture'
 import { computeFlowState } from '@/composables/useFlowState'
 import { flowAt, flowFrames, pathLength } from '@/composables/useFlowGroups'
 import { matchesFilter } from '@/composables/useFilter'
@@ -318,6 +321,40 @@ function resetViewToBits() {
   )
 }
 
+/** The taskbar along the top edge of the workspace. */
+const TASKBAR_H = 56
+
+/**
+ * Pans (same zoom) so a canvas rect is in view: when it reaches into the margins or behind the
+ * sheet, it lands 48 px from the container's left edge, vertically centred.
+ */
+function ensureVisible(rect: Rect) {
+  const el = containerRef.value
+  if (!el) return
+  const { width, height } = el.getBoundingClientRect()
+  if (width === 0 || height === 0) return
+  // an open sheet takes its full width, also while it is still sliding in
+  const sheetWidth = sheetStore.open ? SHEET_WIDTH : sheetStore.revealed
+  const z = zoom.value
+  const left = rect.x * z + panX.value
+  const top = rect.y * z + panY.value
+  const inView =
+    left >= 24 &&
+    left + rect.w * z <= width - sheetWidth - 24 &&
+    top >= TASKBAR_H + 16 &&
+    top + rect.h * z <= height - 16
+  if (inView) return
+  animateView(z, 48 - rect.x * z, height / 2 - (rect.y + rect.h / 2) * z)
+}
+
+// The capture view's next slot stays in view while a series grows
+watch(
+  () => sheetStore.ghost,
+  (ghost) => {
+    if (ghost) ensureVisible({ x: ghost.x, y: ghost.y, w: CAPSULE_W, h: ghost.h })
+  },
+)
+
 // --- Context menu (create bit) ---
 type ContextMenuState = { visible: boolean; x: number; y: number }
 const contextMenu = ref<ContextMenuState>({ visible: false, x: 0, y: 0 })
@@ -562,6 +599,8 @@ onUnmounted(() => {
           @rename="(name) => actions.renamePacket(s.packet.id, name)"
         />
 
+        <LGhostCapsule v-if="sheetStore.ghost" :ghost="sheetStore.ghost" />
+
         <div
           v-for="bit in looseBits"
           :key="bit.id"
@@ -580,6 +619,7 @@ onUnmounted(() => {
             :in-cycle="flow.cycleBitIds.has(bit.id)"
             :lifted="bitDrag?.bitId === bit.id"
             :dimmed="isBitDimmed(bit.id)"
+            :materialize="bit.id === sheetStore.materializeId"
             :snap-hint="
               bitDrag?.target?.kind === 'pair' && bitDrag.target.bitId === bit.id
                 ? bitDrag.target.position

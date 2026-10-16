@@ -200,6 +200,16 @@ describe('useBitCommands', () => {
     expect(store.bits).toHaveLength(1)
   })
 
+  it('create übernimmt eine mitgegebene Client-ID, das Bit liegt sofort im Store', async () => {
+    const store = useBitStore()
+    api.post.mockReturnValue(new Promise(() => {}))
+    const commands = makeCommands()
+    const id = '01900000-0000-7000-8000-000000000001'
+    void commands.create({ id, title: 'neu' }, { x: 0, y: 0 }, null)
+    expect(api.post.mock.calls[0]![1]).toMatchObject({ id, title: 'neu' })
+    expect(store.bits.map((b) => b.id)).toEqual([id])
+  })
+
   it('create ohne Flow sendet kein flowId', async () => {
     api.post.mockResolvedValue({ data: {} })
     const commands = makeCommands()
