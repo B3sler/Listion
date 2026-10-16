@@ -7,6 +7,7 @@ interface Row {
   id: string
   userId: string
   tag: string | null
+  count: number
 }
 
 describe('FakeRepository', () => {
@@ -47,5 +48,20 @@ describe('FakeRepository', () => {
     expect(err).toBeInstanceOf(QueryFailedError)
     expect((err as QueryFailedError).driverError).toMatchObject({ code: '23505' })
     expect(repo.rows.find((r) => r.id === 'a')?.userId).toBe('u5')
+  })
+
+  it('increment addiert auf alle passenden Zeilen und lässt andere unverändert', async () => {
+    const repo = new FakeRepository<Row>(
+      [
+        { id: 'a', userId: 'u5' },
+        { id: 'b', userId: 'u6' },
+      ],
+      { tag: null, count: 1 },
+    )
+    const result = await repo.increment({ id: 'a', userId: 'u5' }, 'count', 4)
+    expect(result.affected).toBe(1)
+    expect(repo.rows.map((r) => r.count)).toEqual([5, 1])
+    expect((await repo.increment({ id: 'a', userId: 'u6' }, 'count', 4)).affected).toBe(0)
+    expect(repo.rows.map((r) => r.count)).toEqual([5, 1])
   })
 })

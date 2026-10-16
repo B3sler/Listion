@@ -15,7 +15,14 @@ async function setup() {
       { id: 'b2', userId: 'u5' },
       { id: 'b3', userId: 'u5' },
     ],
-    { packetId: null, order: 0, status: 0, title: 't', flowId: null } as Partial<Bit>,
+    {
+      packetId: null,
+      order: 0,
+      status: 0,
+      title: 't',
+      flowId: null,
+      focusSeconds: 0,
+    } as Partial<Bit>,
   )
   const packets = new FakeRepository<Packet>()
   const deps = new FakeRepository<Dependency>()
@@ -146,5 +153,20 @@ describe('BitService', () => {
     member('b3')!.flowId = 'f70'
     await service.remove('b3', 'u5')
     expect(flows.rows).toHaveLength(0)
+  })
+
+  it('addFocus addiert auf focusSeconds', async () => {
+    const { service, member } = await setup()
+    await service.addFocus('b1', 'u5', 60)
+    const bit = await service.addFocus('b1', 'u5', 60)
+    expect(member('b1')?.focusSeconds).toBe(120)
+    expect(bit.focusSeconds).toBe(120)
+  })
+
+  it('addFocus wirft 404 für ein fremdes Bit und ändert es nicht', async () => {
+    const { service, bits } = await setup()
+    bits.rows.push({ ...bits.rows[0]!, id: 'foreign', userId: 'u6' })
+    await expect(service.addFocus('foreign', 'u5', 60)).rejects.toBeInstanceOf(NotFoundException)
+    expect(bits.rows.find((b) => b.id === 'foreign')?.focusSeconds).toBe(0)
   })
 })

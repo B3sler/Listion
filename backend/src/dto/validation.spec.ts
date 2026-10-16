@@ -10,6 +10,7 @@ import { CreateFlowDto } from './create-flow.dto.js'
 import { UpdateFlowDto } from './update-flow.dto.js'
 import { definedOnly } from '../common/defined-only.js'
 import { RegisterDto } from './auth.dto.js'
+import { AddFocusDto } from './add-focus.dto.js'
 
 // Gleiche Konfiguration wie in main.ts
 const pipe = new ValidationPipe({ whitelist: true, transform: true })
@@ -201,5 +202,17 @@ describe('Bit-Sheet-Felder', () => {
     await expect(validate(UpdateBitDto, { completedCount: null })).rejects.toBeInstanceOf(
       BadRequestException,
     )
+  })
+})
+
+describe('AddFocusDto', () => {
+  it('akzeptiert 1 bis 86400 ganze Sekunden', async () => {
+    expect(await validate(AddFocusDto, { seconds: 1 })).toEqual({ seconds: 1 })
+    expect(await validate(AddFocusDto, { seconds: 86400 })).toEqual({ seconds: 86400 })
+  })
+
+  it('lehnt 0, mehr als 86400 und Kommazahlen ab', async () => {
+    for (const seconds of [0, 86401, 1.5])
+      await expect(validate(AddFocusDto, { seconds })).rejects.toBeInstanceOf(BadRequestException)
   })
 })

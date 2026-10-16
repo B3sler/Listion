@@ -97,6 +97,24 @@ export class FakeRepository<T extends { id: string }> {
     return { affected }
   }
 
+  /** Like TypeORM: adds `value` to a numeric column of every matching row. */
+  async increment(
+    criteria: string | Where,
+    propertyPath: keyof T & string,
+    value: number,
+  ): Promise<{ affected: number }> {
+    const where = this.toWhere(criteria)
+    let affected = 0
+    for (const row of this.rows) {
+      if (matches(row as Record<string, unknown>, where)) {
+        const record = row as Record<string, unknown>
+        record[propertyPath] = (Number(record[propertyPath]) || 0) + value
+        affected++
+      }
+    }
+    return { affected }
+  }
+
   async delete(criteria: string | Where): Promise<{ affected: number }> {
     const where = this.toWhere(criteria)
     const before = this.rows.length
