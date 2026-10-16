@@ -1,4 +1,5 @@
 import { computed, inject, onScopeDispose, ref, watch, type Ref } from 'vue'
+import api from '@/helpers/api'
 import { useBitStore, type Bit } from '@/stores/bitStore'
 import { useHistoryStore } from '@/stores/historyStore'
 import { BIT_COMMANDS, type UpdateMeta } from './useBitCommands'
@@ -18,7 +19,7 @@ const TEXT_META: Record<TextField, UpdateMeta> = {
 /**
  * Draft of the open detail view, saved live: chips at once via `set`, title and notes 400 ms
  * after the last keystroke. `flush()` sends any waiting text now; it runs on blur, on a bit
- * switch, on unmount (sheet closed) and on `pagehide`. A failed save keeps the draft so `retry`
+ * switch and on unmount (sheet closed); on `pagehide` it goes out as a keepalive fetch. A failed save keeps the draft so `retry`
  * can send it again, even though the store has rolled the bit back.
  */
 export function useBitEditor(bitId: Ref<string | null>) {
@@ -218,7 +219,29 @@ export function useBitEditor(bitId: Ref<string | null>) {
     { flush: 'sync' },
   )
 
-  const onPageHide = () => void flush()
+  /**
+   * The page goes away: an axios request may be cancelled with it, so the waiting text goes out
+   * as one keepalive PUT that outlives the page. Nothing is recorded; the page is gone.
+   */
+  function onPageHide() {
+    const id = bitId.value
+    const patch: Partial<Bit> = {}
+    for (const field of [...timers.keys()]) {
+      clearTimeout(timers.get(field))
+      timers.delete(field)
+      const value = field === 'title' ? title.value : notes.value
+      if (field === 'title' && value.trim() === '') continue
+      patch[field] = value
+    }
+    if (!id || Object.keys(patch).length === 0) return
+    void fetch(`${api.defaults.baseURL ?? ''}/api/bit/${id}`, {
+      method: 'PUT',
+      keepalive: true,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => {})
+  }
   if (typeof window !== 'undefined') window.addEventListener('pagehide', onPageHide)
 
   onScopeDispose(() => {
