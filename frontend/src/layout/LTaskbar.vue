@@ -69,7 +69,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
         </button>
       </div>
       <img :src="logoSrc" alt="Listion Logo" class="h-8" />
-      <div class="flex min-w-0 items-center justify-end">
+      <div class="taskbar__end flex min-w-0 items-center justify-end">
         <LFocusPill />
         <div ref="filterGroup" class="relative flex items-center justify-end">
           <button
@@ -113,6 +113,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
 </template>
 
 <style scoped>
+/* The focus pill sizes itself to this column (container query), so it never reaches the logo */
+.taskbar__end {
+  container: taskbar-end / inline-size;
+  padding-left: 6px;
+}
+
 /* Tool icons take the logo's contrast: light on the dark tab, dark on the light tab */
 .tool {
   position: relative;
