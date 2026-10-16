@@ -410,6 +410,28 @@ describe('useBitCommands: History', () => {
     expect(store.bits.map((b) => b.id)).toEqual([bit.id])
   })
 
+  it('create: Undo räumt wie ein Löschen auf (Timer über onRemove, offenes Sheet zu)', async () => {
+    api.post.mockImplementation((_url: string, body: Bit) =>
+      Promise.resolve({ data: { ...body, packetId: null, order: 0, createdAt: 'server' } }),
+    )
+    const history = useHistoryStore()
+    const sheet = useSheetStore()
+    const onRemove = vi.fn()
+    const commands = makeCommands({ onRemove })
+    const bit = await commands.create({ title: 'neu' }, { x: 0, y: 0 }, null)
+    const other = await commands.create({ title: 'anders' }, { x: 0, y: 100 }, null)
+    sheet.openDetail(bit.id)
+
+    // undoing a bit that is not the open one leaves the sheet alone
+    await history.undo()
+    expect(onRemove).toHaveBeenCalledWith(other.id)
+    expect(sheet.open).toBe(true)
+
+    await history.undo()
+    expect(onRemove).toHaveBeenLastCalledWith(bit.id)
+    expect(sheet.open).toBe(false)
+  })
+
   it('ein fehlgeschlagenes create hinterlässt keinen Eintrag', async () => {
     api.post.mockRejectedValue(new Error('offline'))
     const history = useHistoryStore()

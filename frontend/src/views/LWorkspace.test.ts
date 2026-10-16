@@ -895,6 +895,62 @@ describe('LWorkspace', () => {
       wrapper.unmount()
     })
 
+    it('Strg+Z bis vor das Anlegen schließt das Sheet, gibt den Canvas frei und beendet den Timer ohne Buchung', async () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+      localStorage.clear()
+      try {
+        const { wrapper, api } = await mountEmpty()
+        setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        const sheet = useSheetStore()
+        const bitStore = useBitStore()
+        const focus = useFocusStore()
+        const canvas = () => wrapper.find('.bg-surface1').element as HTMLElement
+        const undo = () =>
+          document.body.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
+          )
+
+        await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 400, clientY: 300 })
+        const input = wrapper.find('.capture input')
+        await input.setValue('A')
+        await input.trigger('keydown', { key: 'Enter', ctrlKey: true })
+        await new Promise((r) => setTimeout(r, 0))
+        expect(sheet.view).toBe('detail')
+        const id = sheet.bitId!
+
+        // an edit in the detail view, a timer running on the new bit
+        await wrapper
+          .find('[aria-label="Status"]')
+          .findAll('[role="radio"]')
+          .find((r) => r.text() === 'In Progress')!
+          .trigger('click')
+        await new Promise((r) => setTimeout(r, 0))
+        focus.start(id)
+        vi.mocked(api.post).mockClear()
+
+        const history = useHistoryStore()
+        undo()
+        // the undo of the edit has finished (it moved to Redo); the sheet stays on the bit
+        await vi.waitFor(() => expect(history.canRedo).toBe(true))
+        expect(bitStore.bits.find((b) => b.id === id)?.status).toBe(0)
+        expect(sheet.open).toBe(true)
+        undo()
+        await vi.waitFor(() => expect(bitStore.bits.some((b) => b.id === id)).toBe(false))
+        await wrapper.vm.$nextTick()
+
+        expect(sheet.open).toBe(false)
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        expect(canvas().style.transform).toBe('translateX(0px)')
+        expect(focus.running).toBeNull()
+        expect(api.post).not.toHaveBeenCalled()
+        wrapper.unmount()
+      } finally {
+        useFocusStore().cancel()
+        localStorage.clear()
+        vi.unstubAllGlobals()
+      }
+    })
+
     it('zeigt in der Geister-Capsule den bereinigten Titel', async () => {
       const { wrapper } = await mountEmpty()
       await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 400, clientY: 300 })

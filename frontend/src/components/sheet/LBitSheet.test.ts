@@ -293,6 +293,35 @@ describe('LBitSheet', () => {
     await w.vm.$nextTick()
     expect(sheet.revealed).toBe(320)
   })
+
+  it('schließt sich, wenn das offene Bit verschwindet, statt eine leere Ansicht zu zeigen', async () => {
+    useBitStore().bits = [bitWith(), bitWith({ id: 'b2' })]
+    const w = mountSheet()
+    const sheet = useSheetStore()
+    sheet.openDetail('b1')
+    await w.vm.$nextTick()
+
+    // e.g. deleted elsewhere: a reload no longer has it
+    useBitStore().bits = [bitWith({ id: 'b2' })]
+    await w.vm.$nextTick()
+    await w.vm.$nextTick()
+    expect(sheet.open).toBe(false)
+    expect(sheet.revealed).toBe(0)
+    expect(w.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('schließt nicht, solange die Bits noch nicht geladen sind', async () => {
+    const sheet = useSheetStore()
+    sheet.openDetail('b1')
+    const w = mountSheet()
+    await w.vm.$nextTick()
+    expect(sheet.open).toBe(true)
+
+    useBitStore().bits = [bitWith()]
+    await w.vm.$nextTick()
+    expect(sheet.open).toBe(true)
+    expect(w.find('textarea.detail__title').exists()).toBe(true)
+  })
 })
 
 describe('Capture-Ansicht', () => {
@@ -525,9 +554,17 @@ describe('Capture-Ansicht', () => {
   })
 
   it('kehrt nach Strg+Enter bei einem Fehler zur Capture-Ansicht zurück', async () => {
-    commands.create.mockImplementationOnce(
-      () => new Promise<Bit>((_, reject) => setTimeout(() => reject(new Error('offline')))),
-    )
+    // like the store: the bit is there at once and goes again when the create fails
+    commands.create.mockImplementationOnce((fields: CreateFields, pos) => {
+      const store = useBitStore()
+      store.bits.push(bitWith({ ...fields, ...pos, id: fields.id! }))
+      return new Promise<Bit>((_, reject) =>
+        setTimeout(() => {
+          store.bits = store.bits.filter((b) => b.id !== fields.id)
+          reject(new Error('offline'))
+        }),
+      )
+    })
     const { w, sheet } = await openCapture()
     await type(w, 'A', { ctrlKey: true })
     expect(sheet.view).toBe('detail')
