@@ -737,6 +737,93 @@ describe('LWorkspace', () => {
       wrapper.unmount()
     })
 
+    describe('verborgene Bits zählen für Interaktionen nicht', () => {
+      async function mountHidden(bits: object[], flows: object[] = []) {
+        const { default: api } = await import('../helpers/api')
+        vi.mocked(api.get).mockImplementation((url: string) =>
+          Promise.resolve({
+            data: url === '/api/bit' ? bits : url === '/api/flow' ? flows : [],
+          }),
+        )
+        vi.mocked(api.post).mockReset()
+        vi.mocked(api.post).mockImplementation((_url: string, body?: unknown) =>
+          Promise.resolve({ data: body }),
+        )
+        vi.mocked(api.put).mockClear()
+        const wrapper = mount(LWorkspace, {
+          global: { plugins: [router, createPinia()] },
+          attachTo: document.body,
+        })
+        await router.isReady()
+        await new Promise((r) => setTimeout(r, 0))
+        setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        useToolStore().setHideSnoozed(true)
+        await wrapper.vm.$nextTick()
+        return { wrapper, api }
+      }
+      const press = (el: Element, x: number, y: number) =>
+        el.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: x, clientY: y }),
+        )
+      const move = (x: number, y: number) =>
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y }))
+      const release = (x: number, y: number) =>
+        window.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y }))
+
+      it('ein Bit neben einem verborgenen Bit rastet dort nicht zu einem Stapel ein', async () => {
+        const { wrapper, api } = await mountHidden([
+          bit('1', null, { snoozedUntil: LATER, x: 0 }),
+          bit('2', null, { x: 600 }),
+        ])
+        const dragged = capsule(wrapper, 'B2')!
+        press(dragged.element, 610, 10)
+        move(200, 15)
+        move(10, 12)
+        await wrapper.vm.$nextTick()
+        release(10, 12)
+        await new Promise((r) => setTimeout(r, 0))
+        expect(api.post).not.toHaveBeenCalledWith('/api/packet', expect.anything())
+        expect(api.put).toHaveBeenCalled()
+        wrapper.unmount()
+      })
+
+      it('ein Lasso über ein verborgenes Bit nimmt es nicht in den Flow auf', async () => {
+        const { wrapper, api } = await mountHidden([
+          bit('1', null, { snoozedUntil: LATER, x: 0 }),
+          bit('2', null, { x: 0, y: 200 }),
+        ])
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
+        await wrapper.vm.$nextTick()
+        const layer = wrapper.find('.lasso-capture').element
+        press(layer, -50, -50)
+        for (const [x, y] of [
+          [300, -50],
+          [300, 300],
+          [-50, 300],
+          [-40, -40],
+        ] as const)
+          move(x, y)
+        release(-40, -40)
+        await new Promise((r) => setTimeout(r, 0))
+        const call = vi.mocked(api.post).mock.calls.find(([url]) => url === '/api/flow')
+        expect(call).toBeDefined()
+        expect((call![1] as { bitIds: string[] }).bitIds).toEqual(['2'])
+        wrapper.unmount()
+      })
+
+      it('ein Flow, dessen einziges Mitglied verborgen ist, zeichnet keinen Rahmen', async () => {
+        const { wrapper } = await mountHidden(
+          [bit('1', null, { snoozedUntil: LATER, x: 0, flowId: 'f1' }), bit('2', null, { x: 900 })],
+          [{ id: 'f1', name: 'Leer', color: '#818cf8' }],
+        )
+        expect(wrapper.find('[data-flow-id="f1"]').exists()).toBe(false)
+        useToolStore().setHideSnoozed(false)
+        await wrapper.vm.$nextTick()
+        expect(wrapper.find('[data-flow-id="f1"]').exists()).toBe(true)
+        wrapper.unmount()
+      })
+    })
+
     it('dimmt mit nur diesem Schalter keine Kapsel und zeigt alles wieder beim Ausschalten', async () => {
       const wrapper = await mountSheet()
       const tools = useToolStore()
