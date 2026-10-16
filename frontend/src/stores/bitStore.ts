@@ -14,11 +14,11 @@ export interface Bit {
   packetId: string | null
   order: number
   flowId?: string | null
-  priority?: number
-  dueDate?: Date | string
+  priority?: number | null
+  dueDate?: Date | string | null
   notes?: string
   createdAt: string
-  color?: string
+  color?: string | null
   size?: 1 | 2 | 3 | 4 | null
   recurrence?: Recurrence | null
   completedCount?: number
@@ -59,10 +59,10 @@ export const useBitStore = defineStore('bit', () => {
     x: number
     y: number
     status?: number
-    priority?: number
+    priority?: Bit['priority']
     dueDate?: string
     notes?: string
-    color?: string
+    color?: Bit['color']
     size?: Bit['size']
     recurrence?: Bit['recurrence']
     flowId?: string
