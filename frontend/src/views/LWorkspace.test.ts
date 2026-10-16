@@ -94,7 +94,7 @@ describe('LWorkspace', () => {
     expect(wrapper.text()).toContain('Release')
   })
 
-  it('Doppelklick auf eine freie Fläche öffnet „New Bit“, auf einer Kapsel nicht', async () => {
+  it('Doppelklick auf eine freie Fläche öffnet „New Bits“, auf einer Kapsel nicht', async () => {
     const wrapper = mount(LWorkspace, { global: { plugins: [router, createPinia()] } })
     await router.isReady()
     await new Promise((r) => setTimeout(r, 0))
@@ -221,7 +221,7 @@ describe('LWorkspace', () => {
       wrapper.unmount()
     })
 
-    it('Doppelklick im Flow-Modus öffnet kein „New Bit“', async () => {
+    it('Doppelklick im Flow-Modus öffnet kein „New Bits“', async () => {
       const { wrapper } = await mountWithFlow()
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }))
       await wrapper.vm.$nextTick()
@@ -232,14 +232,9 @@ describe('LWorkspace', () => {
 
     it('ein im Flow-Rahmen angelegtes Bit wird Mitglied des Flows, außerhalb nicht', async () => {
       const { wrapper, api } = await mountWithFlow()
-      const data = {
-        title: 'Neu',
-        status: 0,
-        priority: undefined,
-        dueDate: undefined,
-        notes: undefined,
-        color: '#6366f1',
-      }
+      vi.mocked(api.post).mockImplementation((_url: string, body?: unknown) =>
+        Promise.resolve({ data: body }),
+      )
       const frame = wrapper.find('[data-flow-id="f9"]')
       const m = /translate3d\(([-\d.]+)px, ([-\d.]+)px/.exec(frame.attributes('style') ?? '')!
       const el = frame.element as HTMLElement
@@ -250,9 +245,13 @@ describe('LWorkspace', () => {
       vi.mocked(api.post).mockClear()
       frame.element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, ...inside }))
       await wrapper.vm.$nextTick()
-      wrapper.findComponent({ name: 'LBitPanel' }).vm.$emit('confirm', data)
+      await wrapper.find('.capture input').setValue('Neu')
+      await wrapper.find('.capture input').trigger('keydown', { key: 'Enter' })
       await new Promise((r) => setTimeout(r, 0))
-      expect(api.post).toHaveBeenCalledWith('/api/bit', expect.objectContaining({ flowId: 'f9' }))
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/bit',
+        expect.objectContaining({ title: 'Neu', flowId: 'f9' }),
+      )
 
       vi.mocked(api.post).mockClear()
       wrapper
@@ -261,11 +260,62 @@ describe('LWorkspace', () => {
           new MouseEvent('dblclick', { bubbles: true, clientX: -2000, clientY: -2000 }),
         )
       await wrapper.vm.$nextTick()
-      wrapper.findComponent({ name: 'LBitPanel' }).vm.$emit('confirm', data)
+      await wrapper.find('.capture input').setValue('Draußen')
+      await wrapper.find('.capture input').trigger('keydown', { key: 'Enter' })
       await new Promise((r) => setTimeout(r, 0))
       expect(api.post).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(api.post).mock.calls[0]![1]).toMatchObject({ title: 'Draußen' })
       expect(vi.mocked(api.post).mock.calls[0]![1]).not.toHaveProperty('flowId')
       wrapper.unmount()
+    })
+
+    it('ein Klick auf eine Kapsel öffnet die Detail-Ansicht mit dem Titel des Bits', async () => {
+      const { wrapper } = await mountWithFlow()
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+      const capsule = wrapper.find('[data-node-type="bit"]')
+      capsule.element.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 5, clientY: 5 }),
+      )
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: 5, clientY: 5 }))
+      await wrapper.vm.$nextTick()
+
+      const sheet = wrapper.find('[role="dialog"]')
+      expect(sheet.attributes('aria-label')).toBe('Bit: Loose')
+      expect(sheet.find<HTMLTextAreaElement>('textarea.detail__title').element.value).toBe('Loose')
+      wrapper.unmount()
+    })
+
+    it('Esc schließt das Sheet', async () => {
+      // reduced motion: the slide settles at once instead of over several frames
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+      try {
+        const { wrapper } = await mountWithFlow()
+        await wrapper.find('.bg-surface1').trigger('dblclick')
+        expect(wrapper.find('.capture').exists()).toBe(true)
+
+        await wrapper.find('.capture input').trigger('keydown', { key: 'Escape' })
+        expect(wrapper.find('.capture').exists()).toBe(false)
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        wrapper.unmount()
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('der Canvas weicht dem offenen Sheet aus', async () => {
+      vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+      try {
+        const { wrapper } = await mountWithFlow()
+        const canvas = () => wrapper.find('.bg-surface1').element as HTMLElement
+        expect(canvas().style.transform).toBe('translateX(0px)')
+        await wrapper.find('.bg-surface1').trigger('dblclick')
+        expect(canvas().style.transform).toBe('translateX(320px)')
+        expect(canvas().style.transition).toBe('')
+        wrapper.unmount()
+      } finally {
+        vi.unstubAllGlobals()
+      }
     })
   })
 
