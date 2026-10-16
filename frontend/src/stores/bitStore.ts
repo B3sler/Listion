@@ -66,6 +66,15 @@ export const useBitStore = defineStore('bit', () => {
     bits.value = res.data
   }
 
+  /** Loads one bit from the server into the list (replacing the copy there, if any). */
+  async function fetchBit(id: string): Promise<Bit> {
+    const res = await api.get<Bit>(`/api/bit/${id}`)
+    const idx = bits.value.findIndex((b) => b.id === id)
+    if (idx === -1) bits.value.push(res.data)
+    else bits.value[idx] = res.data
+    return res.data
+  }
+
   /**
    * Optimistic: the bit is on the canvas before the server answers. The server copy only fills in
    * what the client could not know (createdAt); fields changed locally meanwhile stay local.
@@ -258,6 +267,7 @@ export const useBitStore = defineStore('bit', () => {
     hide,
     unhide,
     fetchBits,
+    fetchBit,
     createBit,
     updateBit,
     queueUpdate,
