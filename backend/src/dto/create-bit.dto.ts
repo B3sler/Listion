@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
 import {
   IsDate,
+  IsDateString,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -122,5 +123,7 @@ export class CreateBitDto {
   })
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  // the shape alone lets 2026-13-45 through to Postgres (500); strict checks the day exists
+  @IsDateString({ strict: true })
   snoozedUntil?: string | null
 }
