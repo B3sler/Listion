@@ -66,10 +66,7 @@ export function stackGeometry(
   return { offsets, gapY, height }
 }
 
-export function computeLayout(input: {
-  bits: Bit[]
-  packets: Packet[]
-}): FlowLayout {
+export function computeLayout(input: { bits: Bit[]; packets: Packet[] }): FlowLayout {
   const packetIds = new Set(input.packets.map((p) => p.id))
   const membersOf = new Map<string, Bit[]>()
   const looseBitIds: string[] = []
