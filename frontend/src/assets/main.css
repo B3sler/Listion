@@ -184,7 +184,8 @@ html.theme-transition *::after {
 }
 
 /* ── Materials ────────────────────────────────────────────── */
-.material {
+.material,
+.material--regular {
   background-color: var(--material-regular);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -362,6 +363,7 @@ html.theme-transition *::after {
 
 @media (prefers-reduced-transparency: reduce) {
   .material,
+  .material--regular,
   .material--thin,
   .material--thick {
     background-color: var(--surface2);
@@ -372,6 +374,7 @@ html.theme-transition *::after {
 
 @media (prefers-contrast: more) {
   .material,
+  .material--regular,
   .material--thin,
   .material--thick {
     background-color: var(--surface1);

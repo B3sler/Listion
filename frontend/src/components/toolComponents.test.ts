@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import LFlowFrame from './LFlowFrame.vue'
 import LFilterPopover from './LFilterPopover.vue'
 import LLassoPath from './LLassoPath.vue'
 import LPacketStack from './LPacketStack.vue'
+import LUndoToast from './LUndoToast.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import { useToolStore } from '@/stores/toolStore'
+import { useHistoryStore } from '@/stores/historyStore'
 import type { Bit } from '@/stores/bitStore'
 
 beforeEach(() => {
@@ -190,5 +192,77 @@ describe('LTaskbar', () => {
       expect(store.filterOpen).toBe(true)
       w.unmount()
     })
+  })
+})
+
+describe('LUndoToast', () => {
+  afterEach(() => {
+    useHistoryStore().dismissToast()
+    vi.unstubAllGlobals()
+  })
+
+  it('zeigt nichts, solange kein Toast aktiv ist', () => {
+    const w = mount(LUndoToast)
+    expect(w.find('.toast').exists()).toBe(false)
+  })
+
+  it('zeigt die Meldung als Statusanzeige mit Undo-Knopf', async () => {
+    const w = mount(LUndoToast)
+    useHistoryStore().showToast({ id: 't1', message: 'Bit deleted', undoable: true })
+    await w.vm.$nextTick()
+    const toast = w.find('.toast')
+    expect(toast.attributes('role')).toBe('status')
+    expect(toast.attributes('aria-live')).toBe('polite')
+    expect(toast.classes()).toContain('material--regular')
+    expect(toast.text()).toContain('Bit deleted')
+    expect(w.find('.toast__undo').text()).toBe('Undo')
+  })
+
+  it('blendet den Undo-Knopf aus, wenn die Aktion nicht umkehrbar ist', async () => {
+    const w = mount(LUndoToast)
+    useHistoryStore().showToast({ id: 't1', message: "Couldn't delete", undoable: false })
+    await w.vm.$nextTick()
+    expect(w.find('.toast').text()).toContain("Couldn't delete")
+    expect(w.find('.toast__undo').exists()).toBe(false)
+  })
+
+  it('ein Klick auf Undo ruft undoToast auf', async () => {
+    const w = mount(LUndoToast)
+    const history = useHistoryStore()
+    const undoToast = vi.spyOn(history, 'undoToast').mockResolvedValue()
+    history.showToast({ id: 't1', message: 'Done', undoable: true, entryId: 'e1' })
+    await w.vm.$nextTick()
+    await w.find('.toast__undo').trigger('click')
+    expect(undoToast).toHaveBeenCalledTimes(1)
+  })
+
+  it('Hover pausiert den Ablauf, Verlassen setzt ihn fort', async () => {
+    const w = mount(LUndoToast)
+    const history = useHistoryStore()
+    const pause = vi.spyOn(history, 'pauseToast')
+    const resume = vi.spyOn(history, 'resumeToast')
+    history.showToast({ id: 't1', message: 'Done', undoable: true })
+    await w.vm.$nextTick()
+    await w.find('.toast').trigger('mouseenter')
+    expect(pause).toHaveBeenCalledTimes(1)
+    expect(resume).not.toHaveBeenCalled()
+    await w.find('.toast').trigger('mouseleave')
+    expect(resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('ein neuer Toast ersetzt den alten; bei Reduced Motion blendet nur die Deckkraft', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+    const w = mount(LUndoToast, { global: { stubs: { transition: false } } })
+    const history = useHistoryStore()
+    history.showToast({ id: 't1', message: 'First', undoable: true })
+    await vi.waitFor(() => expect(w.text()).toContain('First'))
+    history.showToast({ id: 't2', message: 'Second', undoable: true })
+    await vi.waitFor(() => {
+      expect(w.findAll('.toast')).toHaveLength(1)
+      expect(w.text()).toContain('Second')
+    })
+    expect((w.find('.toast').element as HTMLElement).style.transform).toBe('')
+    history.dismissToast()
+    await vi.waitFor(() => expect(w.find('.toast').exists()).toBe(false))
   })
 })

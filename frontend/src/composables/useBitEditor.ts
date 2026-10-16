@@ -1,5 +1,6 @@
 import { computed, inject, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useBitStore, type Bit } from '@/stores/bitStore'
+import { useHistoryStore } from '@/stores/historyStore'
 import { BIT_COMMANDS, type UpdateMeta } from './useBitCommands'
 
 type TextField = 'title' | 'notes'
@@ -24,6 +25,7 @@ export function useBitEditor(bitId: Ref<string | null>) {
   const commands = inject(BIT_COMMANDS)
   if (!commands) throw new Error('useBitEditor needs BIT_COMMANDS to be provided')
   const bitStore = useBitStore()
+  const history = useHistoryStore()
 
   const bit = computed(() => bitStore.bits.find((b) => b.id === bitId.value) ?? null)
 
@@ -166,7 +168,10 @@ export function useBitEditor(bitId: Ref<string | null>) {
     } else if (title.value !== title.value.trim()) {
       onTitleInput(title.value.trim())
     }
-    await flush()
+    // the send above happens synchronously, so the typing step is complete when it is sealed
+    const flushed = flush()
+    history.seal()
+    await flushed
   }
 
   async function set(patch: Partial<Bit>, label: string): Promise<void> {
