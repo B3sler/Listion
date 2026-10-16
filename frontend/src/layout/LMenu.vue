@@ -3,11 +3,13 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { LogOut, Sun, Moon } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/userStore'
+import { useHistoryStore } from '@/stores/historyStore'
 import { useTheme } from '@/composables/useTheme.ts'
 
 const isOpen = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 const userStore = useUserStore()
+const history = useHistoryStore()
 const router = useRouter()
 const { isDark, toggle: toggleTheme } = useTheme()
 
@@ -24,6 +26,8 @@ const initials = computed(() => {
 })
 
 async function handleLogout() {
+  // a pending action (a deferred delete) goes out now, while the session cookie still exists
+  await history.commitToast()
   await userStore.logout()
   isOpen.value = false
   router.push('/login')

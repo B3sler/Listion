@@ -461,3 +461,72 @@ describe('historyStore: Toast-Undo ohne Eintrag, dropBit', () => {
     expect(a.undo).not.toHaveBeenCalled()
   })
 })
+
+describe('historyStore: Abmelden und Verlassen', () => {
+  it('commitToast führt onCommit sofort aus, wartet darauf und räumt den Toast ab', async () => {
+    const h = useHistoryStore()
+    let finish!: () => void
+    const onCommit = vi.fn(() => new Promise<void>((r) => (finish = r)))
+    h.showToast(toastOf({ onCommit }))
+
+    let done = false
+    const committing = h.commitToast().then(() => (done = true))
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(h.toast).toBeNull()
+    await Promise.resolve()
+    expect(done).toBe(false)
+    finish()
+    await committing
+    expect(done).toBe(true)
+
+    // its expiry does not commit a second time
+    await vi.advanceTimersByTimeAsync(TOAST_MS * 2)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+  })
+
+  it('commitToast ohne Toast oder ohne onCommit löst sofort auf', async () => {
+    const h = useHistoryStore()
+    await expect(h.commitToast()).resolves.toBeUndefined()
+    h.showToast(toastOf())
+    await expect(h.commitToast()).resolves.toBeUndefined()
+    expect(h.toast).toBeNull()
+  })
+
+  it('commitToast meldet ein fehlschlagendes onCommit und löst trotzdem auf', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const h = useHistoryStore()
+    h.showToast(toastOf({ onCommit: () => Promise.reject(new Error('offline')) }))
+    await expect(h.commitToast()).resolves.toBeUndefined()
+    expect(error).toHaveBeenCalled()
+  })
+
+  it('clear leert beide Stapel und nimmt den Toast ohne Commit weg', async () => {
+    const h = useHistoryStore()
+    const onCommit = vi.fn(async () => {})
+    h.push(entry())
+    h.push(entry())
+    await h.undo()
+    h.showToast(toastOf({ onCommit }))
+    expect(h.canUndo).toBe(true)
+    expect(h.canRedo).toBe(true)
+
+    h.clear()
+    expect(h.canUndo).toBe(false)
+    expect(h.canRedo).toBe(false)
+    expect(h.toast).toBeNull()
+    await vi.advanceTimersByTimeAsync(TOAST_MS * 2)
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('ein undo, das während clear noch läuft, landet danach auf keinem Stapel', async () => {
+    const h = useHistoryStore()
+    let finish!: () => void
+    h.push(entry({ undo: () => new Promise<void>((r) => (finish = r)) }))
+    const running = h.undo()
+    h.clear()
+    finish()
+    await running
+    expect(h.canUndo).toBe(false)
+    expect(h.canRedo).toBe(false)
+  })
+})

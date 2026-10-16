@@ -573,6 +573,11 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('keydown', onKeydown)
   clearLongPress()
+  // leaving (logout): nothing carries over to the next session. LMenu has committed a pending
+  // toast before logging out; any other is dropped, its request would go out without a cookie.
+  sheetStore.close()
+  sheetStore.revealed = 0
+  history.clear()
 })
 </script>
 

@@ -607,6 +607,53 @@ describe('LWorkspace', () => {
         }
       })
 
+      it('Verlassen (Abmelden) schließt das Sheet, leert die History und committet keinen Toast mehr', async () => {
+        vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+        try {
+          const { wrapper, history, sheet } = await mountWithHistory()
+          const { default: api } = await import('../helpers/api')
+          const pinia = (wrapper.vm as unknown as { $pinia: Pinia }).$pinia
+          vi.mocked(api.delete).mockClear()
+          sheet.openDetail('3')
+          await wrapper.vm.$nextTick()
+          await wrapper.find('.detail__delete').trigger('click')
+          expect(history.toast?.message).toBe('Bit deleted')
+          sheet.openCapture({ x: 0, y: 0 }, null)
+          await wrapper.vm.$nextTick()
+          expect(sheet.ghost).not.toBeNull()
+
+          vi.useFakeTimers()
+          try {
+            wrapper.unmount()
+            expect(sheet.open).toBe(false)
+            expect(sheet.ghost).toBeNull()
+            expect(sheet.series).toEqual([])
+            expect(sheet.revealed).toBe(0)
+            expect(history.canUndo).toBe(false)
+            expect(history.canRedo).toBe(false)
+            expect(history.toast).toBeNull()
+            await vi.advanceTimersByTimeAsync(10_000)
+            expect(api.delete).not.toHaveBeenCalled()
+          } finally {
+            vi.useRealTimers()
+          }
+          // the delete never went out: the bit is not left hidden either
+          expect(useBitStore().hiddenIds.has('3')).toBe(false)
+
+          // the next login: the sheet does not slide in by itself
+          const again = mount(LWorkspace, {
+            global: { plugins: [router, pinia] },
+            attachTo: document.body,
+          })
+          await new Promise((r) => setTimeout(r, 0))
+          expect(again.find('[role="dialog"]').exists()).toBe(false)
+          expect(sheet.revealed).toBe(0)
+          again.unmount()
+        } finally {
+          vi.unstubAllGlobals()
+        }
+      })
+
       it('Strg+Z auf dem Body nimmt das Löschen ebenfalls zurück', async () => {
         vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
         try {
