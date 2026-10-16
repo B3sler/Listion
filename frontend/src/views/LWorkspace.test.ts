@@ -358,6 +358,98 @@ describe('LWorkspace', () => {
         vi.unstubAllGlobals()
       }
     })
+
+    const pressKey = (target: EventTarget, init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+      target.dispatchEvent(event)
+      return event
+    }
+
+    describe('Undo-Tastatur und Toast', () => {
+      async function mountWithHistory() {
+        const { wrapper } = await mountWithFlow()
+        // the stores of this mount (an earlier, still mounted workspace may own the active pinia)
+        setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        return { wrapper, history: useHistoryStore(), sheet: useSheetStore() }
+      }
+
+      it('Strg+Z auf dem Body macht rückgängig, Strg+Umschalt+Z stellt wieder her', async () => {
+        const { wrapper, history } = await mountWithHistory()
+        const undo = vi.spyOn(history, 'undo').mockResolvedValue(true)
+        const redo = vi.spyOn(history, 'redo').mockResolvedValue(true)
+
+        const first = pressKey(document.body, { key: 'z', ctrlKey: true })
+        expect(undo).toHaveBeenCalledTimes(1)
+        expect(first.defaultPrevented).toBe(true)
+
+        pressKey(document.body, { key: 'Z', metaKey: true, shiftKey: true })
+        expect(redo).toHaveBeenCalledTimes(1)
+        expect(undo).toHaveBeenCalledTimes(1)
+        wrapper.unmount()
+      })
+
+      it('Strg+Z im Textfeld überlässt dem Browser das Text-Undo', async () => {
+        const { wrapper, history, sheet } = await mountWithHistory()
+        const undo = vi.spyOn(history, 'undo').mockResolvedValue(true)
+        const redo = vi.spyOn(history, 'redo').mockResolvedValue(true)
+        sheet.openDetail('3')
+        await wrapper.vm.$nextTick()
+
+        const area = wrapper.find('textarea.detail__title').element
+        const event = pressKey(area, { key: 'z', ctrlKey: true })
+        pressKey(area, { key: 'z', ctrlKey: true, shiftKey: true })
+        expect(undo).not.toHaveBeenCalled()
+        expect(redo).not.toHaveBeenCalled()
+        expect(event.defaultPrevented).toBe(false)
+        wrapper.unmount()
+      })
+
+      it('Z ohne Strg oder ⌘ tut nichts', async () => {
+        const { wrapper, history } = await mountWithHistory()
+        const undo = vi.spyOn(history, 'undo').mockResolvedValue(true)
+        pressKey(document.body, { key: 'z' })
+        expect(undo).not.toHaveBeenCalled()
+        wrapper.unmount()
+      })
+
+      it('Löschen über das Sheet zeigt „Bit deleted“, Undo im Toast bringt die Kapsel zurück', async () => {
+        vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+        try {
+          const { wrapper, history, sheet } = await mountWithHistory()
+          sheet.openDetail('3')
+          await wrapper.vm.$nextTick()
+          await wrapper.find('.detail__delete').trigger('click')
+          expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(0)
+          expect(wrapper.find('.toast').text()).toContain('Bit deleted')
+
+          await wrapper.find('.toast__undo').trigger('click')
+          await vi.waitFor(() => expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(1))
+          expect(history.toast).toBeNull()
+          expect(wrapper.find('.toast').exists()).toBe(false)
+          wrapper.unmount()
+        } finally {
+          vi.unstubAllGlobals()
+        }
+      })
+
+      it('Strg+Z auf dem Body nimmt das Löschen ebenfalls zurück', async () => {
+        vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+        try {
+          const { wrapper, history, sheet } = await mountWithHistory()
+          sheet.openDetail('3')
+          await wrapper.vm.$nextTick()
+          await wrapper.find('.detail__delete').trigger('click')
+          expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(0)
+
+          pressKey(document.body, { key: 'z', ctrlKey: true })
+          await vi.waitFor(() => expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(1))
+          history.dismissToast()
+          wrapper.unmount()
+        } finally {
+          vi.unstubAllGlobals()
+        }
+      })
+    })
   })
 
   it('Filter dimmt nicht passende Kapseln', async () => {

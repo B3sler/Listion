@@ -9,6 +9,7 @@ import LFlowFrame from '@/components/LFlowFrame.vue'
 import LLassoPath from '@/components/LLassoPath.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
 import LSplash from '@/components/LSplash.vue'
+import LUndoToast from '@/components/LUndoToast.vue'
 import LBitSheet from '@/components/sheet/LBitSheet.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
@@ -33,8 +34,9 @@ import { useBitStore } from '@/stores/bitStore'
 import { usePacketStore } from '@/stores/packetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
 import { useFlowStore } from '@/stores/flowStore'
-import { useToolStore } from '@/stores/toolStore'
+import { isEditable, useToolStore } from '@/stores/toolStore'
 import { useSheetStore } from '@/stores/sheetStore'
+import { useHistoryStore } from '@/stores/historyStore'
 import type { Dependency, DependencyItem, PacketCard } from '@/types/flow'
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -63,6 +65,7 @@ const dependencyStore = useDependencyStore()
 const flowStore = useFlowStore()
 const toolStore = useToolStore()
 const sheetStore = useSheetStore()
+const history = useHistoryStore()
 const actions = useFlowActions()
 
 function toCanvas(clientX: number, clientY: number) {
@@ -435,7 +438,18 @@ function onWorkspaceMouseDown(e: MouseEvent) {
   handleMouseDown(e)
 }
 
+/** Ctrl/⌘+Z undoes, with Shift redoes. Inside a text field the browser's own undo applies. */
+function handleUndoShortcut(e: KeyboardEvent): boolean {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 'z') return false
+  if (e.isComposing || isEditable(e.target)) return false
+  e.preventDefault()
+  const run = e.shiftKey ? history.redo() : history.undo()
+  run.catch((err) => console.error('Undo failed:', err))
+  return true
+}
+
 function onKeydown(e: KeyboardEvent) {
+  if (handleUndoShortcut(e)) return
   if (!toolStore.handleShortcut(e)) return
   if (e.key === 'Escape') cancelLasso()
   if (toolStore.activeTool !== 'flow') cancelLasso()
@@ -660,6 +674,8 @@ onUnmounted(() => {
       :items="menuItems"
       @close="closeContextMenu"
     />
+
+    <LUndoToast />
 
     <LSplash v-if="showSplash" @done="showSplash = false" />
   </div>

@@ -3,6 +3,7 @@ import { defineComponent, nextTick, ref, type Ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { useBitStore, type Bit } from '@/stores/bitStore'
+import { useHistoryStore } from '@/stores/historyStore'
 import { BIT_COMMANDS, type BitCommands } from './useBitCommands'
 import { useBitEditor } from './useBitEditor'
 
@@ -133,6 +134,22 @@ describe('useBitEditor', () => {
     await editor.onTextBlur()
     expect(editor.title.value).toBe('Steuer')
     expect(commands.update).toHaveBeenCalledWith('b1', { title: 'Steuer' }, expect.anything())
+  })
+
+  it('schliesst den Tipp-Schritt beim Blur ab, nachdem der Text gesendet wurde', async () => {
+    const { editor } = setup()
+    const order: string[] = []
+    commands.update.mockImplementation(() => {
+      order.push('update')
+      return Promise.resolve()
+    })
+    const seal = vi.spyOn(useHistoryStore(), 'seal').mockImplementation(() => {
+      order.push('seal')
+    })
+    editor.onTitleInput('Steuer abgeben')
+    await editor.onTextBlur()
+    expect(seal).toHaveBeenCalledTimes(1)
+    expect(order).toEqual(['update', 'seal'])
   })
 
   it('set() speichert sofort mit dem Label', async () => {

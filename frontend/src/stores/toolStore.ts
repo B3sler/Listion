@@ -49,7 +49,7 @@ function saveFilters(filters: FilterState): void {
   }
 }
 
-function isEditable(target: EventTarget | null): boolean {
+export function isEditable(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   return (
     target.tagName === 'INPUT' ||
