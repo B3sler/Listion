@@ -115,6 +115,23 @@ describe('useBitCommands', () => {
     expect(store.bits[0]).toMatchObject({ status: 0, completedCount: 1 })
   })
 
+  it('räumt beim Verlassen des Workspace (Scope-Ende) einen wartenden Roll ab, ohne zu senden', async () => {
+    vi.useFakeTimers()
+    const store = useBitStore()
+    store.bits = [bitWith({ recurrence: 'daily', dueDate: todayKey(), completedCount: 0 })]
+    const commands = makeCommands()
+    const result = commands.complete('1')
+    await vi.advanceTimersByTimeAsync(400)
+    const timers = vi.getTimerCount()
+    scopes.splice(0).forEach((scope) => scope.stop())
+    // the roll timer is gone (the toast's timer belongs to the history store)
+    expect(vi.getTimerCount()).toBe(timers - 1)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(api.put).not.toHaveBeenCalled()
+    expect(store.bits[0]!.status).toBe(0)
+    await expect(result).resolves.toEqual({ rolledTo: null })
+  })
+
   it('ein fehlgeschlagener Roll stellt den Stand vor dem Abhaken wieder her', async () => {
     vi.useFakeTimers()
     const store = useBitStore()

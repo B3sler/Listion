@@ -385,6 +385,8 @@ export function useBitCommands(opts: BitCommandsOptions): BitCommands {
     onScopeDispose(() => {
       if (typeof window !== 'undefined') window.removeEventListener('pagehide', onPageHide)
       clearSealTimer()
+      // a roll still waiting would go out after the workspace is gone (logout: without a cookie)
+      for (const id of [...rolling.keys()]) cancelRoll(id)
       // the workspace goes away without committing (its toast is dropped): the bits come back
       for (const pending of pendingDeletes.values()) {
         if (pending.state !== 'pending') continue
