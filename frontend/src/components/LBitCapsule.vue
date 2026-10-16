@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Check, Flag, Lock, Moon, Repeat } from 'lucide-vue-next'
 import type { Bit } from '@/stores/bitStore'
 import type { WorkflowState } from '@/types/flow'
@@ -8,6 +8,7 @@ import { useToday } from '@/composables/useToday'
 import { formatDayShort, toDateKey } from '@/helpers/localDate'
 import { isSnoozed } from '@/helpers/bitMeta'
 import { prefersReducedMotion, Spring, SPRING_DEFAULT } from '@/helpers/motion'
+import { useSheetStore } from '@/stores/sheetStore'
 
 const props = defineProps<{
   bit: Bit
@@ -112,6 +113,15 @@ onBeforeUnmount(() => {
   if (materializeFrame !== null) cancelAnimationFrame(materializeFrame)
 })
 defineExpose({ settle })
+
+// A bit ticked off in the sheet settles wherever its capsule is: loose, stacked or in a flow
+const sheet = useSheetStore()
+watch(
+  () => sheet.settleRequest,
+  (request) => {
+    if (request?.bitId === props.bit.id) settle()
+  },
+)
 
 const ariaLabel = computed(() => {
   const parts = [props.bit.title, STATUS_LABEL[props.bit.status] ?? 'Open']
