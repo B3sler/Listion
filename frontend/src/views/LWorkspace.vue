@@ -347,11 +347,26 @@ function ensureVisible(rect: Rect) {
   animateView(z, 48 - rect.x * z, height / 2 - (rect.y + rect.h / 2) * z)
 }
 
-// The capture view's next slot stays in view while a series grows
+/**
+ * Where the series stands: a new click point or the bit just placed. Only when this moves does
+ * the canvas follow the ghost; typing, size or colour changes and edits elsewhere leave the
+ * canvas where the user put it (the sheet is a parallel layer, the canvas stays usable).
+ */
+let revealedStep: string | null = null
+
 watch(
   () => sheetStore.ghost,
   (ghost) => {
-    if (ghost) ensureVisible({ x: ghost.x, y: ghost.y, w: CAPSULE_W, h: ghost.h })
+    if (!ghost) {
+      // capture left (closed or detail): showing it again reveals the slot once more
+      revealedStep = null
+      return
+    }
+    const { origin, lastRect } = sheetStore
+    const step = `${origin.x},${origin.y}|${lastRect ? `${lastRect.x},${lastRect.y}` : ''}`
+    if (step === revealedStep) return
+    revealedStep = step
+    ensureVisible({ x: ghost.x, y: ghost.y, w: CAPSULE_W, h: ghost.h })
   },
 )
 

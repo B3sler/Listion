@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { addDays, dueToApi, todayKey } from '@/helpers/localDate'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
@@ -588,6 +588,8 @@ describe('LWorkspace', () => {
     })
 
     it('schwenkt den Canvas, wenn der Slot hinter dem Sheet oder außerhalb liegt', async () => {
+      // the canvas restores its last pan from localStorage; start from the origin
+      localStorage.clear()
       vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
       const rect = vi
         .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -611,6 +613,71 @@ describe('LWorkspace', () => {
         rect.mockRestore()
         vi.unstubAllGlobals()
       }
+    })
+
+    describe('Schwenken nur, wenn die Serie weiterrückt', () => {
+      async function openAndPanAway() {
+        const { wrapper } = await mountEmpty()
+        const layer = () =>
+          (wrapper.find('.bg-surface1 > .origin-top-left').element as HTMLElement).style.transform
+        await wrapper.find('.bg-surface1').trigger('dblclick', { clientX: 300, clientY: 400 })
+        expect(layer()).toBe('translate3d(0px, 0px, 0) scale(1)')
+        // the user scrolls the canvas away: the slot (200…400) is now off to the left
+        await wrapper.find('.bg-surface1').trigger('wheel', { deltaX: 600, deltaY: 0 })
+        expect(layer()).toBe('translate3d(-600px, 0px, 0) scale(1)')
+        return { wrapper, layer }
+      }
+
+      let rect: ReturnType<typeof vi.spyOn>
+      beforeEach(() => {
+        // the canvas restores its last pan from localStorage; start from the origin
+        localStorage.clear()
+        vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+        rect = vi
+          .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+          .mockReturnValue(DOMRect.fromRect({ x: 0, y: 0, width: 1000, height: 800 }))
+      })
+      afterEach(() => {
+        rect.mockRestore()
+        vi.unstubAllGlobals()
+      })
+
+      it('Tippen im Eingabefeld schwenkt den Canvas nicht zurück', async () => {
+        const { wrapper, layer } = await openAndPanAway()
+        await wrapper.find('.capture input').setValue('Steuer')
+        await wrapper.find('.capture input').setValue('Steuer ~xl #rot')
+        expect(layer()).toBe('translate3d(-600px, 0px, 0) scale(1)')
+        wrapper.unmount()
+      })
+
+      it('eine Änderung an einem anderen Bit schwenkt den Canvas nicht zurück', async () => {
+        const { wrapper, layer } = await openAndPanAway()
+        setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+        const store = useBitStore()
+        store.bits.push({
+          id: 'x',
+          title: 'Woanders',
+          status: 0,
+          x: 2000,
+          y: 2000,
+          packetId: null,
+          order: 0,
+          createdAt: '',
+        })
+        await wrapper.vm.$nextTick()
+        await store.updateBit('x', { x: 2100 })
+        await wrapper.vm.$nextTick()
+        expect(layer()).toBe('translate3d(-600px, 0px, 0) scale(1)')
+        wrapper.unmount()
+      })
+
+      it('Enter mit dem nächsten Slot außerhalb schwenkt dorthin', async () => {
+        const { wrapper, layer } = await openAndPanAway()
+        await enter(wrapper, 'A')
+        // next slot (200, 384 + 32 + 12): x 48 px from the left, its middle at 800 / 2
+        expect(layer()).toBe('translate3d(-152px, -44px, 0) scale(1)')
+        wrapper.unmount()
+      })
     })
   })
 
