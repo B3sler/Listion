@@ -1,7 +1,7 @@
 import { ref, type ComputedRef, type Ref } from 'vue'
 import { VelocityTracker, project } from '@/helpers/motion'
 import type { NodeRef } from '@/types/flow'
-import { CAPSULE_H, CAPSULE_W, type FlowLayout } from './useFlowLayout'
+import { CAPSULE_W, type FlowLayout } from './useFlowLayout'
 import type { Point } from './useFlowGroups'
 import { findSnapTarget, type SnapTarget } from './useStackDrag'
 
@@ -97,7 +97,7 @@ export function useFlowGestures(opts: FlowGestureOptions) {
         const c = opts.toCanvas(ev.clientX, ev.clientY)
         const x = c.x - grab.x
         const y = c.y - grab.y
-        const probe = { x: x + CAPSULE_W / 2, y: y + CAPSULE_H / 2 }
+        const probe = { x: x + CAPSULE_W / 2, y: y + rect.h / 2 }
         bitDrag.value = { bitId, x, y, target: findSnapTarget(probe, bitId, opts.layout.value) }
       },
       async end(ev, moved, v) {
