@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import api from '@/helpers/api'
 import { uuidv7 } from '@/helpers/uuid'
 import type { Recurrence } from '@/helpers/recurrence'
@@ -44,6 +44,22 @@ interface BitQueue {
 
 export const useBitStore = defineStore('bit', () => {
   const bits = ref<Bit[]>([])
+  /**
+   * Bits deleted on the canvas but still inside their undo window. They stay in `bits` (and on
+   * the server) so an undo restores them unchanged; layout, filter, HUD and arrows skip them.
+   */
+  const hiddenIds = ref(new Set<string>())
+  const visibleBits = computed(() =>
+    hiddenIds.value.size === 0 ? bits.value : bits.value.filter((b) => !hiddenIds.value.has(b.id)),
+  )
+
+  function hide(id: string): void {
+    hiddenIds.value.add(id)
+  }
+
+  function unhide(id: string): void {
+    hiddenIds.value.delete(id)
+  }
 
   async function fetchBits(): Promise<void> {
     const res = await api.get<Bit[]>('/api/bit')
@@ -55,6 +71,8 @@ export const useBitStore = defineStore('bit', () => {
    * what the client could not know (createdAt); fields changed locally meanwhile stay local.
    */
   async function createBit(payload: {
+    /** A given id recreates a bit (redo); otherwise a new one is generated. */
+    id?: string
     title: string
     x: number
     y: number
@@ -69,7 +87,7 @@ export const useBitStore = defineStore('bit', () => {
   }): Promise<Bit> {
     const body = {
       ...payload,
-      id: uuidv7(),
+      id: payload.id ?? uuidv7(),
       x: Math.round(payload.x),
       y: Math.round(payload.y),
       status: payload.status ?? 0,
@@ -117,6 +135,8 @@ export const useBitStore = defineStore('bit', () => {
   }
 
   const queues = new Map<string, BitQueue>()
+  /** Per bit with updates underway: settles once the last of them is answered. */
+  const drains = new Map<string, Promise<void>>()
 
   function patchLocal(id: string, patch: Partial<Bit>): void {
     const idx = bits.value.findIndex((b) => b.id === id)
@@ -191,15 +211,34 @@ export const useBitStore = defineStore('bit', () => {
       }
       queue.waiting.push(update)
       for (const k of before.keys()) queue.lastWriter.set(k, update)
-      if (idle) void drain(id, queue)
+      if (idle) {
+        const run = drain(id, queue)
+        drains.set(id, run)
+        void run.then(() => {
+          if (drains.get(id) === run) drains.delete(id)
+        })
+      }
     })
   }
 
   async function deleteBit(id: string): Promise<void> {
     await whenCreated(id)
+    // a save still on its way (e.g. the detail view's flush) must not arrive after the DELETE
+    await drains.get(id)
     await api.delete(`/api/bit/${id}`)
     bits.value = bits.value.filter((b) => b.id !== id)
   }
 
-  return { bits, fetchBits, createBit, updateBit, queueUpdate, deleteBit }
+  return {
+    bits,
+    hiddenIds,
+    visibleBits,
+    hide,
+    unhide,
+    fetchBits,
+    createBit,
+    updateBit,
+    queueUpdate,
+    deleteBit,
+  }
 })

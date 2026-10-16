@@ -398,3 +398,84 @@ describe('bitStore.queueUpdate', () => {
     )
   })
 })
+
+describe('bitStore: versteckte Bits', () => {
+  it('hide nimmt ein Bit aus visibleBits, unhide bringt es zurück, bits bleibt unverändert', () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ id: '1' }), bitWith({ id: '2' })]
+    expect(store.visibleBits.map((b) => b.id)).toEqual(['1', '2'])
+    store.hide('1')
+    expect(store.hiddenIds.has('1')).toBe(true)
+    expect(store.visibleBits.map((b) => b.id)).toEqual(['2'])
+    expect(store.bits).toHaveLength(2)
+    store.unhide('1')
+    expect(store.hiddenIds.size).toBe(0)
+    expect(store.visibleBits.map((b) => b.id)).toEqual(['1', '2'])
+  })
+
+  it('ein Reload lässt ein verstecktes Bit versteckt', () => {
+    const store = useBitStore()
+    store.bits = [bitWith({ id: '1' })]
+    store.hide('1')
+    store.bits = [bitWith({ id: '1' }), bitWith({ id: '2' })]
+    expect(store.visibleBits.map((b) => b.id)).toEqual(['2'])
+  })
+
+  it('createBit übernimmt eine vorgegebene ID', () => {
+    const store = useBitStore()
+    api.post.mockResolvedValue({ data: {} })
+    const id = '01890a5d-ac96-774b-bcce-b302099a8057'
+    void store.createBit({ id, title: 'x', x: 0, y: 0 })
+    expect(store.bits[0]!.id).toBe(id)
+    expect(api.post).toHaveBeenCalledWith('/api/bit', expect.objectContaining({ id }))
+  })
+
+  it('deleteBit wartet, bis laufende Updates des Bits gespeichert sind', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith()]
+    const put = pendingPut()
+    api.delete.mockResolvedValue({})
+    const saved = store.queueUpdate('1', { title: 'b' })
+    const removed = store.deleteBit('1')
+    await flush()
+    expect(api.delete).not.toHaveBeenCalled()
+    put.resolve()
+    await saved
+    await removed
+    expect(api.delete).toHaveBeenCalledWith('/api/bit/1')
+    expect(store.bits).toHaveLength(0)
+  })
+
+  it('deleteBit löscht auch nach einem fehlgeschlagenen Update', async () => {
+    const store = useBitStore()
+    store.bits = [bitWith()]
+    const put = pendingPut()
+    api.delete.mockResolvedValue({})
+    const saved = store.queueUpdate('1', { title: 'b' })
+    const removed = store.deleteBit('1')
+    put.reject(new Error('offline'))
+    await expect(saved).rejects.toThrow('offline')
+    await removed
+    expect(api.delete).toHaveBeenCalledWith('/api/bit/1')
+  })
+})
+
+describe('dependencyStore.createDependency mit ID', () => {
+  it('sendet die vorgegebene ID statt einer neuen', async () => {
+    const store = useDependencyStore()
+    api.post.mockImplementation((_url: string, body: Dependency) => Promise.resolve({ data: body }))
+    await store.createDependency({ type: 'bit', id: '1' }, { type: 'bit', id: '2' }, 'dep-old')
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/dependency',
+      expect.objectContaining({ id: 'dep-old', fromId: '1', toId: '2' }),
+    )
+    expect(store.dependencies.map((d) => d.id)).toEqual(['dep-old'])
+  })
+
+  it('vergibt ohne ID wie bisher eine UUIDv7', async () => {
+    const store = useDependencyStore()
+    api.post.mockImplementation((_url: string, body: Dependency) => Promise.resolve({ data: body }))
+    await store.createDependency({ type: 'bit', id: '1' }, { type: 'bit', id: '2' })
+    expect(store.dependencies[0]!.id).toMatch(V7)
+  })
+})

@@ -16,6 +16,7 @@ import {
 } from './useFlowLayout'
 import { flowAt, lassoHits, type Point } from './useFlowGroups'
 import { isValidLink } from './useFlowState'
+import { compareIds } from '@/helpers/uuid'
 import type { SnapTarget } from './useStackDrag'
 
 export function useFlowActions() {
@@ -96,6 +97,23 @@ export function useFlowActions() {
     await Promise.all(patched.map((p) => api.put(`/api/bit/${p.id}`, { x: p.x, y: p.y })))
   }
 
+  /**
+   * The layout leaves out bits waiting to be deleted, but the packet still holds them: put them
+   * back at their old index so an undo finds them in their stack unchanged.
+   */
+  function withHiddenMembers(packetId: string, ids: string[], movedId: string): string[] {
+    if (bitStore.hiddenIds.size === 0) return ids
+    const all = bitStore.bits
+      .filter((b) => b.packetId === packetId)
+      .sort((a, b) => a.order - b.order || compareIds(a.id, b.id))
+    const result = [...ids]
+    all.forEach((b, i) => {
+      if (b.id !== movedId && bitStore.hiddenIds.has(b.id) && !result.includes(b.id))
+        result.splice(Math.min(i, result.length), 0, b.id)
+    })
+    return result
+  }
+
   function dropBit(
     bitId: string,
     target: SnapTarget | null,
@@ -114,7 +132,7 @@ export function useFlowActions() {
         ids.splice(target.index, 0, bitId)
         // dropped back into its own slot: nothing to save
         if (ids.length === current.length && ids.every((id, i) => id === current[i])) return
-        await packetStore.setBits(target.packetId, ids)
+        await packetStore.setBits(target.packetId, withHiddenMembers(target.packetId, ids, bitId))
       } else if (target?.kind === 'pair') {
         const t = layout.bitRects.get(target.bitId)
         if (!t) return
@@ -196,12 +214,20 @@ export function useFlowActions() {
     return guarded(() => dependencyStore.deleteDependency(id))
   }
 
-  function deleteBit(id: string, layout: FlowLayout): Promise<void> {
-    return guarded(async () => {
-      const packetBefore = new Map(bitStore.bits.map((b) => [b.id, b.packetId] as const))
+  /**
+   * Unlike the other actions this rejects when the DELETE fails (after reloading the server
+   * state), so the deferred delete can bring the bit back and say so.
+   */
+  async function deleteBit(id: string, layout: FlowLayout): Promise<void> {
+    const packetBefore = new Map(bitStore.bits.map((b) => [b.id, b.packetId] as const))
+    try {
       await bitStore.deleteBit(id)
-      await reloadKeepingFreedPositions(layout, packetBefore, id)
-    })
+    } catch (e) {
+      console.error('Flow update failed:', e)
+      await reloadAll().catch(() => {})
+      throw e
+    }
+    await guarded(() => reloadKeepingFreedPositions(layout, packetBefore, id))
   }
 
   /** Resolves true when the lasso caught something and a flow was created. */
