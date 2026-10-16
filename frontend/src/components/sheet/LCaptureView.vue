@@ -114,10 +114,30 @@ const rows = computed(() =>
   }),
 )
 
-/** Sends the create; the row and the capsule are there already (optimistic). */
-function send(item: SeriesEntry, fields: CreateFields, pos: { x: number; y: number }) {
+function isConflict(e: unknown): boolean {
+  return (e as { response?: { status?: number } } | null)?.response?.status === 409
+}
+
+/**
+ * Sends the create; the row and the capsule are there already (optimistic). On a retry a 409
+ * means the first try did reach the server: the bit exists under this id and is loaded instead.
+ */
+function send(
+  item: SeriesEntry,
+  fields: CreateFields,
+  pos: { x: number; y: number },
+  isRetry = false,
+) {
   sheet.materializeId = fields.id ?? null
-  commands.create(fields, pos, sheet.flowId).catch((e: unknown) => {
+  commands.create(fields, pos, sheet.flowId).catch(async (e: unknown) => {
+    if (isRetry && fields.id && isConflict(e)) {
+      try {
+        await bitStore.fetchBit(fields.id)
+        return
+      } catch (fetchError) {
+        e = fetchError
+      }
+    }
     console.error('Failed to create bit:', e)
     item.failed = true
     item.fields = fields
@@ -151,16 +171,14 @@ function submit({ details }: { details: boolean }) {
   if (details) sheet.openDetail(id)
 }
 
-/** The same bit again, under a new id (the failed one may still exist on the server). */
+/** The same bit again under the same id, so a first try that did arrive is not doubled. */
 function retry(item: SeriesEntry) {
   const { fields, pos } = item
   if (!fields || !pos) return
-  const again = { ...fields, id: uuidv7() }
-  item.id = again.id
   item.failed = false
   delete item.fields
   delete item.pos
-  send(item, again, pos)
+  send(item, fields, pos, true)
 }
 
 function openRow(id: string) {

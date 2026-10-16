@@ -530,7 +530,7 @@ describe('Capture-Ansicht', () => {
     expect(sheet.lastRect).toBeNull()
   })
 
-  it('zeigt bei einem Fehler „Couldn’t create“ mit Retry, Retry legt mit neuer ID an', async () => {
+  it('zeigt bei einem Fehler „Couldn’t create“ mit Retry, Retry sendet dieselbe ID noch einmal', async () => {
     commands.create.mockImplementationOnce(() => Promise.reject(new Error('offline')))
     const { w, sheet } = await openCapture()
     await type(w, 'Steuer !!')
@@ -545,12 +545,49 @@ describe('Capture-Ansicht', () => {
     expect(commands.create).toHaveBeenCalledTimes(2)
     const [first, firstPos] = commands.create.mock.calls[0]!
     const [again, againPos] = commands.create.mock.calls[1]!
-    expect(again).toEqual({ ...first, id: expect.any(String) })
-    expect(again.id).not.toBe(first.id)
+    // the first try may have reached the server: the same id cannot create it twice
+    expect(again).toEqual(first)
     expect(againPos).toEqual(firstPos)
     await flush()
     expect(w.find('.capture__row--failed').exists()).toBe(false)
-    expect(sheet.series).toEqual([{ id: again.id, failed: false }])
+    expect(sheet.series).toEqual([{ id: first.id, failed: false }])
+  })
+
+  it('wertet beim Retry ein 409 als angelegt und lädt das Bit vom Server', async () => {
+    commands.create
+      .mockImplementationOnce(() => Promise.reject(new Error('timeout')))
+      .mockImplementationOnce(() =>
+        Promise.reject(Object.assign(new Error('conflict'), { response: { status: 409 } })),
+      )
+    const store = useBitStore()
+    const fetchBit = vi
+      .spyOn(store, 'fetchBit')
+      .mockImplementation((id: string) => {
+        const bit = bitWith({ id, title: 'Steuer' })
+        store.bits.push(bit)
+        return Promise.resolve(bit)
+      })
+    const { w, sheet } = await openCapture()
+    await type(w, 'Steuer')
+    await flush()
+    await w.find('.capture__row--failed button').trigger('click')
+    await flush()
+    expect(fetchBit).toHaveBeenCalledWith(createdId(0))
+    expect(w.find('.capture__row--failed').exists()).toBe(false)
+    expect(w.findAll('.capture__row')).toHaveLength(1)
+    expect(sheet.series).toEqual([{ id: createdId(0), failed: false }])
+  })
+
+  it('zeigt die Zeile wieder als gescheitert, wenn ein Retry anders scheitert', async () => {
+    commands.create.mockImplementation(() => Promise.reject(new Error('offline')))
+    const fetchBit = vi.spyOn(useBitStore(), 'fetchBit')
+    const { w } = await openCapture()
+    await type(w, 'Steuer')
+    await flush()
+    await w.find('.capture__row--failed button').trigger('click')
+    await flush()
+    expect(fetchBit).not.toHaveBeenCalled()
+    expect(w.find('.capture__row--failed').exists()).toBe(true)
   })
 
   it('kehrt nach Strg+Enter bei einem Fehler zur Capture-Ansicht zurück', async () => {

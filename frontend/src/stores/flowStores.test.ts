@@ -399,6 +399,36 @@ describe('bitStore.queueUpdate', () => {
   })
 })
 
+describe('bitStore.fetchBit', () => {
+  const b = (extra: Partial<Bit> = {}): Bit => ({
+    id: '1',
+    title: 'Server',
+    status: 0,
+    x: 0,
+    y: 0,
+    packetId: null,
+    order: 0,
+    createdAt: '2026-10-16T08:00:00.000Z',
+    ...extra,
+  })
+
+  it('lädt ein einzelnes Bit und nimmt es in die Liste auf', async () => {
+    api.get.mockResolvedValueOnce({ data: b() })
+    const store = useBitStore()
+    await expect(store.fetchBit('1')).resolves.toEqual(b())
+    expect(api.get).toHaveBeenCalledWith('/api/bit/1')
+    expect(store.bits).toEqual([b()])
+  })
+
+  it('ersetzt ein schon vorhandenes Bit, statt es doppelt zu führen', async () => {
+    api.get.mockResolvedValueOnce({ data: b({ title: 'Neu' }) })
+    const store = useBitStore()
+    store.bits = [b({ title: 'Alt' })]
+    await store.fetchBit('1')
+    expect(store.bits).toEqual([b({ title: 'Neu' })])
+  })
+})
+
 describe('bitStore: versteckte Bits', () => {
   it('hide nimmt ein Bit aus visibleBits, unhide bringt es zurück, bits bleibt unverändert', () => {
     const store = useBitStore()
