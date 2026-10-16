@@ -682,6 +682,35 @@ describe('LHoldToComplete', () => {
     expect(w.emitted('complete')).toBeUndefined()
   })
 
+  it('verschluckt nach einem abgebrochenen Halten (pointercancel) nicht den nächsten Klick', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(w.emitted('complete')).toHaveLength(1)
+    // the browser took the pointer over: no click follows this press
+    await w.find('button').trigger('pointercancel')
+    await w.setProps({ done: true })
+    await vi.advanceTimersByTimeAsync(1000)
+
+    // e.g. a keyboard click on the done bit, without a pointerdown before it
+    await w.find('button').trigger('click')
+    expect(w.emitted('reopen')).toHaveLength(1)
+  })
+
+  it('öffnet nach einem Halten ohne folgenden Klick beim nächsten Tippen wieder', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(600)
+    // the release landed elsewhere, its click never came
+    await w.setProps({ done: true })
+    await vi.advanceTimersByTimeAsync(1000)
+
+    await w.find('button').trigger('pointerdown')
+    await w.find('button').trigger('pointerup')
+    await w.find('button').trigger('click')
+    expect(w.emitted('reopen')).toHaveLength(1)
+  })
+
   it('startet bei einem erledigten Bit keinen Haltevorgang', async () => {
     const w = mountHold({ done: true })
     await w.find('button').trigger('pointerdown')

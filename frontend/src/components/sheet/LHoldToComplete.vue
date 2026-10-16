@@ -81,8 +81,9 @@ function tick() {
 }
 
 function onPointerDown(event: PointerEvent) {
-  if (props.done || event.button !== 0) return
+  // a new press: whatever click the last one left pending never came (also on a done bit)
   swallowClick = false
+  if (props.done || event.button !== 0) return
   hideTooltip()
   clearHold()
   const target = event.currentTarget
@@ -118,6 +119,12 @@ function onPointerEnd() {
   clearHold()
   ring.to(0, SPRING_DEFAULT)
   if (heldFor < TAP_MS) showTooltip()
+}
+
+function onPointerCancel() {
+  // the browser took the pointer over: no click follows this press
+  swallowClick = false
+  onPointerEnd()
 }
 
 function onClick() {
@@ -182,7 +189,7 @@ onBeforeUnmount(() => {
       :aria-describedby="tooltip ? tooltipId : undefined"
       @pointerdown="onPointerDown"
       @pointerup="onPointerEnd"
-      @pointercancel="onPointerEnd"
+      @pointercancel="onPointerCancel"
       @click="onClick"
       @contextmenu.prevent
       @keydown="onKeydown"
