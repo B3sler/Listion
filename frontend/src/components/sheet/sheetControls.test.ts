@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import LSegmented from './LSegmented.vue'
 import LMiniCalendar from './LMiniCalendar.vue'
+import LPropertyChip from './LPropertyChip.vue'
+import LDatePicker from './LDatePicker.vue'
+import { Calendar } from 'lucide-vue-next'
 
 const sizes = [
   { value: 'S', label: 'S' },
@@ -283,5 +286,140 @@ describe('LMiniCalendar', () => {
     expect((w.element as HTMLElement).style.getPropertyValue('--cal-accent')).toBe('#3b82f6')
     w.unmount()
     host.remove()
+  })
+})
+
+describe('LPropertyChip', () => {
+  function mountChip(props: Partial<InstanceType<typeof LPropertyChip>['$props']> = {}) {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const w = mount(LPropertyChip, {
+      props: { icon: Calendar, label: 'Due', set: true, expanded: false, ...props },
+      slots: { default: '<p class="picker">Auswahl</p>' },
+      attachTo: host,
+    })
+    return { w, host }
+  }
+
+  it('rendert den Slot nicht, solange der Chip eingeklappt ist', () => {
+    const { w, host } = mountChip({ expanded: false })
+    expect(w.find('.picker').exists()).toBe(false)
+    expect(w.find('.chip__btn').attributes('aria-expanded')).toBe('false')
+    w.unmount()
+    host.remove()
+  })
+
+  it('rendert den Slot im aufgeklappten Zustand und verknüpft ihn per aria-controls', () => {
+    const { w, host } = mountChip({ expanded: true })
+    expect(w.find('.picker').exists()).toBe(true)
+    const btn = w.find('.chip__btn')
+    expect(btn.attributes('aria-expanded')).toBe('true')
+    const region = w.find('.chip__region')
+    expect(region.attributes('id')).toBeTruthy()
+    expect(btn.attributes('aria-controls')).toBe(region.attributes('id'))
+    w.unmount()
+    host.remove()
+  })
+
+  it('emittiert beim Klick auf den Chip toggle', async () => {
+    const { w, host } = mountChip()
+    await w.find('.chip__btn').trigger('click')
+    expect(w.emitted('toggle')).toHaveLength(1)
+    w.unmount()
+    host.remove()
+  })
+
+  it('emittiert beim Klick auf das × clear, ohne toggle', async () => {
+    const { w, host } = mountChip({ set: true })
+    await w.find('[aria-label="Clear Due"]').trigger('click')
+    expect(w.emitted('clear')).toHaveLength(1)
+    expect(w.emitted('toggle')).toBeUndefined()
+    w.unmount()
+    host.remove()
+  })
+
+  it('zeigt das × nur, wenn ein Wert gesetzt ist', () => {
+    const { w, host } = mountChip({ set: false })
+    expect(w.find('[aria-label="Clear Due"]').exists()).toBe(false)
+    expect(w.find('.chip').classes()).not.toContain('chip--set')
+    w.unmount()
+    host.remove()
+  })
+
+  it('setzt bei tone="danger" die Klasse chip--danger', () => {
+    const { w, host } = mountChip({ tone: 'danger' })
+    expect(w.find('.chip').classes()).toContain('chip--danger')
+    w.unmount()
+    host.remove()
+  })
+
+  describe('bei reduzierter Bewegung', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('hängt den Slot beim Einklappen aus und beim Aufklappen ein', async () => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true })),
+      )
+      const { w, host } = mountChip({ expanded: true })
+      expect(w.find('.picker').exists()).toBe(true)
+      await w.setProps({ expanded: false })
+      await nextTick()
+      expect(w.find('.picker').exists()).toBe(false)
+      await w.setProps({ expanded: true })
+      await nextTick()
+      expect(w.find('.picker').exists()).toBe(true)
+      w.unmount()
+      host.remove()
+    })
+  })
+
+  it('emittiert bei Esc in der Auswahl toggle und fokussiert den Chip', async () => {
+    const { w, host } = mountChip({ expanded: true })
+    await w.find('.picker').trigger('keydown', { key: 'Escape' })
+    expect(w.emitted('toggle')).toHaveLength(1)
+    expect(document.activeElement).toBe(w.find('.chip__btn').element)
+    w.unmount()
+    host.remove()
+  })
+})
+
+describe('LDatePicker', () => {
+  const quick = [
+    { label: 'Today', key: '2026-10-16' },
+    { label: 'Tomorrow', key: '2026-10-17' },
+    { label: 'None', key: null },
+  ]
+
+  function mountPicker(modelValue: string | null = null) {
+    return mount(LDatePicker, {
+      props: { modelValue, today: '2026-10-16', accent: '#3b82f6', quick },
+    })
+  }
+
+  it('emittiert für die Schnellwahl None den Wert null', async () => {
+    const w = mountPicker('2026-10-20')
+    const none = w.findAll('.picker__quick').find((b) => b.text() === 'None')!
+    await none.trigger('click')
+    expect(w.emitted('update:modelValue')).toEqual([[null]])
+  })
+
+  it('emittiert für die Schnellwahl Tomorrow deren Schlüssel', async () => {
+    const w = mountPicker()
+    const tomorrow = w.findAll('.picker__quick').find((b) => b.text() === 'Tomorrow')!
+    await tomorrow.trigger('click')
+    expect(w.emitted('update:modelValue')).toEqual([['2026-10-17']])
+  })
+
+  it('markiert die zum Wert passende Schnellwahl mit aria-pressed', () => {
+    const w = mountPicker('2026-10-17')
+    const pressed = w.findAll('.picker__quick').map((b) => b.attributes('aria-pressed'))
+    expect(pressed).toEqual(['false', 'true', 'false'])
+  })
+
+  it('reicht eine Kalenderauswahl als update:modelValue durch', async () => {
+    const w = mountPicker()
+    await w.find('[data-key="2026-10-20"]').trigger('click')
+    expect(w.emitted('update:modelValue')).toEqual([['2026-10-20']])
   })
 })
