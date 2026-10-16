@@ -252,15 +252,30 @@ describe('useSheetGesture Geste', () => {
     expect(onClosed).not.toHaveBeenCalled()
   })
 
-  it('führt eine ohne Bewegung losgelassene Unterbrechung zum Ziel zu Ende', () => {
+  it('führt ein ohne Bewegung losgelassenes, schließendes Sheet zu Ende, auch kurz nach dem Start', () => {
     const { g, el, onClosed } = openSheet()
     g.close()
-    step(8)
+    step(2)
+    // caught early: by position alone (less than 40 % out) it would spring back open
+    expect(g.x.value).toBeGreaterThan(-0.4 * SHEET_WIDTH)
     down(g, el, 200)
     fire('pointerup', 200)
     step(300)
     expect(g.x.value).toBe(-SHEET_WIDTH)
     expect(onClosed).toHaveBeenCalledTimes(1)
+  })
+
+  it('führt ein ohne Bewegung losgelassenes, öffnendes Sheet zu Ende, auch kurz nach dem Start', () => {
+    const { g, el, onClosed } = setup()
+    g.open()
+    step(2)
+    // caught early: by position alone (more than 40 % out) it would close again
+    expect(g.x.value).toBeLessThan(-0.4 * SHEET_WIDTH)
+    down(g, el, 200)
+    fire('pointerup', 200)
+    step(300)
+    expect(g.x.value).toBe(0)
+    expect(onClosed).not.toHaveBeenCalled()
   })
 
   it('ruft onClosed nicht auf, wenn ein schließendes Sheet zurückgeholt wird', () => {

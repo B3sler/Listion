@@ -33,8 +33,11 @@ interface GestureState {
   startY: number
   startSheetX: number
   axis: 'x' | 'y' | null
-  /** The sheet was in motion when grabbed; a release without a swipe lets it finish. */
-  caught: boolean
+  /**
+   * Where the sheet was heading when grabbed in motion (null: it was at rest). A release
+   * without a swipe resumes towards it: opening keeps opening, closing keeps closing.
+   */
+  caughtTarget: number | null
   captureEl: Element | null
 }
 
@@ -100,9 +103,10 @@ export function useSheetGesture(opts: { onClosed: () => void }) {
 
     if (g.axis === 'x') {
       settle(cancelled ? 0 : tracker.velocity().x)
-    } else if (g.caught) {
-      // Grabbed mid-flight but never swiped: carry on from where it was caught
-      settle(0)
+    } else if (g.caughtTarget !== null) {
+      // Grabbed mid-flight but never swiped: carry on to where it was going
+      if (g.caughtTarget <= -SHEET_WIDTH) close()
+      else open()
     }
   }
 
@@ -126,7 +130,7 @@ export function useSheetGesture(opts: { onClosed: () => void }) {
     if (target?.closest?.(IGNORED_TARGETS)) return
 
     // Direct input wins: freeze the sheet exactly where it is on screen, drop its momentum
-    const caught = spring.isAnimating
+    const caughtTarget = spring.isAnimating ? spring.target : null
     spring.stop()
     spring.value = x.value
     spring.target = x.value
@@ -138,7 +142,7 @@ export function useSheetGesture(opts: { onClosed: () => void }) {
       startY: e.clientY,
       startSheetX: x.value,
       axis: null,
-      caught,
+      caughtTarget,
       captureEl: e.currentTarget instanceof Element ? e.currentTarget : null,
     }
     tracker.reset()
