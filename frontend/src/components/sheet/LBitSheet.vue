@@ -33,6 +33,15 @@ const stopActions = sheet.$onAction(({ name, after }) => {
   if (name === 'openCapture' || name === 'openDetail') after(() => open())
 })
 
+// Closed from outside (a command deleting the open bit, its redo): the sheet is gone at once,
+// so slide the gesture home too, or the canvas would stay pushed aside with no sheet next to it.
+watch(
+  () => sheet.open,
+  (isOpen) => {
+    if (!isOpen && x.value > -SHEET_WIDTH) close()
+  },
+)
+
 const bit = computed(() =>
   sheet.view === 'detail' ? (bitStore.bits.find((b) => b.id === sheet.bitId) ?? null) : null,
 )
