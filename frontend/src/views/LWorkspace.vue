@@ -85,10 +85,23 @@ function toCanvas(clientX: number, clientY: number) {
 const selectedDependencyId = ref<string | null>(null)
 const highlightedPacketId = ref<string | null>(null)
 
+const dayKey = useToday()
+
+/**
+ * The bits that exist on the canvas. With "Hide snoozed" on, snoozed loose bits are treated
+ * as absent from every interaction (snapping, lasso, flow frames, arrows) — like pending-delete
+ * bits. Loose bits never shift others, so nothing reflows; stack members always stay.
+ */
+const canvasBits = computed(() =>
+  toolStore.filters.hideSnoozed
+    ? bitStore.visibleBits.filter((b) => b.packetId != null || !isSnoozed(b, dayKey.value))
+    : bitStore.visibleBits,
+)
+
 // Layout of the stored state — what snap detection and drops reason about
 const baseLayout = computed(() =>
   computeLayout({
-    bits: bitStore.visibleBits,
+    bits: canvasBits.value,
     packets: packetStore.packets,
   }),
 )
@@ -105,7 +118,7 @@ provide(BIT_COMMANDS, commands)
 
 // Frames before any gesture — drop membership is judged against these
 const baseFrames = computed(() =>
-  flowFrames(baseLayout.value, bitStore.visibleBits, packetStore.packets, flowStore.flows),
+  flowFrames(baseLayout.value, canvasBits.value, packetStore.packets, flowStore.flows),
 )
 
 const {
@@ -163,12 +176,12 @@ const liveLayout = computed(() => {
     return p
   })
   const bits = fd
-    ? bitStore.visibleBits.map((b) =>
+    ? canvasBits.value.map((b) =>
         b.packetId == null && inDraggedFlow(b.flowId)
           ? { ...b, x: b.x + fd.dx, y: b.y + fd.dy }
           : b,
       )
-    : bitStore.visibleBits
+    : canvasBits.value
   const layout = computeLayout({ bits, packets })
   const bd = bitDrag.value
   if (bd) layout.bitRects.set(bd.bitId, { x: bd.x, y: bd.y, w: CAPSULE_W, h: draggedHeight.value })
@@ -177,7 +190,7 @@ const liveLayout = computed(() => {
 
 // Frames follow their members live, including while one is dragged
 const liveFrames = computed(() =>
-  flowFrames(liveLayout.value, bitStore.visibleBits, packetStore.packets, flowStore.flows),
+  flowFrames(liveLayout.value, canvasBits.value, packetStore.packets, flowStore.flows),
 )
 
 const flow = computed(() =>
@@ -198,27 +211,9 @@ const filterDimmed = computed(() => {
   return dimmed
 })
 
-const dayKey = useToday()
-
-/**
- * Snoozed loose bits that "Hide snoozed" keeps off the canvas. They stay in the layout (so
- * stacks and snap targets do not move) and are only skipped when rendering; bits inside a
- * stack are never hidden.
- */
-const hiddenSnoozedIds = computed(() => {
-  const ids = new Set<string>()
-  if (!toolStore.filters.hideSnoozed) return ids
-  for (const id of liveLayout.value.looseBitIds) {
-    const bit = bitStore.visibleBits.find((b) => b.id === id)
-    if (bit && isSnoozed(bit, dayKey.value)) ids.add(id)
-  }
-  return ids
-})
-
 const looseBits = computed(() =>
   liveLayout.value.looseBitIds
-    .filter((id) => !hiddenSnoozedIds.value.has(id))
-    .map((id) => bitStore.visibleBits.find((b) => b.id === id)!)
+    .map((id) => canvasBits.value.find((b) => b.id === id)!)
     .filter(Boolean),
 )
 
@@ -275,11 +270,6 @@ function isDependencyDimmed(dep: Dependency): boolean {
 
 const dependencyItems = computed<DependencyItem[]>(() =>
   dependencyStore.dependencies.flatMap((dep) => {
-    if (
-      (dep.fromType === 'bit' && hiddenSnoozedIds.value.has(dep.fromId)) ||
-      (dep.toType === 'bit' && hiddenSnoozedIds.value.has(dep.toId))
-    )
-      return []
     const from = anchor(liveLayout.value, { type: dep.fromType, id: dep.fromId }, 'out')
     const to = anchor(liveLayout.value, { type: dep.toType, id: dep.toId }, 'in')
     if (!from || !to) return []
