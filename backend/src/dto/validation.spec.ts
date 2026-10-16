@@ -182,6 +182,20 @@ describe('Bit-Sheet-Felder', () => {
       await expect(validate(CreateBitDto, body)).rejects.toBeInstanceOf(BadRequestException)
   })
 
+  it('lehnt unmögliche Kalendertage für snoozedUntil mit 400 ab (nicht erst in Postgres)', async () => {
+    for (const snoozedUntil of ['2026-13-45', '2026-02-30', '2026-00-10', '2026-04-31']) {
+      await expect(validate(CreateBitDto, { title: 'T', snoozedUntil })).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+      await expect(validate(UpdateBitDto, { snoozedUntil })).rejects.toBeInstanceOf(
+        BadRequestException,
+      )
+    }
+    // a leap day exists in a leap year
+    const leap = await validate(UpdateBitDto, { snoozedUntil: '2028-02-29' })
+    expect(leap).toEqual({ snoozedUntil: '2028-02-29' })
+  })
+
   it('Update erlaubt null zum Zurücksetzen und completedCount, aber nie focusSeconds', async () => {
     const u = await validate(UpdateBitDto, {
       size: null,
