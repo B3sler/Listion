@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, toRaw, useTemplateRef, watch } from 'vue'
-import { CircleAlert, CircleCheck, Circle, X } from 'lucide-vue-next'
+import { Calendar, CircleAlert, CircleCheck, Circle, Flag, X } from 'lucide-vue-next'
 import { BIT_COMMANDS, type CreateFields } from '@/composables/useBitCommands'
 import { CAPSULE_W, capsuleHeight } from '@/composables/useFlowLayout'
 import { useCapturePlacement } from '@/composables/useCapturePlacement'
 import { useToday } from '@/composables/useToday'
 import { useBitStore } from '@/stores/bitStore'
 import { useSheetStore, type Ghost, type SeriesEntry } from '@/stores/sheetStore'
-import { dueToApi, fromDateKey } from '@/helpers/localDate'
+import { dueToApi, formatDayShort, fromDateKey, toDateKey } from '@/helpers/localDate'
+import { PRIORITY_NAME } from '@/helpers/bitMeta'
 import { DEFAULT_COLOR } from '@/helpers/palette'
 import {
   parseQuickEntry,
@@ -105,12 +106,25 @@ onUnmounted(() => {
 })
 
 // ── Series ───────────────────────────────────────────────────────────
-/** The series as shown: live titles from the store; a deleted bit drops out. */
+/** What a row shows after its title, as in the mockup: „📅 Fr  ⚑ !!“. */
+function rowMeta(fields: Pick<CreateFields, 'dueDate' | 'priority'>) {
+  const p = fields.priority
+  return {
+    due: fields.dueDate ? formatDayShort(toDateKey(fields.dueDate), today.value) : null,
+    priority:
+      p === 1 || p === 2 || p === 3 ? { marks: '!'.repeat(p), name: PRIORITY_NAME[p] } : null,
+  }
+}
+
+/** The series as shown: live fields from the store; a deleted bit drops out. */
 const rows = computed(() =>
   sheet.series.flatMap((item) => {
-    if (item.failed) return [{ item, title: item.fields?.title ?? '', done: false }]
+    if (item.failed) {
+      const fields = item.fields ?? { title: '' }
+      return [{ item, title: fields.title, done: false, ...rowMeta(fields) }]
+    }
     const bit = bitStore.bits.find((b) => b.id === item.id)
-    return bit ? [{ item, title: bit.title, done: bit.status === 2 }] : []
+    return bit ? [{ item, title: bit.title, done: bit.status === 2, ...rowMeta(bit) }] : []
   }),
 )
 
@@ -229,10 +243,30 @@ onMounted(focusInput)
               aria-hidden="true"
             />
             <span class="capture__row-title">{{ row.title }}</span>
+            <span v-if="row.due" class="capture__row-meta">
+              <Calendar :size="12" aria-hidden="true" />
+              <span class="capture__row-due">{{ row.due }}</span>
+            </span>
+            <span v-if="row.priority" class="capture__row-meta">
+              <Flag :size="12" aria-hidden="true" />
+              <span class="capture__row-priority" :aria-label="`Priority ${row.priority.name}`">{{
+                row.priority.marks
+              }}</span>
+            </span>
           </button>
           <div v-else class="capture__row capture__row--failed">
             <CircleAlert class="capture__mark" :size="15" aria-hidden="true" />
             <span class="capture__row-title">{{ row.title }}</span>
+            <span v-if="row.due" class="capture__row-meta">
+              <Calendar :size="12" aria-hidden="true" />
+              <span class="capture__row-due">{{ row.due }}</span>
+            </span>
+            <span v-if="row.priority" class="capture__row-meta">
+              <Flag :size="12" aria-hidden="true" />
+              <span class="capture__row-priority" :aria-label="`Priority ${row.priority.name}`">{{
+                row.priority.marks
+              }}</span>
+            </span>
             <span class="capture__failed">Couldn’t create</span>
             <button type="button" class="capture__retry pressable" @click="retry(row.item)">
               Retry
@@ -392,6 +426,20 @@ button.capture__row:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.capture__row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  color: var(--text2);
+  font-size: 0.75rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.capture__row--failed .capture__row-meta {
+  color: inherit;
 }
 
 .capture__failed {

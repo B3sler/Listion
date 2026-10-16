@@ -497,6 +497,41 @@ describe('Capture-Ansicht', () => {
     expect(sheet.open).toBe(false)
   })
 
+  it('zeigt in der Serie Fälligkeit und Priorität wie im Mockup', async () => {
+    const { w } = await openCapture()
+    await type(w, 'Steuer morgen !!')
+    await type(w, 'Belege')
+    await flush()
+    const [first, second] = w.findAll('.capture__row')
+    expect(first!.find('.capture__row-due').text()).toBe('Tomorrow')
+    expect(first!.find('.capture__row-priority').text()).toBe('!!')
+    expect(first!.find('.capture__row-priority').attributes('aria-label')).toBe('Priority Medium')
+    expect(second!.find('.capture__row-due').exists()).toBe(false)
+    expect(second!.find('.capture__row-priority').exists()).toBe(false)
+  })
+
+  it('folgt Fälligkeit und Priorität live aus dem Store', async () => {
+    const { w } = await openCapture()
+    await type(w, 'Steuer')
+    await flush()
+    const store = useBitStore()
+    const at = store.bits.findIndex((b) => b.id === createdId(0))
+    store.bits[at] = { ...store.bits[at]!, priority: 3, dueDate: dueToApi(todayKey()) }
+    await w.vm.$nextTick()
+    expect(w.find('.capture__row-due').text()).toBe('Today')
+    expect(w.find('.capture__row-priority').text()).toBe('!!!')
+  })
+
+  it('zeigt Fälligkeit und Priorität auch in einer gescheiterten Zeile', async () => {
+    commands.create.mockImplementationOnce(() => Promise.reject(new Error('offline')))
+    const { w } = await openCapture()
+    await type(w, 'Steuer morgen !')
+    await flush()
+    const row = w.find('.capture__row--failed')
+    expect(row.find('.capture__row-due').text()).toBe('Tomorrow')
+    expect(row.find('.capture__row-priority').text()).toBe('!')
+  })
+
   it('zeigt die neue Zeile sofort, noch bevor der Server antwortet', async () => {
     commands.create.mockImplementation((fields: CreateFields, pos) => {
       useBitStore().bits.push(bitWith({ ...fields, ...pos, id: fields.id! }))
@@ -560,13 +595,11 @@ describe('Capture-Ansicht', () => {
         Promise.reject(Object.assign(new Error('conflict'), { response: { status: 409 } })),
       )
     const store = useBitStore()
-    const fetchBit = vi
-      .spyOn(store, 'fetchBit')
-      .mockImplementation((id: string) => {
-        const bit = bitWith({ id, title: 'Steuer' })
-        store.bits.push(bit)
-        return Promise.resolve(bit)
-      })
+    const fetchBit = vi.spyOn(store, 'fetchBit').mockImplementation((id: string) => {
+      const bit = bitWith({ id, title: 'Steuer' })
+      store.bits.push(bit)
+      return Promise.resolve(bit)
+    })
     const { w, sheet } = await openCapture()
     await type(w, 'Steuer')
     await flush()
