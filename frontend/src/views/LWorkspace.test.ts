@@ -9,6 +9,7 @@ import { useSheetStore } from '@/stores/sheetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
 import { useHistoryStore } from '@/stores/historyStore'
 import { FOCUS_KEY, FOCUS_PENDING_KEY, useFocusStore } from '@/stores/focusStore'
+import { useToolStore } from '@/stores/toolStore'
 
 // Keine echten HTTP-Requests im Test: Stores laden Bits/Verbindungen über den API-Client.
 vi.mock('../helpers/api', () => ({
@@ -669,6 +670,87 @@ describe('LWorkspace', () => {
     expect(high.classes()).not.toContain('capsule--dimmed')
     expect(low.classes()).toContain('capsule--dimmed')
     localStorage.clear()
+  })
+
+  describe('Filter „Hide snoozed“', () => {
+    beforeEach(() => localStorage.clear())
+    afterEach(() => localStorage.clear())
+
+    const LATER = '2099-01-01'
+    const bit = (id: string, packetId: string | null, extra: Record<string, unknown> = {}) => ({
+      id,
+      title: `B${id}`,
+      status: 0,
+      x: Number(id) * 300,
+      y: 0,
+      packetId,
+      order: Number(id),
+      createdAt: '',
+      ...extra,
+    })
+
+    async function mountSheet() {
+      const { default: api } = await import('../helpers/api')
+      vi.mocked(api.get).mockImplementation((url: string) =>
+        Promise.resolve({
+          data:
+            url === '/api/bit'
+              ? [
+                  bit('1', null, { snoozedUntil: LATER }),
+                  bit('2', null),
+                  bit('3', '7', { snoozedUntil: LATER }),
+                  bit('4', '7'),
+                ]
+              : url === '/api/packet'
+                ? [{ id: '7', name: 'Release', x: 1500, y: 0 }]
+                : url === '/api/dependency'
+                  ? [
+                      { id: 'a', fromType: 'bit', fromId: '1', toType: 'bit', toId: '2' },
+                      { id: 'b', fromType: 'bit', fromId: '2', toType: 'bit', toId: '4' },
+                    ]
+                  : [],
+        }),
+      )
+      const wrapper = mount(LWorkspace, { global: { plugins: [router, createPinia()] } })
+      await router.isReady()
+      await new Promise((r) => setTimeout(r, 0))
+      setActivePinia((wrapper.vm as unknown as { $pinia: Pinia }).$pinia)
+      return wrapper
+    }
+    const capsule = (w: VueWrapper, title: string) =>
+      w.findAll('[data-node-type="bit"]').find((c) => c.text().includes(title))
+
+    it('blendet gesnoozte lose Bits und ihre Pfeile aus, Stapel-Mitglieder bleiben blass', async () => {
+      const wrapper = await mountSheet()
+      expect(wrapper.findAll('[data-node-type="bit"]')).toHaveLength(4)
+      expect(wrapper.findAll('.dep__line')).toHaveLength(2)
+
+      useToolStore().setHideSnoozed(true)
+      await wrapper.vm.$nextTick()
+      expect(capsule(wrapper, 'B1')).toBeUndefined()
+      expect(capsule(wrapper, 'B2')).toBeDefined()
+      const inStack = capsule(wrapper, 'B3')!
+      expect(inStack.classes()).toContain('capsule--snoozed')
+      expect(capsule(wrapper, 'B4')).toBeDefined()
+      // the arrow into the hidden bit goes, the one between visible bits stays
+      expect(wrapper.findAll('.dep__line')).toHaveLength(1)
+      wrapper.unmount()
+    })
+
+    it('dimmt mit nur diesem Schalter keine Kapsel und zeigt alles wieder beim Ausschalten', async () => {
+      const wrapper = await mountSheet()
+      const tools = useToolStore()
+      tools.setHideSnoozed(true)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findAll('.capsule--dimmed')).toHaveLength(0)
+      expect(wrapper.findAll('.dep--dimmed')).toHaveLength(0)
+
+      tools.setHideSnoozed(false)
+      await wrapper.vm.$nextTick()
+      expect(capsule(wrapper, 'B1')).toBeDefined()
+      expect(wrapper.findAll('.dep__line')).toHaveLength(2)
+      wrapper.unmount()
+    })
   })
 
   describe('Serie in der Capture-Ansicht', () => {

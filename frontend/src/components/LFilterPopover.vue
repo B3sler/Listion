@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import type { FilterState } from '@/stores/toolStore'
+import type { FilterGroup, FilterState } from '@/stores/toolStore'
 
 defineProps<{ filters: FilterState }>()
 
 const emit = defineEmits<{
-  toggle: [group: keyof FilterState, value: string | number]
+  toggle: [group: FilterGroup, value: string | number]
+  'toggle-snoozed': []
   reset: []
 }>()
 
 const GROUPS: {
-  key: keyof FilterState
+  key: FilterGroup
   title: string
   options: { value: string | number; label: string }[]
 }[] = [
@@ -41,7 +42,7 @@ const GROUPS: {
   },
 ]
 
-function isOn(filters: FilterState, key: keyof FilterState, value: string | number): boolean {
+function isOn(filters: FilterState, key: FilterGroup, value: string | number): boolean {
   return (filters[key] as (string | number)[]).includes(value)
 }
 </script>
@@ -64,6 +65,17 @@ function isOn(filters: FilterState, key: keyof FilterState, value: string | numb
         </button>
       </div>
     </section>
+    <button
+      class="filter__switch"
+      type="button"
+      role="switch"
+      data-filter="hide-snoozed"
+      :aria-checked="filters.hideSnoozed"
+      @click="emit('toggle-snoozed')"
+    >
+      <span class="filter__switch-label">Hide snoozed</span>
+      <span class="filter__track" aria-hidden="true"><span class="filter__thumb" /></span>
+    </button>
     <button class="filter__reset" type="button" @click="emit('reset')">Reset</button>
   </div>
 </template>
@@ -109,6 +121,54 @@ function isOn(filters: FilterState, key: keyof FilterState, value: string | numb
 .filter__chip[aria-pressed='true'] {
   background: var(--brand);
   color: hsl(0 0% 100%);
+}
+.filter__switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 2px 2px;
+  border: none;
+  background: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text1);
+  cursor: pointer;
+  text-align: left;
+}
+.filter__track {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--fill-press);
+  transition: background-color 160ms ease-out;
+}
+.filter__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(0 0% 100%);
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.25);
+  transition: transform 160ms ease-out;
+}
+.filter__switch[aria-checked='true'] .filter__track {
+  background: var(--brand);
+}
+.filter__switch[aria-checked='true'] .filter__thumb {
+  transform: translateX(14px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter__track,
+  .filter__thumb {
+    transition: none;
+  }
 }
 .filter__reset {
   display: block;

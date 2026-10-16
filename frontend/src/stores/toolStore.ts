@@ -9,7 +9,12 @@ export interface FilterState {
   workflow: WorkflowFilter[]
   priority: number[]
   due: DueFilter[]
+  /** Not a dimming filter: snoozed loose bits are not rendered at all. */
+  hideSnoozed: boolean
 }
+
+/** The chip groups; `hideSnoozed` is a switch of its own. */
+export type FilterGroup = 'workflow' | 'priority' | 'due'
 
 export const FILTER_STORAGE_KEY = 'listion-filter'
 
@@ -18,7 +23,7 @@ const PRIORITY: readonly number[] = [1, 2, 3]
 const DUE: readonly DueFilter[] = ['overdue', 'today', 'week']
 
 function emptyFilters(): FilterState {
-  return { workflow: [], priority: [], due: [] }
+  return { workflow: [], priority: [], due: [], hideSnoozed: false }
 }
 
 function pick<T>(value: unknown, allowed: readonly T[]): T[] {
@@ -35,6 +40,7 @@ function loadFilters(): FilterState {
       workflow: pick(parsed.workflow, WORKFLOW),
       priority: pick(parsed.priority, PRIORITY),
       due: pick(parsed.due, DUE),
+      hideSnoozed: parsed.hideSnoozed === true,
     }
   } catch {
     return emptyFilters()
@@ -66,17 +72,26 @@ export const useToolStore = defineStore('tool', () => {
   const filters = ref<FilterState>(loadFilters())
 
   const activeFilterCount = computed(
-    () => filters.value.workflow.length + filters.value.priority.length + filters.value.due.length,
+    () =>
+      filters.value.workflow.length +
+      filters.value.priority.length +
+      filters.value.due.length +
+      (filters.value.hideSnoozed ? 1 : 0),
   )
 
   function setTool(tool: Tool) {
     activeTool.value = tool
   }
 
-  function toggleFilter<K extends keyof FilterState>(group: K, value: FilterState[K][number]) {
+  function toggleFilter<K extends FilterGroup>(group: K, value: FilterState[K][number]) {
     const list = filters.value[group] as FilterState[K][number][]
     const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
     filters.value = { ...filters.value, [group]: next }
+    saveFilters(filters.value)
+  }
+
+  function setHideSnoozed(value: boolean) {
+    filters.value = { ...filters.value, hideSnoozed: value }
     saveFilters(filters.value)
   }
 
@@ -105,6 +120,7 @@ export const useToolStore = defineStore('tool', () => {
     activeFilterCount,
     setTool,
     toggleFilter,
+    setHideSnoozed,
     resetFilters,
     handleShortcut,
   }

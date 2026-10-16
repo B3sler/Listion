@@ -51,6 +51,7 @@ describe('toolStore', () => {
       workflow: ['ready'],
       priority: [3],
       due: [],
+      hideSnoozed: false,
     })
     setActivePinia(createPinia())
     expect(useToolStore().activeFilterCount).toBe(2)
@@ -60,9 +61,49 @@ describe('toolStore', () => {
 
   it('startet mit leeren Filtern bei kaputtem localStorage', () => {
     localStorage.setItem(FILTER_STORAGE_KEY, '{not json')
-    expect(useToolStore().filters).toEqual({ workflow: [], priority: [], due: [] })
+    expect(useToolStore().filters).toEqual({
+      workflow: [],
+      priority: [],
+      due: [],
+      hideSnoozed: false,
+    })
     setActivePinia(createPinia())
     localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ workflow: 'x', priority: [9, 2] }))
-    expect(useToolStore().filters).toEqual({ workflow: [], priority: [2], due: [] })
+    expect(useToolStore().filters).toEqual({
+      workflow: [],
+      priority: [2],
+      due: [],
+      hideSnoozed: false,
+    })
+  })
+
+  it('zählt „Hide snoozed“ mit, speichert es und setzt es zurück', () => {
+    const s = useToolStore()
+    s.toggleFilter('priority', 3)
+    s.setHideSnoozed(true)
+    expect(s.filters.hideSnoozed).toBe(true)
+    expect(s.activeFilterCount).toBe(2)
+    expect(JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)!).hideSnoozed).toBe(true)
+    setActivePinia(createPinia())
+    const reloaded = useToolStore()
+    expect(reloaded.filters.hideSnoozed).toBe(true)
+    expect(reloaded.activeFilterCount).toBe(2)
+    reloaded.setHideSnoozed(false)
+    expect(reloaded.activeFilterCount).toBe(1)
+    reloaded.setHideSnoozed(true)
+    reloaded.resetFilters()
+    expect(reloaded.filters.hideSnoozed).toBe(false)
+    expect(reloaded.activeFilterCount).toBe(0)
+  })
+
+  it('liest ein nicht-boolesches hideSnoozed als aus', () => {
+    for (const bad of ['true', 1, null, [true]]) {
+      setActivePinia(createPinia())
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ hideSnoozed: bad }))
+      expect(useToolStore().filters.hideSnoozed).toBe(false)
+    }
+    setActivePinia(createPinia())
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ hideSnoozed: true }))
+    expect(useToolStore().filters.hideSnoozed).toBe(true)
   })
 })
