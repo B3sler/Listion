@@ -607,6 +607,28 @@ describe('LWorkspace', () => {
         }
       })
 
+      it('Done → In Progress im Sheet ist ein Schritt: ein Strg+Z stellt Done wieder her', async () => {
+        const { wrapper, history, sheet } = await mountWithHistory()
+        const bitStore = useBitStore()
+        bitStore.bits = bitStore.bits.map((b) => (b.id === '3' ? { ...b, status: 2 } : b))
+        sheet.openDetail('3')
+        await wrapper.vm.$nextTick()
+
+        await wrapper
+          .find('[aria-label="Status"]')
+          .findAll('[role="radio"]')
+          .find((r) => r.text() === 'In Progress')!
+          .trigger('click')
+        await vi.waitFor(() => expect(bitStore.bits.find((b) => b.id === '3')?.status).toBe(1))
+        await new Promise((r) => setTimeout(r, 0))
+
+        pressKey(document.body, { key: 'z', ctrlKey: true })
+        await vi.waitFor(() => expect(history.canRedo).toBe(true))
+        expect(bitStore.bits.find((b) => b.id === '3')?.status).toBe(2)
+        expect(history.canUndo).toBe(false)
+        wrapper.unmount()
+      })
+
       it('Verlassen (Abmelden) schließt das Sheet, leert die History und committet keinen Toast mehr', async () => {
         vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
         try {

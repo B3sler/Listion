@@ -378,12 +378,13 @@ async function setStatus(value: number) {
   if (!b || value === b.status) return
   if (value === 2) return complete()
   if (b.status === 2) {
+    // leaving Done is one step, also straight to In Progress (one undo restores Done)
     try {
-      await commands.reopen(b.id)
+      await commands.reopen(b.id, value === 1 ? 1 : 0)
     } catch (e) {
-      return report(e)
+      report(e)
     }
-    if (value === 0) return
+    return
   }
   await editor.set({ status: value }, 'Status')
 }
