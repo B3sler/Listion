@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import LSegmented from './LSegmented.vue'
@@ -6,6 +6,7 @@ import LMiniCalendar from './LMiniCalendar.vue'
 import LPropertyChip from './LPropertyChip.vue'
 import LDatePicker from './LDatePicker.vue'
 import LQuickEntryInput from './LQuickEntryInput.vue'
+import LHoldToComplete from './LHoldToComplete.vue'
 import type { QuickEntry } from '@/helpers/quickEntry'
 import { Calendar } from 'lucide-vue-next'
 
@@ -526,5 +527,186 @@ describe('LQuickEntryInput', () => {
       props: { modelValue: '', entry: entry([]), ariaLabel: 'Next bit' },
     })
     expect(w.find('input').attributes('aria-label')).toBe('Next bit')
+  })
+})
+
+describe('LHoldToComplete', () => {
+  const vibrate = vi.fn()
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vibrate.mockClear()
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(navigator, 'vibrate')
+  })
+
+  function mountHold(props: { done?: boolean; color?: string } = {}) {
+    return mount(LHoldToComplete, { props: { done: false, color: '#ef4444', ...props } })
+  }
+
+  /** Scale of the check mark, read back from its inline transform. */
+  function checkScale(w: ReturnType<typeof mountHold>): number {
+    const match = /scale\(([\d.]+)\)/.exec(w.find('.hold__check').attributes('style') ?? '')
+    return match ? Number(match[1]) : NaN
+  }
+
+  /** Fill of the ring, 0 … 1, read back from the SVG stroke. */
+  function fill(w: ReturnType<typeof mountHold>): number {
+    const ring = w.find('.hold__ring')
+    const total = Number(ring.attributes('stroke-dasharray'))
+    return 1 - Number(ring.attributes('stroke-dashoffset')) / total
+  }
+
+  it('hakt nicht ab, wenn vor 600 ms losgelassen wird', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(599)
+    await w.find('button').trigger('pointerup')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(w.emitted('complete')).toBeUndefined()
+    expect(vibrate).not.toHaveBeenCalled()
+  })
+
+  it('hakt nach 600 ms Halten genau einmal ab und vibriert mit 10', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(w.emitted('complete')).toHaveLength(1)
+    expect(vibrate).toHaveBeenCalledWith(10)
+    await w.find('button').trigger('pointerup')
+    await w.find('button').trigger('click')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(w.emitted('complete')).toHaveLength(1)
+    expect(w.emitted('reopen')).toBeUndefined()
+  })
+
+  it('füllt den Ring linear mit der Haltezeit', async () => {
+    const w = mountHold()
+    expect(fill(w)).toBe(0)
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(300)
+    expect(fill(w)).toBeGreaterThan(0.4)
+    expect(fill(w)).toBeLessThan(0.55)
+  })
+
+  it('federt den Ring beim frühen Loslassen auf 0 zurück', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(400)
+    const held = fill(w)
+    expect(held).toBeGreaterThan(0.5)
+    await w.find('button').trigger('pointerup')
+    await vi.advanceTimersByTimeAsync(100)
+    expect(fill(w)).toBeLessThan(held)
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(fill(w)).toBe(0)
+  })
+
+  it('macht beim erneuten Drücken vom aktuellen Ringstand weiter', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(400)
+    await w.find('button').trigger('pointerup')
+    await vi.advanceTimersByTimeAsync(50)
+    const mid = fill(w)
+    expect(mid).toBeGreaterThan(0)
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(100)
+    expect(fill(w)).toBeGreaterThan(mid)
+  })
+
+  it('zeigt nach einem Druck unter 200 ms 1,5 s lang den Tooltip', async () => {
+    const w = mountHold()
+    expect(w.find('[role="tooltip"]').exists()).toBe(false)
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(100)
+    await w.find('button').trigger('pointerup')
+    const tip = w.find('[role="tooltip"]')
+    expect(tip.exists()).toBe(true)
+    expect(tip.text()).toBe('Hold to complete')
+    expect(w.find('button').attributes('aria-describedby')).toBe(tip.attributes('id'))
+    await vi.advanceTimersByTimeAsync(1499)
+    expect(w.find('[role="tooltip"]').exists()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(w.find('[role="tooltip"]').exists()).toBe(false)
+    expect(w.find('button').attributes('aria-describedby')).toBeUndefined()
+  })
+
+  it('zeigt nach einem längeren, abgebrochenen Druck keinen Tooltip', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(300)
+    await w.find('button').trigger('pointerup')
+    expect(w.find('[role="tooltip"]').exists()).toBe(false)
+  })
+
+  it('hakt per Leertaste und Enter sofort ab', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('keydown', { key: ' ' })
+    expect(w.emitted('complete')).toHaveLength(1)
+    expect(vibrate).toHaveBeenCalledWith(10)
+    const w2 = mountHold()
+    await w2.find('button').trigger('keydown', { key: 'Enter' })
+    expect(w2.emitted('complete')).toHaveLength(1)
+  })
+
+  it('öffnet ein erledigtes Bit mit einem normalen Klick wieder', async () => {
+    const w = mountHold({ done: true })
+    await w.find('button').trigger('click')
+    expect(w.emitted('reopen')).toHaveLength(1)
+    expect(w.emitted('complete')).toBeUndefined()
+  })
+
+  it('startet bei einem erledigten Bit keinen Haltevorgang', async () => {
+    const w = mountHold({ done: true })
+    await w.find('button').trigger('pointerdown')
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(w.emitted('complete')).toBeUndefined()
+  })
+
+  it('ignoriert einen Klick ohne Halten bei einem offenen Bit', async () => {
+    const w = mountHold()
+    await w.find('button').trigger('click')
+    expect(w.emitted('complete')).toBeUndefined()
+    expect(w.emitted('reopen')).toBeUndefined()
+  })
+
+  it('lässt den Haken beim Erledigen mit Überschwingen einspringen', async () => {
+    const w = mountHold()
+    const scale = () => checkScale(w)
+    expect(scale()).toBe(0)
+    await w.setProps({ done: true })
+    let peak = 0
+    for (let i = 0; i < 60; i++) {
+      await vi.advanceTimersByTimeAsync(16)
+      peak = Math.max(peak, scale())
+    }
+    expect(peak).toBeGreaterThan(1)
+    expect(scale()).toBe(1)
+  })
+
+  it('zeigt bei Reduced Motion den Haken ohne Überschwingen', async () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('reduced-motion') }))
+    const w = mountHold()
+    await w.setProps({ done: true })
+    await vi.advanceTimersByTimeAsync(16)
+    expect(checkScale(w)).toBe(1)
+  })
+
+  it('zeigt ein bereits erledigtes Bit sofort mit Haken und vollem Ring', () => {
+    const w = mountHold({ done: true })
+    expect(checkScale(w)).toBe(1)
+    expect(fill(w)).toBe(1)
+    expect(w.find('button').attributes('aria-pressed')).toBe('true')
+  })
+
+  it('färbt den Ring mit der übergebenen Farbe', () => {
+    const w = mountHold({ color: '#22c55e' })
+    expect(w.find('button').attributes('style')).toContain('#22c55e')
   })
 })
