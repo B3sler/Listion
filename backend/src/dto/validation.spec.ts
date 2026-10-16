@@ -158,3 +158,42 @@ describe('Request-Validierung', () => {
     ).rejects.toBeInstanceOf(BadRequestException)
   })
 })
+
+describe('Bit-Sheet-Felder', () => {
+  it('akzeptiert size, recurrence und snoozedUntil beim Erstellen', async () => {
+    const bit = await validate(CreateBitDto, {
+      title: 'T',
+      size: 3,
+      recurrence: 'weekdays',
+      snoozedUntil: '2026-10-21',
+    })
+    expect(bit).toMatchObject({ size: 3, recurrence: 'weekdays', snoozedUntil: '2026-10-21' })
+  })
+
+  it('lehnt ungültige Werte ab', async () => {
+    for (const body of [
+      { title: 'T', size: 0 },
+      { title: 'T', size: 5 },
+      { title: 'T', recurrence: 'yearly' },
+      { title: 'T', snoozedUntil: '21.10.2026' },
+      { title: 'T', snoozedUntil: '2026-10-21T00:00:00Z' },
+    ])
+      await expect(validate(CreateBitDto, body)).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('Update erlaubt null zum Zurücksetzen und completedCount, aber nie focusSeconds', async () => {
+    const u = await validate(UpdateBitDto, {
+      size: null,
+      recurrence: null,
+      snoozedUntil: null,
+      completedCount: 4,
+      focusSeconds: 9999,
+    })
+    expect(u).toEqual({ size: null, recurrence: null, snoozedUntil: null, completedCount: 4 })
+    await expect(validate(UpdateBitDto, { completedCount: -1 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    )
+    const c = await validate(CreateBitDto, { title: 'T', completedCount: 3, focusSeconds: 5 })
+    expect(c).toEqual({ title: 'T' })
+  })
+})
