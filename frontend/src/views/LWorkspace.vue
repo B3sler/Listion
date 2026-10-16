@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { Fullscreen, ScanSearch, ZoomIn, ZoomOut } from 'lucide-vue-next'
 import LContextMenu from '@/components/LContextMenu.vue'
-import LBitPanel from '@/components/LBitPanel.vue'
 import LBitCapsule from '@/components/LBitCapsule.vue'
 import LPacketStack from '@/components/LPacketStack.vue'
 import LDependencyLayer from '@/components/LDependencyLayer.vue'
@@ -10,6 +9,7 @@ import LFlowFrame from '@/components/LFlowFrame.vue'
 import LLassoPath from '@/components/LLassoPath.vue'
 import LPacketsHud from '@/components/LPacketsHud.vue'
 import LSplash from '@/components/LSplash.vue'
+import LBitSheet from '@/components/sheet/LBitSheet.vue'
 import LTaskbar from '@/layout/LTaskbar.vue'
 import LMenu from '@/layout/LMenu.vue'
 import { useTheme } from '@/composables/useTheme.ts'
@@ -34,6 +34,7 @@ import { usePacketStore } from '@/stores/packetStore'
 import { useDependencyStore } from '@/stores/dependencyStore'
 import { useFlowStore } from '@/stores/flowStore'
 import { useToolStore } from '@/stores/toolStore'
+import { useSheetStore } from '@/stores/sheetStore'
 import type { Dependency, DependencyItem, PacketCard } from '@/types/flow'
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -61,6 +62,7 @@ const packetStore = usePacketStore()
 const dependencyStore = useDependencyStore()
 const flowStore = useFlowStore()
 const toolStore = useToolStore()
+const sheetStore = useSheetStore()
 const actions = useFlowActions()
 
 function toCanvas(clientX: number, clientY: number) {
@@ -377,25 +379,16 @@ function handleTouchEndWithLongPress() {
   handleTouchEnd()
 }
 
-// --- Detail panel ---
-const showPanel = ref(false)
-const panelMode = ref<'create' | 'edit'>('create')
-const panelBitId = ref<string | null>(null)
-const panelBit = computed(() =>
-  panelBitId.value !== null ? bitStore.bits.find((b) => b.id === panelBitId.value) : undefined,
-)
-
+// --- Bit sheet ---
 function createBit() {
   closeContextMenu()
-  panelMode.value = 'create'
-  panelBitId.value = null
-  showPanel.value = true
+  // a bit created inside a flow frame joins that flow
+  const flowId = flowAt(contextCanvasPos.value, baseFrames.value, flowStore.flows)
+  sheetStore.openCapture(contextCanvasPos.value, flowId)
 }
 
 function openBitDetail(id: string) {
-  panelMode.value = 'edit'
-  panelBitId.value = id
-  showPanel.value = true
+  sheetStore.openDetail(id)
 }
 
 /** The status circle ticks a bit off; ticking a done bit re-opens it. */
@@ -408,45 +401,6 @@ async function toggleDone(id: string) {
   } catch (e) {
     console.error('Failed to update bit status:', e)
   }
-}
-
-async function onPanelConfirm(data: {
-  title: string
-  status: number
-  priority: number | undefined
-  dueDate: string | undefined
-  notes: string | undefined
-  color: string
-}) {
-  if (panelMode.value === 'create') {
-    showPanel.value = false
-    try {
-      // a bit created inside a flow frame joins that flow
-      const flowId = flowAt(contextCanvasPos.value, baseFrames.value, flowStore.flows)
-      await bitStore.createBit({
-        ...data,
-        x: contextCanvasPos.value.x - CAPSULE_W / 2,
-        y: contextCanvasPos.value.y - CAPSULE_H / 2,
-        ...(flowId !== null ? { flowId } : {}),
-      })
-    } catch (e) {
-      console.error('Failed to create bit:', e)
-    }
-  } else if (panelBitId.value !== null) {
-    try {
-      await bitStore.updateBit(panelBitId.value, data)
-      showPanel.value = false
-    } catch (e) {
-      console.error('Failed to update bit:', e)
-    }
-  }
-}
-
-async function onPanelDelete() {
-  if (panelBitId.value === null) return
-  const id = panelBitId.value
-  showPanel.value = false
-  await actions.deleteBit(id, baseLayout.value)
 }
 
 const menuItems = [{ label: 'Create Bit', icon: '+', action: createBit }]
@@ -509,16 +463,7 @@ onUnmounted(() => {
 
 <template>
   <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden">
-    <Transition name="sheet">
-      <LBitPanel
-        v-if="showPanel"
-        :mode="panelMode"
-        :bit="panelBit"
-        @confirm="onPanelConfirm"
-        @cancel="showPanel = false"
-        @delete="onPanelDelete"
-      />
-    </Transition>
+    <LBitSheet />
 
     <div
       ref="containerRef"
@@ -533,8 +478,8 @@ onUnmounted(() => {
       @touchend="handleTouchEndWithLongPress"
       :style="{
         cursor: isDragging ? 'grabbing' : 'default',
-        transform: showPanel ? 'translateX(300px)' : 'translateX(0)',
-        transition: 'transform var(--spring-duration) var(--ease-spring)',
+        // follows the sheet live (finger and spring), so no transition of its own
+        transform: `translateX(${sheetStore.revealed}px)`,
       }"
     >
       <div class="absolute inset-0 origin-top-left" :style="{ transform: canvasTransform }">
@@ -778,27 +723,6 @@ onUnmounted(() => {
   height: 1px;
   margin: 3px 0;
   background: var(--separator);
-}
-
-/* ── Bit panel sheet: enters and leaves along the same path ── */
-.sheet-enter-active,
-.sheet-leave-active {
-  transition:
-    transform var(--spring-duration) var(--ease-spring),
-    opacity 0.25s ease;
-}
-.sheet-enter-from,
-.sheet-leave-to {
-  transform: translateX(-100%);
-  opacity: 0.6;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sheet-enter-from,
-  .sheet-leave-to {
-    transform: none;
-    opacity: 0;
-  }
 }
 
 /* Loose capsules glide to new positions; while dragged they follow the pointer 1:1 */

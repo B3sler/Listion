@@ -141,6 +141,19 @@ function closeChip(key: ChipKey) {
   }
 }
 
+/**
+ * For the sheet's Esc: closes an open picker and reports whether there was one. (The picker
+ * handles Esc itself while focus is inside it; this covers focus anywhere else.)
+ */
+function closeOpenChip(): boolean {
+  const key = open.value
+  if (key === null) return false
+  closeChip(key)
+  return true
+}
+
+defineExpose({ closeOpenChip })
+
 watch(
   () => props.bitId,
   async () => {
