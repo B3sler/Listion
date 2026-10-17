@@ -68,6 +68,9 @@ docker compose -f docker-compose.prod.yml up -d
 
 Requires `.env` with real secrets (see below). `synchronize` is disabled in production; the backend applies TypeORM migrations on startup instead (`backend/src/migrations/`, registered explicitly in `backend/src/data-source.ts`). After any entity change, generate a migration — workflow in DOCKER.md → "Database schema and migrations".
 
+### Raspberry Pi test server
+A Pi 4 follows `main`: after green CI, `.github/workflows/publish-images.yml` pushes arm64 images to GHCR, and a systemd timer on the Pi pulls them (`docker-compose.pi.yml`, `deploy/pi/`). It is public through Tailscale Funnel, so nginx and the backend's `trust proxy` must keep resolving the real client IP. Setup: `docs/raspberry-pi.md`.
+
 ## Environment Variables
 
 All required. No insecure fallbacks in code. Use `.env.example` as template.
