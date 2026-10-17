@@ -1,0 +1,15 @@
+# Raspberry Pi test server, layered on top of docker-compose.prod.yml:
+#   COMPOSE_FILE=docker-compose.prod.yml:docker-compose.pi.yml
+# Runs the arm64 images that .github/workflows/publish-images.yml pushes to GHCR
+# instead of building them on the Pi. Setup: docs/raspberry-pi.md.
+services:
+  backend:
+    image: ghcr.io/b3sler/listion-backend:latest
+    build: !reset null
+
+  frontend:
+    image: ghcr.io/b3sler/listion-frontend:latest
+    build: !reset null
+    # Loopback only: the outside world reaches it through Tailscale Funnel.
+    ports: !override
+      - "127.0.0.1:8080:80"

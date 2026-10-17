@@ -1,0 +1,10 @@
+# Enable with the same instance name as the service: listion-deploy@jonas.timer
+[Unit]
+Description=Check for a new Listion version every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
