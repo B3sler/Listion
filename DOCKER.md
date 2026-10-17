@@ -174,6 +174,10 @@ ALTER TABLE "bit" ADD COLUMN "flowId" integer NULL;
 ALTER TABLE "packet" ADD COLUMN "flowId" integer NULL;
 ```
 
+### Raspberry Pi test server
+
+A Pi follows `main` with the arm64 images CI pushes to GHCR and is public through Tailscale Funnel: see [docs/raspberry-pi.md](docs/raspberry-pi.md).
+
 ### Stop Production Environment
 
 ```bash
