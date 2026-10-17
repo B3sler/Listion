@@ -1,5 +1,6 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import { Logger, ValidationPipe } from '@nestjs/common'
 import { AppModule } from './app.module.js'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
@@ -12,7 +13,14 @@ async function bootstrap() {
     throw new Error('JWT_SECRET is not set (see backend/.env.example)')
   }
 
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
+
+  // In production the backend is only reachable through nginx, which forwards the
+  // client's address. Without this every request carries nginx's IP and all users
+  // share one rate-limit bucket.
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1)
+  }
 
   app.use(helmet())
   app.use(cookieParser())
